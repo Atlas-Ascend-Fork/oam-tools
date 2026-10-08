@@ -80,13 +80,13 @@ Before setting up the environment, confirm that your hardware is within the supp
 
 ## 🚀 Quick Start: From Source to a Verified Install
 
-The shortest path from zero to a working install, using the default root installation path — four steps to a usable toolkit. For third-party library customization, offline builds, debug builds and other full build options, plus per-component test verification, see the "Source Code Compilation" and "Installation and Verification" sections below.
+The shortest path from zero to a working install, using the default root installation path — complete the following four sections in order to get a usable toolkit. For third-party library customization, offline builds, debug builds and other full build options, plus per-component test verification, see the "Source Code Compilation" and "Installation and Verification" sections below.
 
-### 1. Install Dependencies
+### Install Dependencies
 
 Follow the [Quick Installation Guide](./docs/en/quick_install.md) to install the CANN software packages and build dependencies.
 
-### 2. Build
+### Build
 
 ```bash
 # For non-root users, replace /usr/local with ${HOME}
@@ -96,13 +96,13 @@ bash build.sh
 
 The build produces `build_out/cann-oam-tools_<cann_version>_linux-<arch>.run` (`<arch>` is `x86_64` or `aarch64`).
 
-### 3. Install
+### Install the Package
 
 ```bash
 ./build_out/cann-oam-tools_<cann_version>_linux-<arch>.run --full
 ```
 
-### 4. Verify
+### Verify the Installation
 
 Reload the environment variables and invoke asys — printing the help output means the installation succeeded:
 
