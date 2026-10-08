@@ -40,7 +40,8 @@ stages:
             with:
               repo_name: ${{ env.repo_name }}
               target_branch: ${{ env.TARGET_BRANCH }}
-              repo_url: ${{ vars.CI_PATH }}
+              comment: ${{ atomgit.event.comment.body }}
+              token: ${{ secrets.TESTTOKEN }}
         runs-on: ['self-hosted', 'arch=x64', 'spec=small']
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/ubuntu20.04.05_x86:k8s_v1.1006
@@ -70,7 +71,7 @@ stages:
       JOB_x86_compile_ubuntu24:
         name: Compile_Ascend_X86_ubuntu24
         uses: .gitcode/workflows/compile_action.yml
-        with: 
+        with:
           task_name: 'Compile_Ascend_X86_ubuntu24'
           image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_X86_ubuntu24  }}
           arch: 'x64'
@@ -92,7 +93,7 @@ stages:
     pre:
     - type: auto
     fail-fast: false
-  stage3: 
+  stage3:
     name: UT
     select: selected_by_default
     jobs:
@@ -107,7 +108,7 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-              token: ${{secrets.GIT_TOKEN}}
+              allow-unsafe-pr-checkout: true
           -
             name: api_check
             identifier: api_check
@@ -205,7 +206,8 @@ stages:
             identifier: process_checkout
             uses: checkout
             with:
-              token: ${{secrets.GIT_TOKEN}}
+              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
               path: "./runner"
           -
             name: download

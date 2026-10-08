@@ -1,8 +1,8 @@
-name: compile_action 
+name: compile_action
 
 on:
   workflow_call:
-    inputs: 
+    inputs:
       task_name:
         required: true
         type: string
@@ -22,13 +22,13 @@ jobs:
   JOB_compile:
     name: Compile
     steps:
-      - 
+      -
         name: Checkout
         identifier: process_checkout
         uses: checkout
         with:
           ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
-          token: ${{secrets.GIT_TOKEN}}
+          allow-unsafe-pr-checkout: true
       -
         name: download
         uses: obs-download
@@ -91,7 +91,7 @@ jobs:
           access-key: ${{ secrets.AK }}
           secret-key: ${{ secrets.SK }}
           artifact-path: "${{ steps.process_checkout.outputs.path }}/build_out/*.run"
-          object-prefix: ${{ env.obs_path }}/  
+          object-prefix: ${{ env.obs_path }}/
     if: "${{ default() }}"
     runs-on: ['self-hosted', 'arch=${{ inputs.arch }}', 'spec=xlarge']
     container:
