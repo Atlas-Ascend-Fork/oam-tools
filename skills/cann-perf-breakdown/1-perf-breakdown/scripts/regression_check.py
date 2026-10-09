@@ -21,7 +21,9 @@ L3: stages keys 与 stage_indices 集合相等
 L4: runtime_auxiliary 名字集合相等
 L5: 每个 layer_type 的叶节点路径集合 Jaccard ≥ 0.95
 L6: 每个叶节点的 op_indices 集合 Jaccard ≥ 0.90
-L7: op 总覆盖（union of op_indices）相等
+L7: op 总覆盖相等；v2 使用 collect_ownership()['per_owner']，包括每次实际调用的
+    trace_instances、stages、runtime_auxiliary、excluded_profiler_ops、unmapped_ops，
+    不计 structures 代表模板
 L8: 11 类算子的 shape_semantic 字段存在性 100%
 """
 import argparse
@@ -69,6 +71,13 @@ def collect_leaves(layer_struct):
 
 
 def collect_all_op_indices(config):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import breakdown_common as bc
+
+    if bc.detect_schema_version(config) == 2:
+        # Templates only describe representative calls; ownership includes every
+        # observed invocation and the existing runtime/excluded/unmapped categories.
+        return set(bc.collect_ownership(config)['per_owner'])
     out = set()
 
     def walk(node):
@@ -142,12 +151,24 @@ def check_regression(baseline, new, l5_threshold=0.95, l6_threshold=0.90):
     })
 
     # L3
-    bl_st = set((baseline.get('stages') or {}).keys())
-    new_st = set((new.get('stages') or {}).keys())
+    bl_stages = baseline.get('stages') or {}
+    new_stages = new.get('stages') or {}
+    bl_st = set(bl_stages)
+    new_st = set(new_stages)
+    stage_mismatches = []
+    for name in sorted(bl_st & new_st):
+        # Match the single-instance default used by compute_metrics/report.
+        bl_indices = set(bl_stages[name].get('stage_indices') or [0])
+        new_indices = set(new_stages[name].get('stage_indices') or [0])
+        if bl_indices != new_indices:
+            stage_mismatches.append({'stage': name,
+                                     'baseline': sorted(bl_indices),
+                                     'new': sorted(new_indices)})
     findings.append({
         'id': 'L3',
-        'pass': bl_st == new_st,
-        'detail': f'stages baseline={sorted(bl_st)}, new={sorted(new_st)}',
+        'pass': bl_st == new_st and not stage_mismatches,
+        'detail': {'baseline_stages': sorted(bl_st), 'new_stages': sorted(new_st),
+                   'stage_indices_mismatches': stage_mismatches},
     })
 
     # L4
