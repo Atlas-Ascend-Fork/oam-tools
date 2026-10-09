@@ -2,7 +2,7 @@
 
 ## 综合流程图
 
-下图分两层展示：**上层**是一条日志流经的数据流水线（每条连线标注流动的产物），**下层**是驱动各阶段的三个 Skill 及其能力组件。虚线「驱动」箭头表示哪个 Skill 支撑哪一步，底部虚线表示迭代闭环。
+下图分两层展示：**上层**是一条日志流经的数据流水线（每条连线标注流动的产物），**下层**是驱动各阶段的五个 Skill 及其能力组件。泛化日志请求先进入 orchestrator-skill，再由它协调 eval-skill、trace-skill 和 metric-skill；trace-skill 在 diagnose 阶段生成时间线与调用链。虚线「驱动」箭头表示哪个 Skill 支撑哪一步，底部虚线表示迭代闭环。
 
 评估结论产出后先经过 **🎯 可信度评估**：高可信结论继续进入度量报告，并沉淀到诊断知识库的案例库，增强下一次诊断的案例匹配；低可信结论回到补采日志环节补齐证据，不进入报告定论。
 
@@ -14,18 +14,26 @@ flowchart TB
         A["🔧 算子执行<br/>训推模型"]
         B["📋 完整日志"]
         EV["🧭 评估结论"]
+        TR["🧵 时间线与调用链"]
         CF["🎯 可信度评估<br/>HIGH / MEDIUM / LOW"]
         MR["📈 度量报告"]
         FX["✏️ 修复优化"]
         A ==>|"原始日志"| B
         B ==>|"清洗 + 诊断"| EV
-        EV ==>|"五维打分"| CF
+        EV ==>|"trace-skill"| TR
+        TR ==>|"五维打分"| CF
         CF ==>|"量化 + 基线对比"| MR
         MR ==>|"问题清单 + 建议"| FX
     end
     FX -.->|"🔁 迭代闭环：重跑 → 复测"| A
 
-    %% ===== 下层：三个 Skill 的能力组件 =====
+    %% ===== 下层：五个 Skill 的能力组件 =====
+    subgraph ORCH["🧭 编排 Skill · 统一入口"]
+        direction TB
+        OG1["案例检索 · 场景识别 · 路由"]
+        OG2["时间线证据 → diagnosis.md"]
+    end
+
     subgraph COLLECT["📥 采集 Skill · 可选"]
         direction TB
         C1["msnpureport / host / plog 采集文档"]
@@ -39,6 +47,11 @@ flowchart TB
         EG3["崩溃专项<br/>coredump/Stackcore 手册 · 报告模板"]
         EG4["可信度评估<br/>五维评分规范 · assess_confidence.py"]
         EG5["案例沉淀<br/>入库规范 · promote_case.py"]
+    end
+
+    subgraph TRACE["🧵 Trace Skill · 时间线与调用链"]
+        direction TB
+        TR1["fault-trace.json · tracing-report.html"]
     end
 
     subgraph KBS["🧠 诊断知识库回流"]
@@ -58,8 +71,10 @@ flowchart TB
     CF -.->|"LOW / 证据不足：补采日志"| B
 
     %% ===== 能力层驱动主线 =====
+    ORCH -. 驱动 .-> EV
     COLLECT -. 驱动 .-> B
     EVAL -. 驱动 .-> EV
+    TRACE -. 驱动 .-> TR
     EG4 -. 驱动 .-> CF
     EG5 -. 驱动 .-> KB
     METRIC -. 驱动 .-> MR
@@ -69,6 +84,7 @@ flowchart TB
     classDef collect fill:#edf5ff,stroke:#1677ff,color:#171a1d;
     classDef eval fill:#fdeef0,stroke:#e6002d,color:#171a1d;
     classDef metric fill:#eef9f4,stroke:#18a66b,color:#171a1d;
+    classDef trace fill:#fff2e8,stroke:#fa8c16,color:#171a1d;
     classDef gate fill:#fff7e6,stroke:#d48806,stroke-width:2px,color:#171a1d,font-weight:bold;
     classDef kb fill:#f0e6ff,stroke:#722ed1,color:#171a1d;
     class A,B,EV,MR,FX flow;
@@ -79,11 +95,13 @@ flowchart TB
     class EG5 kb;
     class KB kb;
     class MG1,MG2 metric;
+    class TR1 trace;
     style PIPE fill:#f4f5f2,stroke:#171a1d,stroke-width:2px;
     style COLLECT fill:#edf5ff,stroke:#1677ff,stroke-dasharray:6 4;
     style EVAL fill:#fdeef0,stroke:#e6002d;
     style KBS fill:#f0e6ff,stroke:#722ed1;
     style METRIC fill:#eef9f4,stroke:#18a66b;
+    style TRACE fill:#fff2e8,stroke:#fa8c16;
 ```
 
 ## 流程说明
@@ -93,6 +111,7 @@ flowchart TB
 | **算子执行 / 训推模型** | 运行算子或训练/推理模型，产生原始运行日志 |
 | **采集 Skill（可选）** | 当日志不完整或需要从多源采集时启用；包含 msnpureprot、host、plog 三类采集文档及采集脚本 |
 | **完整的日志** | 经采集（或直接获取）后的完整日志数据，崩溃场景可包含 coredump / Stackcore / asys / msnpureport 产物 |
+| **orchestrator-skill** | 统一入口，先做案例检索和场景识别，再路由后续能力；时间线写入诊断产物 |
 | **评估 Skill** | 对日志进行清洗、结合背景知识、故障处理参考、coredump 分析手册和案例库进行评估分析 |
 | **🎯 可信度评估** | 对评估结论本身按五维模型（证据完整性/一致性/因果链/复现验证/知识对齐）打分，输出 HIGH / MEDIUM / LOW / INSUFFICIENT 等级，决定结论能否作定论、能否入库 |
 | **🧠 案例库沉淀** | HIGH 且关键项满足的报告写入 `cases.md`，MEDIUM 或待补证的进 `cases-pending.md` 候选区；沉淀后的案例反哺下一次诊断的 Step 5 案例匹配 |

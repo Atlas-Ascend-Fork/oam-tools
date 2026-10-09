@@ -156,11 +156,25 @@
       color: var(--muted);
       padding-left: 12px;
       border-left: 1px solid var(--line-strong);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-family: var(--font-ui);
       font-size: 14px;
       line-height: 26px;
       font-weight: 400;
       white-space: nowrap;
+    }
+    .confidence-icon {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 24px;
+      transform: translateY(5px);
+    }
+    .confidence-text {
+      display: inline-block;
+      transform: translateY(5px);
+      font-weight: 700;
     }
     .top-spacer { flex: 1; }
     .toolbar { display: flex; align-items: center; gap: 8px; }
@@ -359,6 +373,45 @@
     }
     .step-title { min-height: 43px; font-size: 14px; line-height: 22px; font-weight: 500; }
     .step-copy { color: var(--muted); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+
+    .report-component-chain-scroll { overflow-x: auto; padding: 8px 1px 12px; }
+    .report-component-chain-stage { position: relative; min-width: 100%; min-height: 150px; padding-top: 10px; }
+    .report-component-chain-row { position: relative; z-index: 2; display: flex; align-items: stretch; gap: 34px; }
+    .report-component-card {
+      position: relative;
+      flex: 0 0 138px;
+      min-height: 124px;
+      padding: 13px 11px;
+      border: 1px solid var(--line-strong);
+      border-left: 4px solid var(--role-color, var(--line-strong));
+      border-radius: 12px;
+      color: var(--text);
+      background: var(--surface-2);
+      text-align: left;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+    }
+    .report-component-card:hover { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 16%, transparent); }
+    .report-component-card[data-fault-role="fault-source"] { --role-color: var(--red); --role-bg: var(--red-bg); --role-text: var(--red); }
+    .report-component-card[data-fault-role="direct-trigger"] { --role-color: var(--orange); --role-bg: var(--orange-bg); --role-text: var(--orange); }
+    .report-component-card[data-fault-role="propagation"] { --role-color: var(--green); --role-bg: var(--green-bg); --role-text: var(--green); }
+    .report-component-card[data-fault-role="affected"],
+    .report-component-card[data-fault-role="business-error"] { --role-color: var(--blue); --role-bg: var(--blue-bg); --role-text: var(--blue); }
+    .report-component-name { display: block; padding-right: 58px; font-size: 14px; line-height: 22px; font-weight: 600; }
+    .report-component-count { position: absolute; top: 10px; right: 9px; padding: 1px 6px; border-radius: 10px; color: var(--blue); background: var(--blue-bg); font-size: 11px; line-height: 18px; text-align: center; white-space: nowrap; }
+    .report-component-role { display: inline-flex; margin-top: 7px; padding: 1px 7px; border-radius: 10px; color: var(--role-text, var(--muted)); background: var(--role-bg, var(--surface-3)); font-size: 12px; line-height: 18px; }
+    .report-component-summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin-top: 7px; max-height: 54px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+    .report-component-time { display: block; margin-top: 6px; color: var(--muted); font: 10px var(--font-mono); line-height: 14px; }
+    .report-component-wires { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .report-component-wires .proven { fill: none; stroke: var(--green); stroke-width: 2; }
+    .report-component-wires .inferred { fill: none; stroke: var(--blue); stroke-width: 2; stroke-dasharray: 7 5; }
+    .report-component-wires text { fill: var(--muted); font: 11px/16px var(--font-ui); text-anchor: middle; }
+    .report-component-legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 12px; line-height: 18px; }
+    .report-component-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .report-component-legend i { width: 28px; border-top: 2px solid var(--green); }
+    .report-component-legend i.inferred { border-top: 2px dashed var(--blue); }
+    .report-component-gap { margin-top: 12px; padding: 10px 12px; border-left: 4px solid var(--orange); border-radius: 8px; color: var(--text-2); background: var(--orange-bg); font-size: 12px; line-height: 20px; }
+    .report-component-empty { margin: 0; padding: 14px; border-radius: 8px; color: var(--muted); background: var(--surface-2); }
 
     .remedy-head, .remedy-row {
       display: grid;
@@ -703,6 +756,13 @@
 <body>
   <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
     <defs>
+      <symbol id="confidence" viewBox="0 0 24 24" aria-hidden="true">
+        <linearGradient id="confidence-gradient" x1="2.25000572" x2="25.5530224" y1="3.60229397" y2="23.7629395" gradientUnits="userSpaceOnUse">
+			<stop stop-color="rgb(229,147,46)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(163,78,3)" offset="1" stop-opacity="1" />
+		</linearGradient>
+        <path id="合并" d="M12.9233 0.422472L12.9245 0.422932L19.408 2.92023C20.1535 3.20719 20.721 3.62195 21.1106 4.16451C21.5369 4.75821 21.75 5.50495 21.75 6.40473L21.75 12.8742C21.75 13.8229 21.6237 14.7353 21.3711 15.6112C21.1534 16.366 20.8419 17.0938 20.4366 17.7945C19.9332 18.6648 19.3267 19.4215 18.6172 20.0645C18.0889 20.5433 17.5035 20.959 16.8609 21.3117L12.8017 23.5422C12.5334 23.6895 12.2651 23.763 11.9968 23.7629C11.7292 23.7627 11.4616 23.6893 11.194 23.5425L7.1385 21.3114Q6.173 20.7824 5.3796 20.0634L5.37948 20.0633C4.6704 19.4207 4.0644 18.6644 3.5615 17.7942C3.16136 17.1019 2.85276 16.3829 2.63576 15.6372C2.37858 14.7536 2.25 13.8326 2.25 12.8742L2.25 6.40473C2.25 5.50075 2.46442 4.75135 2.89324 4.15651C3.28186 3.61745 3.8466 3.20533 4.58742 2.92017L11.072 0.422472C11.379 0.303612 11.6861 0.243932 11.9933 0.243412C12.3032 0.242892 12.6132 0.302572 12.9233 0.422472ZM12.3829 1.82175C12.256 1.77263 12.129 1.74781 12.002 1.74731C11.8718 1.74677 11.7415 1.77175 11.6112 1.82223L5.12626 4.32003C4.70536 4.48205 4.38102 4.71597 4.1532 5.02181C3.8844 5.38267 3.75 5.84363 3.75 6.40473L3.75 12.8742C3.75 13.6986 3.86192 14.49 4.08578 15.2483C4.26896 15.8689 4.5271 16.4673 4.8602 17.0437C5.29028 17.7878 5.80942 18.4326 6.41764 18.978C6.85324 19.3687 7.33454 19.7084 7.8615 19.9972L11.9155 22.2274C11.9432 22.2426 11.9708 22.2501 11.9985 22.25C12.0255 22.2499 12.0524 22.2424 12.0793 22.2276L16.1391 19.9968C16.6597 19.7111 17.1357 19.3755 17.5672 18.9901C18.1809 18.442 18.7045 17.7931 19.1381 17.0434C19.4763 16.4588 19.7373 15.8517 19.9212 15.2221C20.1404 14.4714 20.25 13.6888 20.25 12.8742L20.25 6.40473C20.25 5.84809 20.1169 5.38987 19.8508 5.03005C19.6219 4.72055 19.2946 4.48387 18.8688 4.31997L12.3841 1.82223L12.3829 1.82175ZM13.5785 7.70803L12 9.27651L10.4215 7.70803C9.84028 7.13051 8.89798 7.13051 8.31678 7.70803L5.6859 10.3222C5.3953 10.6109 5.25 10.9894 5.25 11.3678C5.25 11.7463 5.3953 12.1247 5.6859 12.4135L10.9477 17.6418C11.5288 18.2193 12.4712 18.2193 13.0524 17.6418L18.3141 12.4135C18.6047 12.1247 18.75 11.7463 18.75 11.3678C18.75 10.9894 18.6047 10.6109 18.3141 10.3222L15.6832 7.70803C15.102 7.13051 14.1597 7.13051 13.5785 7.70803ZM14.3044 12.7665L15.0652 13.5271L12 16.5729L6.76166 11.3678L9.36912 8.77695L10.9469 10.3447L9.72192 11.5809C9.57632 11.7279 9.5039 11.9047 9.50468 12.1116C9.50544 12.3184 9.57916 12.4948 9.72582 12.6406L11.5367 14.4688C11.683 14.6143 11.8594 14.687 12.0657 14.6869C12.2721 14.6869 12.4484 14.6141 12.5947 14.4685L14.3044 12.7665ZM12.8736 10.5313L12.8694 10.5272L14.6309 8.77695L17.2383 11.3678L16.1293 12.4698L14.8358 11.1767C14.6896 11.0305 14.5131 10.9573 14.3064 10.9571C14.0996 10.9568 13.923 11.0297 13.7764 11.1755L12.0653 12.879L11.3144 12.1049L12.8736 10.5313Z" fill="url(#confidence-gradient)" fill-rule="evenodd" />
+      </symbol>
       <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-server" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="8" rx="2" fill="none" stroke="currentColor"/><rect x="2" y="13" width="20" height="8" rx="2" fill="none" stroke="currentColor"/><path d="M6 7h.01M6 17h.01" stroke="currentColor" stroke-linecap="round"/></symbol>
@@ -712,10 +772,8 @@
       <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
       <symbol id="i-link" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" fill="none" stroke="currentColor"/><circle cx="6" cy="12" r="3" fill="none" stroke="currentColor"/><circle cx="18" cy="19" r="3" fill="none" stroke="currentColor"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4" fill="none" stroke="currentColor"/></symbol>
       <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5-5L7.3 3.7l3 3 2.4-2.4a4 4 0 0 0 5 5L9 18l-3 3-3-3 3-3 8.7-8.7Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-tree" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="5" rx="1" fill="none" stroke="currentColor"/><rect x="2" y="16" width="6" height="5" rx="1" fill="none" stroke="currentColor"/><rect x="16" y="16" width="6" height="5" rx="1" fill="none" stroke="currentColor"/><path d="M12 8v4M5 16v-4h14v4" fill="none" stroke="currentColor"/></symbol>
       <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor"/><path d="M9 1v3m6-3v3M9 20v3m6-3v3M20 9h3m-3 6h3M1 9h3m-3 6h3" stroke="currentColor" stroke-linecap="round"/></symbol>
       <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    </defs>
   </svg>
 
   <header class="topbar">
@@ -723,7 +781,7 @@
       <button class="back" type="button" aria-label="返回页面顶部" title="返回页面顶部" onclick="window.scrollTo({top:0})"><svg><use href="#i-arrow-left"/></svg></button>
       <div class="title-wrap">
         <h1>{{report.title}}</h1>
-        <span class="confidence-badge">{{diagnosis.confidence_display}}</span>
+        <span class="confidence-badge"><svg class="confidence-icon" aria-hidden="true"><use href="#confidence"></use></svg><span class="confidence-text">{{diagnosis.confidence_display}}</span></span>
       </div>
       <div class="top-spacer"></div>
       <div class="toolbar">
@@ -801,6 +859,13 @@
           <div class="chain-step"><div class="step-number">4</div><div class="step-title">{{evidence_chain.3.title}}</div><div class="step-copy">{{evidence_chain.3.detail}}</div></div>
           <div class="chain-step"><div class="step-number">5</div><div class="step-title">{{evidence_chain.4.title}}</div><div class="step-copy">{{evidence_chain.4.detail}}</div></div>
         </div>
+      </section>
+
+      <section class="panel" aria-labelledby="component-chain-title">
+        <h2 class="section-title" id="component-chain-title"><svg aria-hidden="true"><use href="#i-link"></use></svg>调用链</h2>
+        <!-- REPORT_COMPONENT_CHAIN_START -->
+        <p class="report-component-empty">调用链未提供</p>
+        <!-- REPORT_COMPONENT_CHAIN_END -->
       </section>
 
       <section class="panel" aria-labelledby="remedy-title">
@@ -945,7 +1010,7 @@
     "detail": "未提供",
     "confidence": "INSUFFICIENT",
     "confidence_score": null,
-    "confidence_display": "可信度 未提供 · INSUFFICIENT",
+    "confidence_display": "可信度 未提供",
     "facts": [
       {"label": "首报", "value": "未提供"},
       {"label": "根因主体", "value": "未提供"},
@@ -1070,7 +1135,7 @@
         const minimumTimelineWidth = Math.max(180, Math.floor(availableWidth * .28));
         const maximumTimelineWidth = Math.max(
           minimumTimelineWidth,
-          Math.floor(availableWidth - 220)
+          Math.floor(availableWidth - 180)
         );
         let bestWidth = Math.round(availableWidth * .58);
         let bestDifference = Infinity;
@@ -1111,6 +1176,68 @@
       addEventListener('afterprint', scheduleEvidenceBalance);
       if (document.fonts?.ready) document.fonts.ready.then(scheduleEvidenceBalance);
 
+      const componentChainStage = document.querySelector('#report-component-chain-stage');
+      const componentChainSvg = document.querySelector('#report-component-chain-wires');
+      const componentChainPaths = document.querySelector('#report-component-chain-paths');
+
+      function drawComponentChainWires() {
+        if (!componentChainStage || !componentChainSvg || !componentChainPaths) return;
+        const stageBox = componentChainStage.getBoundingClientRect();
+        componentChainSvg.setAttribute('viewBox', `0 0 ${Math.max(1, stageBox.width)} ${Math.max(1, stageBox.height)}`);
+        componentChainPaths.replaceChildren();
+        const cards = new Map(
+          [...componentChainStage.querySelectorAll('[data-component-chain-component]')]
+            .map(card => [card.dataset.componentChainComponent, card])
+        );
+        [...componentChainStage.querySelectorAll('[data-component-chain-edge]')].forEach((edge, index) => {
+          const source = cards.get(edge.dataset.edgeFrom);
+          const target = cards.get(edge.dataset.edgeTo);
+          if (!source || !target) return;
+          const sourceBox = source.getBoundingClientRect();
+          const targetBox = target.getBoundingClientRect();
+          const forward = sourceBox.left < targetBox.left;
+          const sourceX = (forward ? sourceBox.right : sourceBox.left) - stageBox.left;
+          const targetX = (forward ? targetBox.left : targetBox.right) - stageBox.left;
+          const sourceY = sourceBox.top - stageBox.top + sourceBox.height / 2;
+          const targetY = targetBox.top - stageBox.top + targetBox.height / 2;
+          const adjacent = Math.abs(targetX - sourceX) < 54;
+          let d;
+          let labelY;
+          if (adjacent) {
+            d = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+            labelY = sourceY - 9;
+          } else {
+            const channelY = forward ? 17 + (index % 3) * 9 : stageBox.height - 14 - (index % 3) * 9;
+            const sourceTurn = sourceX + (forward ? 10 : -10);
+            const targetTurn = targetX + (forward ? -10 : 10);
+            d = `M ${sourceX} ${sourceY} L ${sourceTurn} ${sourceY} L ${sourceTurn} ${channelY} L ${targetTurn} ${channelY} L ${targetTurn} ${targetY} L ${targetX} ${targetY}`;
+            labelY = channelY - 5;
+          }
+          const strength = edge.dataset.edgeStrength === 'proven' ? 'proven' : 'inferred';
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('class', strength);
+          path.setAttribute('marker-end', `url(#component-arrow-${strength})`);
+          path.dataset.componentChainStrength = strength;
+          componentChainPaths.append(path);
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', (sourceX + targetX) / 2);
+          label.setAttribute('y', labelY);
+          label.textContent = strength === 'proven' ? '调用' : '推断';
+          componentChainPaths.append(label);
+        });
+      }
+
+      let componentChainFrame;
+      const scheduleComponentChainDraw = () => {
+        cancelAnimationFrame(componentChainFrame);
+        componentChainFrame = requestAnimationFrame(drawComponentChainWires);
+      };
+      scheduleComponentChainDraw();
+      addEventListener('load', scheduleComponentChainDraw, {once: true});
+      addEventListener('resize', scheduleComponentChainDraw, {passive: true});
+      if (document.fonts?.ready) document.fonts.ready.then(scheduleComponentChainDraw);
+
       const architecture = document.querySelector('#architecture-canvas');
       const wireSvg = document.querySelector('#architecture-wires');
       const wirePaths = document.querySelector('#wire-paths');
@@ -1125,6 +1252,8 @@
         wireSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
         wirePaths.replaceChildren();
 
+        // SVG geometry must come from the DOMRect relative to the architecture
+        // canvas. HTMLElement instances do not expose top/bottom/left/right.
         const box = element => {
           const rect = element.getBoundingClientRect();
           return {
@@ -1138,11 +1267,11 @@
             cy: rect.top - canvasBox.top + rect.height / 2
           };
         };
-        const addPath = (d, type = 'call') => {
+        const addPath = (d, type = 'call', withArrow = true) => {
           const path = document.createElementNS(svgNs, 'path');
           path.setAttribute('d', d);
           path.setAttribute('class', `${type}-wire`);
-          path.setAttribute('marker-end', `url(#arrow-${type})`);
+          if (withArrow) path.setAttribute('marker-end', `url(#arrow-${type})`);
           wirePaths.append(path);
         };
         const addLabel = (x, y, value, type = 'call') => {
@@ -1152,6 +1281,7 @@
           label.setAttribute('class', `wire-label${type === 'error' ? ' error-label' : ''}`);
           label.textContent = value;
           wirePaths.append(label);
+          return label;
         };
 
         const nodes = new Map(
@@ -1159,6 +1289,36 @@
             .map(element => [element.dataset.nodeId, element])
         );
         const edges = [...architecture.querySelectorAll('[data-graph-edge]')];
+        const hardwareRouteGroups = new Map();
+        const addHardwareRoute = (groupKey, edge) => {
+          const group = hardwareRouteGroups.get(groupKey) || [];
+          group.push(edge);
+          hardwareRouteGroups.set(groupKey, group);
+        };
+        edges.forEach(edge => {
+          const sourceElement = nodes.get(edge.dataset.edgeFrom);
+          const targetElement = nodes.get(edge.dataset.edgeTo);
+          if (!sourceElement || !targetElement) return;
+          const sourceLayer = sourceElement.closest('.layer');
+          const targetLayer = targetElement.closest('.layer');
+          const kind = edge.dataset.edgeKind === 'call' ? 'call' : 'error';
+          if (kind === 'call' && targetLayer?.dataset.layerKind === 'hardware'
+              && sourceLayer !== targetLayer) {
+            addHardwareRoute(`call:source:${edge.dataset.edgeFrom}`, edge);
+            addHardwareRoute(`call:target:${edge.dataset.edgeTo}`, edge);
+          } else if (kind === 'error' && sourceLayer?.dataset.layerKind === 'hardware'
+              && sourceLayer !== targetLayer) {
+            addHardwareRoute(`error:source:${edge.dataset.edgeFrom}`, edge);
+            addHardwareRoute(`error:target:${edge.dataset.edgeTo}`, edge);
+          }
+        });
+        const routeSlot = (groupKey, edge) => {
+          const group = hardwareRouteGroups.get(groupKey) || [];
+          const index = group.indexOf(edge);
+          return {index: Math.max(0, index), count: Math.max(1, group.length)};
+        };
+        const routeOffset = (slot, unit) =>
+          slot.count > 1 ? (slot.index - (slot.count - 1) / 2) * unit : 0;
         const edgeGroupKey = edge => {
           const sourceLayerElement = nodes.get(edge.dataset.edgeFrom)?.closest('.layer');
           const sourceLayer = sourceLayerElement?.dataset.layerKind
@@ -1171,10 +1331,122 @@
           return JSON.stringify([sourceLayer, legend, edge.dataset.edgeLabel || '']);
         };
         const edgePlacements = [];
+        const renderedPaths = [];
+        const aggregatedHardwareCalls = new Set();
+        const aggregatedHardwareErrors = new Set();
+        const hardwareCallsBySource = new Map();
+        const hardwareErrorsByTarget = new Map();
         edges.forEach(edge => {
           const sourceElement = nodes.get(edge.dataset.edgeFrom);
           const targetElement = nodes.get(edge.dataset.edgeTo);
           if (!sourceElement || !targetElement) return;
+          const sourceLayer = sourceElement.closest('.layer');
+          const targetLayer = targetElement.closest('.layer');
+          const isHardwareCall = edge.dataset.edgeKind === 'call'
+            && targetLayer?.dataset.layerKind === 'hardware'
+            && sourceLayer !== targetLayer;
+          const isHardwareError = edge.dataset.edgeKind !== 'call'
+            && sourceLayer?.dataset.layerKind === 'hardware'
+            && sourceLayer !== targetLayer;
+          if (isHardwareCall) {
+            const group = hardwareCallsBySource.get(edge.dataset.edgeFrom) || [];
+            group.push(edge);
+            hardwareCallsBySource.set(edge.dataset.edgeFrom, group);
+          }
+          if (!isHardwareError) return;
+          const group = hardwareErrorsByTarget.get(edge.dataset.edgeTo) || [];
+          group.push(edge);
+          hardwareErrorsByTarget.set(edge.dataset.edgeTo, group);
+        });
+        // A component fan-out uses one public trunk and one arrow per hardware
+        // card. The arrow belongs at the card edge, never at the fork point.
+        hardwareCallsBySource.forEach(group => {
+          if (group.length < 2) return;
+          const firstEdge = group[0];
+          const sourceElement = nodes.get(firstEdge.dataset.edgeFrom);
+          const sourceLayer = sourceElement?.closest('.layer');
+          if (!sourceElement || !sourceLayer) return;
+          const source = box(sourceElement);
+          const sourceLayerBox = box(sourceLayer);
+          const sourceLaneOffset = Math.min(30, Math.max(12, source.width * .12));
+          const sourceRouteX = source.cx - sourceLaneOffset;
+          const branchY = sourceLayerBox.bottom + 22;
+          renderedPaths.push({
+            path: `M ${sourceRouteX} ${source.bottom} V ${branchY}`,
+            kind: 'call',
+            withArrow: false,
+          });
+          group.forEach(edge => {
+            const targetElement = nodes.get(edge.dataset.edgeTo);
+            if (!targetElement) return;
+            const target = box(targetElement);
+            const targetLaneOffset = Math.min(18, Math.max(8, target.width * .12));
+            const targetAnchorX = target.cx - targetLaneOffset;
+            const targetRouteX = targetAnchorX + routeOffset(
+              routeSlot(`call:target:${edge.dataset.edgeTo}`, edge), 12
+            );
+            renderedPaths.push({
+              path: `M ${sourceRouteX} ${branchY} H ${targetRouteX} V ${target.top}`,
+              kind: 'call',
+              withArrow: true,
+            });
+            aggregatedHardwareCalls.add(edge);
+          });
+          edgePlacements.push({
+            edge: firstEdge,
+            kind: 'call',
+            label: '多卡任务下发',
+            labelX: sourceRouteX,
+            labelY: branchY - 10,
+          });
+        });
+        // Hardware fan-in keeps per-card branches but emits one component-side
+        // error arrow and one aggregate label for the whole group.
+        hardwareErrorsByTarget.forEach(group => {
+          if (group.length < 2) return;
+          const firstEdge = group[0];
+          const targetElement = nodes.get(firstEdge.dataset.edgeTo);
+          const targetLayer = targetElement?.closest('.layer');
+          if (!targetElement || !targetLayer) return;
+          const target = box(targetElement);
+          const targetLayerBox = box(targetLayer);
+          const targetLaneOffset = Math.min(30, Math.max(12, target.width * .12));
+          const targetRouteX = target.cx + targetLaneOffset;
+          const branchY = targetLayerBox.bottom + 38;
+          group.forEach(edge => {
+            const sourceElement = nodes.get(edge.dataset.edgeFrom);
+            if (!sourceElement) return;
+            const source = box(sourceElement);
+            const sourceLaneOffset = Math.min(18, Math.max(8, source.width * .12));
+            const sourceAnchorX = source.cx + sourceLaneOffset;
+            const sourceRouteX = sourceAnchorX + routeOffset(
+              routeSlot(`error:source:${edge.dataset.edgeFrom}`, edge), 12
+            );
+            renderedPaths.push({
+              path: `M ${sourceRouteX} ${source.top} V ${branchY} H ${targetRouteX}`,
+              kind: 'error',
+              withArrow: false,
+            });
+            aggregatedHardwareErrors.add(edge);
+          });
+          renderedPaths.push({
+            path: `M ${targetRouteX} ${branchY} V ${target.bottom}`,
+            kind: 'error',
+            withArrow: true,
+          });
+          edgePlacements.push({
+            edge: firstEdge,
+            kind: 'error',
+            label: '多卡错误上报/影响',
+            labelX: targetRouteX,
+            labelY: branchY - 10,
+          });
+        });
+        edges.forEach(edge => {
+          const sourceElement = nodes.get(edge.dataset.edgeFrom);
+          const targetElement = nodes.get(edge.dataset.edgeTo);
+          if (!sourceElement || !targetElement) return;
+          if (aggregatedHardwareCalls.has(edge) || aggregatedHardwareErrors.has(edge)) return;
 
           const source = box(sourceElement);
           const target = box(targetElement);
@@ -1197,24 +1469,36 @@
           let labelX;
           let labelY;
           if (callIntoHardware) {
-            const routeTop = sourceLayer.bottom;
+            const routeTop = box(sourceLayer).bottom;
             const sourceLaneOffset = Math.min(30, Math.max(12, source.width * .12));
             const targetLaneOffset = Math.min(18, Math.max(8, target.width * .12));
             const sourceAnchorX = source.cx - sourceLaneOffset;
             const targetAnchorX = target.cx - targetLaneOffset;
+            const sourceRouteX = sourceAnchorX + routeOffset(
+              routeSlot(`call:source:${edge.dataset.edgeFrom}`, edge), 12
+            );
+            const targetRouteX = targetAnchorX + routeOffset(
+              routeSlot(`call:target:${edge.dataset.edgeTo}`, edge), 12
+            );
             const branchY = routeTop + 22;
-            path = `M ${sourceAnchorX} ${source.bottom} V ${branchY} H ${targetAnchorX} V ${target.top}`;
-            labelX = targetAnchorX;
+            path = `M ${sourceRouteX} ${source.bottom} V ${branchY} H ${targetRouteX} V ${target.top}`;
+            labelX = targetRouteX;
             labelY = branchY - 10;
           } else if (errorFromHardware) {
-            const routeTop = targetLayer.bottom;
+            const routeTop = box(targetLayer).bottom;
             const sourceLaneOffset = Math.min(18, Math.max(8, source.width * .12));
             const targetLaneOffset = Math.min(30, Math.max(12, target.width * .12));
             const sourceAnchorX = source.cx + sourceLaneOffset;
             const targetAnchorX = target.cx + targetLaneOffset;
+            const sourceRouteX = sourceAnchorX + routeOffset(
+              routeSlot(`error:source:${edge.dataset.edgeFrom}`, edge), 12
+            );
+            const targetRouteX = targetAnchorX + routeOffset(
+              routeSlot(`error:target:${edge.dataset.edgeTo}`, edge), 12
+            );
             const branchY = routeTop + 38;
-            path = `M ${sourceAnchorX} ${source.top} V ${branchY} H ${targetAnchorX} V ${target.bottom}`;
-            labelX = sourceAnchorX;
+            path = `M ${sourceRouteX} ${source.top} V ${branchY} H ${targetRouteX} V ${target.bottom}`;
+            labelX = sourceRouteX;
             labelY = branchY - 10;
           } else if (directLayerCall && target.top >= source.bottom) {
             path = `M ${source.cx} ${source.bottom} V ${target.top}`;
@@ -1228,10 +1512,11 @@
             labelX = useLeftRail ? railX + 8 : railX - 8;
             labelY = (source.cy + target.cy) / 2;
           }
-          edgePlacements.push({edge, path, kind, labelX, labelY});
+          renderedPaths.push({path, kind, withArrow: true});
+          edgePlacements.push({edge, kind, labelX, labelY});
         });
 
-        edgePlacements.forEach(({path, kind}) => addPath(path, kind));
+        renderedPaths.forEach(({path, kind, withArrow}) => addPath(path, kind, withArrow));
         const labelGroups = new Map();
         edgePlacements.forEach(placement => {
           const key = edgeGroupKey(placement.edge);
@@ -1249,7 +1534,12 @@
           const labelXs = group.map(placement => placement.labelX);
           const first = group[0];
           const desiredX = (Math.min(...labelXs) + Math.max(...labelXs)) / 2;
-          const label = addLabel(desiredX, first.labelY, first.edge.dataset.edgeLabel, first.kind);
+          const label = addLabel(
+            desiredX,
+            first.labelY,
+            first.label || first.edge.dataset.edgeLabel,
+            first.kind
+          );
           const labelBox = label.getBBox();
           const halfWidth = labelBox.width / 2;
           let bestX = desiredX;

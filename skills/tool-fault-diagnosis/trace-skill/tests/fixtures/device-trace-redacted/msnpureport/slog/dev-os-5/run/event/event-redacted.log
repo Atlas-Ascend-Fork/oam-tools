@@ -1,0 +1,1 @@
+[EVENT] DRV(2583,dms_poll_task):1970-01-01-00:00:10.560.325 [dms_event.c:1392][fault_manager][    9.621873] event_id=0x8c2fa009; device_id=0; severity=0[OK]; description=[OS init]; event_raised_time=9560 ms.

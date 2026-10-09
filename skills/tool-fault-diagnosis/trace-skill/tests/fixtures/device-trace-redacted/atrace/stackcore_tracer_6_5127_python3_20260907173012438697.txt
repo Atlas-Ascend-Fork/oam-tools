@@ -1,0 +1,7 @@
+[process]
+crash task:python3
+crash pid:5127
+crash tid:5127
+crash reason:   SIGNAL 6
+[stack]
+#00 0x0000000000000000 /redacted/libc.so (gsignal)

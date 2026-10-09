@@ -1,0 +1,17 @@
+# Incremental fault-trace MVP
+
+**Status: accepted.** The first implementation will use both the available diagnostic package and a controlled CANNLab SIGABRT package to validate structured event parsing, CANN Trace handling, correlation mechanics, and fault-chain slicing, while keeping an interface for complete call spans. Full Host/Device sequence acceptance still requires a representative product-fault fixture containing matched `task_id`, `stream_id`, `device_id`, and duration evidence; this avoids treating a controlled process crash as proof of production-fault reconstruction.
+
+## Consequences
+
+- The initial HTML output must label point-in-time evidence separately from correlated call spans.
+- Missing correlation fields must lower evidence strength rather than be silently inferred.
+- The parser and report schema must remain extensible for later Device execution spans.
+- Host `syslog` is an optional evidence adapter for OS-level OOM, process exit, reset, and driver faults; it is not required for the initial trace parser.
+- The initial package size is small enough for a sequential full scan. Parsers read source files incrementally and emit normalized records without retaining all raw text in memory; a multi-pass correlation index is deferred until measured input size or performance data justifies it.
+- The first parser set covers Host run/debug `plog`, CANN atrace stackcore, Device OS/runtime/event/debug logs, `host_kernel.log`, and available scheduler snapshots. Host `syslog` is optional. A `system_info/event_sched/event_trace` file that contains only a scheduler-table header is not treated as CANN Trace evidence.
+- The controlled CANNLab SIGABRT fixture validates real Trace format handling and explicit Host Runtime task lifecycle records. Its Device package was collected separately after the crash, and it is not a representative product fault, so it does not establish complete cross-domain Host/Device reconstruction acceptance.
+- A later representative product-fault package containing matched Host/Device correlation evidence will be required before claiming complete component-call reconstruction acceptance.
+- Incomplete input produces a usable partial trace rather than a hard failure. Both JSON and HTML declare `partial` status and enumerate missing source types, unaligned clock domains, unmatched span endpoints, parse coverage, and other evidence gaps. Generation fails only when no valid timestamped event or fault anchor can support a fault view.
+- Verification uses three fixture classes. The original diagnostic package validates partial fault slicing, clock-domain separation, provenance, and partial-result reporting. The controlled CANNLab SIGABRT package validates real Host `plog`, CANN atrace, Device maintenance-log parsing, and correlation mechanics without claiming a product defect. Synthetic fixtures exercise every supported identity match, span, clock-alignment, evidence-conflict, duplicate-observation, and truncation branch deterministically.
+- The MVP merge gate requires JSON Schema validation, parser unit tests, the complete synthetic correlation suite, successful parsing of the original diagnostic package, and end-to-end generation of both JSON and self-contained offline HTML from the controlled CANNLab SIGABRT package. A representative real product fault remains a separate product-level acceptance gate and must pass before complete production-fault reconstruction is claimed.

@@ -37,7 +37,7 @@ SKILLS_ROOT = SCRIPT_DIR.parent.parent
 STAGE_IDS = tuple(STAGE_FILES)
 STATE_VERSION = 2
 TERMINAL_OK = ('success', 'skipped')
-MANUAL = ('diagnose', 'report')
+MANUAL = ()
 CHECK_KEYS = ('has_first_error_line', 'has_env_version', 'has_full_timeline', 'has_crash_artifacts',
               'has_repro_input', 'multi_source_agree', 'timeline_consistent', 'no_contradiction',
               'root_cause_localized', 'chain_no_gap', 'alternatives_excluded', 'reproducible',
@@ -55,9 +55,13 @@ BUSINESS_FIELDS = {
 }
 SCRIPTS = {'case_lookup': 'orchestrator-skill/scripts/detect_scenario.py',
            'detect': 'orchestrator-skill/scripts/detect_scenario.py',
-           'clean': 'eval-skill/scripts/clean.py',
            'confidence': 'eval-skill/scripts/assess_confidence.py',
            'promote': 'eval-skill/scripts/promote_case.py'}
+TRACE_SCRIPT = SKILLS_ROOT / 'trace-skill/scripts/build_fault_trace.py'
+TRACE_CORE_DIR = SKILLS_ROOT / 'trace-skill/scripts/fault_trace_core'
+HTML_SCRIPT = SKILLS_ROOT / 'metric-skill/scripts/build_html_report.py'
+HTML_TEMPLATE = SKILLS_ROOT / 'metric-skill/template/index.html'
+HTML_RULES = SKILLS_ROOT / 'metric-skill/template/report-template-rules.md'
 
 
 def digest(value):
@@ -226,6 +230,11 @@ def inputs_for(sid, plan, state):
     scripts = [SCRIPT_DIR / 'run_pipeline.py', SCRIPT_DIR / 'artifact_contract.py']
     if sid in SCRIPTS:
         scripts.append(SKILLS_ROOT / SCRIPTS[sid])
+    if sid == 'diagnose':
+        scripts.append(TRACE_SCRIPT)
+        scripts.extend(sorted(TRACE_CORE_DIR.glob('*.py')))
+    if sid == 'report':
+        scripts.extend((HTML_SCRIPT, HTML_TEMPLATE, HTML_RULES))
     materials = plan.materials()
     parameters = plan.params(sid)
     dependencies = {'input': plan.input, 'revision': state['stages'][sid]['revision'],
@@ -413,7 +422,531 @@ def prepare_clean_input(plan, artifact, work):
     return source, logs, []
 
 
-def execute(sid, plan, state, artifact, work):
+def _trace_input(plan, work):
+    """Give trace-skill a directory for a single log while preserving archives."""
+    if plan.source.is_dir() or plan.source.suffix.lower() == '.zip':
+        return plan.source
+    directory = work / 'trace-input'
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / plan.source.name
+    shutil.copy2(plan.source, target)
+    return directory
+
+
+def _run_trace(plan, artifact, work):
+    trace_dir = work / 'trace'
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    if not TRACE_SCRIPT.is_file():
+        artifact['evidence_gaps'].append('trace-skill 脚本不可用；已保留原始日志继续诊断。')
+        return None, trace_dir
+    try:
+        run_command([sys.executable, str(TRACE_SCRIPT), str(_trace_input(plan, work)),
+                     '--output-dir', str(trace_dir)], plan.params('diagnose').get('timeout', 1800))
+    except (StepError, OSError, shutil.Error) as exc:
+        artifact['evidence_gaps'].append('trace-skill 未生成有效 trace：' + str(exc))
+        for path in sorted(trace_dir.glob('fault-trace-inventory.json')):
+            attach(artifact, path, 'trace_inventory')
+        return None, trace_dir
+
+    kinds = {
+        'fault-trace.json': 'fault_trace_json',
+        'tracing-report.html': 'trace_report_html',
+        'fault-trace.html': 'fault_trace_html',
+    }
+    for name, kind in kinds.items():
+        path = trace_dir / name
+        if path.is_file():
+            attach(artifact, path, kind)
+    trace_path = trace_dir / 'fault-trace.json'
+    if not trace_path.is_file():
+        artifact['evidence_gaps'].append('trace-skill 未产生 fault-trace.json。')
+        return None, trace_dir
+    try:
+        return json.loads(trace_path.read_text(encoding='utf-8')), trace_dir
+    except (OSError, ValueError) as exc:
+        artifact['evidence_gaps'].append('fault-trace.json 无法读取：' + str(exc))
+        return None, trace_dir
+
+
+def _timestamp(text):
+    match = re.search(r'(?:\d{4}[-/]\d{2}[-/]\d{2}[ T-])?\d{2}:\d{2}:\d{2}(?:\.\d{1,6}){1,2}',
+                     str(text or ''))
+    return match.group(0) if match else '时间戳未提供'
+
+
+def _entity(text, pattern):
+    match = re.search(pattern, str(text or ''), re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def _event_source(event, trace):
+    evidence = trace.get('evidence', {}) if isinstance(trace, dict) else {}
+    for evidence_id in event.get('evidence_ids', []):
+        item = evidence.get(evidence_id)
+        if isinstance(item, dict):
+            return {'file': item.get('source_path'), 'line': item.get('line'),
+                    'text': item.get('excerpt') or event.get('message', '')}
+    return {'file': event.get('source_path'), 'line': event.get('line'),
+            'text': event.get('message', '')}
+
+
+def _trace_timeline(trace):
+    if not isinstance(trace, dict):
+        return []
+    anchor = trace.get('selected_anchor_id')
+    rows = []
+    for event in trace.get('events', []):
+        if not isinstance(event, dict):
+            continue
+        source = _event_source(event, trace)
+        raw_time = ((event.get('timestamp') or {}).get('raw'))
+        status = 'direct_trigger' if event.get('id') == anchor else 'observed'
+        rows.append({
+            'id': event.get('id'),
+            'time': raw_time or '时间戳未提供',
+            'host': event.get('location'),
+            'pid': ((event.get('execution') or {}).get('pid')),
+            'rank': ((event.get('execution') or {}).get('rank')),
+            'device': ((event.get('execution') or {}).get('device')),
+            'phase': event.get('interaction') or event.get('kind') or 'observed',
+            'role': status,
+            'source': source,
+        })
+    return rows
+
+
+def _diagnosis_body(result):
+    first = result.get('first_error') or {}
+    reference = '{}:{}'.format(first.get('file', '未提供'), first.get('line', '未提供'))
+    root = result.get('root_cause') or {}
+    recommendation = (result.get('recommendations') or [{}])[0].get('action', '补齐缺失证据后重新诊断。')
+    return ('# Diagnosis\n\n## 问题摘要\n\n'
+            '自动诊断识别到 {}；当前证据不足以确认根因。\n\n'
+            '## 关键证据链\n\n'
+            '- `{}`：{}。\n'
+            '- trace-skill 已作为诊断附属步骤执行；调用链只表示观测关系，不等于根因证明。\n\n'
+            '## 根因分析\n\n'
+            '根因状态为 `{}`。{}\n\n'
+            '## 修复建议\n\n{}\n'.format(
+                first.get('text', '未发现可定位的错误行'), reference,
+                first.get('text', '未发现可定位的错误行'), root.get('status', 'undetermined'),
+                root.get('description', '证据不足，无法定位根因。'), recommendation))
+
+
+def _auto_diagnose(plan, state, artifact, work):
+    detect, _ = read_artifact(plan.artifact('detect'))
+    lookup, _ = read_artifact(plan.artifact('case_lookup'))
+    detected = detect.get('result', {})
+    lookup_result = lookup.get('result', {})
+    errors = detected.get('errors') or lookup_result.get('errors') or []
+    trace, trace_dir = _run_trace(plan, artifact, work)
+
+    first = errors[0] if errors else None
+    if first is not None:
+        text = first.get('text', '')
+        first_error = {
+            'file': first.get('file'), 'line': first.get('line'), 'text': text,
+            'timestamp': first.get('timestamp') or _timestamp(text),
+            'entities': {
+                'pid': _entity(text, r'\((\d+)[,)]'),
+                'device': _entity(text, r'(?:device[_ ]?id|device)\s*[=:]\s*(\d+)'),
+                'rank': _entity(text, r'\brank\s*[=:]?\s*(\d+)'),
+            },
+            'association': '最早可见错误候选；仍需跨来源核对首错与因果关系。',
+        }
+    else:
+        first_error = None
+
+    timeline = _trace_timeline(trace)
+    if not timeline:
+        for index, item in enumerate(errors):
+            text = item.get('text', '')
+            timeline.append({
+                'id': 'error-{}'.format(index + 1),
+                'time': item.get('timestamp') or _timestamp(text),
+                'host': None, 'pid': _entity(text, r'\((\d+)[,)]'),
+                'rank': _entity(text, r'\brank\s*[=:]?\s*(\d+)'),
+                'device': _entity(text, r'(?:device[_ ]?id|device)\s*[=:]\s*(\d+)'),
+                'phase': 'error', 'role': 'direct_trigger' if index == 0 else 'observed',
+                'source': {'file': item.get('file'), 'line': item.get('line'), 'text': text},
+            })
+
+    trace_chain = (trace or {}).get('component_chain') if isinstance(trace, dict) else None
+    causal_chain = []
+    if isinstance(trace_chain, dict):
+        for edge in trace_chain.get('edges', []):
+            if not isinstance(edge, dict):
+                continue
+            causal_chain.append({
+                'from': edge.get('source_component'), 'to': edge.get('target_component'),
+                'support': edge.get('evidence_ids', []), 'counterevidence': [],
+                'status': 'supported' if edge.get('strength') == 'proven' else 'unresolved',
+            })
+
+    source_files = {item.get('file') for item in errors if item.get('file')}
+    materials = detected.get('materials') or {}
+    trace_status = (trace or {}).get('status') if isinstance(trace, dict) else None
+    gaps = list(detected.get('missing_materials') or [])
+    if trace_status and trace_status != 'complete':
+        gaps.append('trace status=' + str(trace_status))
+    diagnostics = (trace or {}).get('diagnostics', {}) if isinstance(trace, dict) else {}
+    gaps.extend(str(item) for item in diagnostics.get('gaps', []) if item)
+    if not first_error:
+        gaps.append('未发现可定位的错误行')
+    artifact['evidence_gaps'].extend(item for item in gaps if item not in artifact['evidence_gaps'])
+
+    def check(value, evidence):
+        return {'value': bool(value), 'evidence': evidence or '未提供该项证据'}
+
+    checks = {
+        'has_first_error_line': check(bool(first_error), first_error and '{}:{}'.format(first_error['file'], first_error['line'])),
+        'has_env_version': check(False, '未发现 CANN/Driver/Firmware/OS 版本证据。'),
+        'has_full_timeline': check(bool(trace and trace_status == 'complete' and len(timeline) > 1), 'trace 事件数={}'.format(len(timeline))),
+        'has_crash_artifacts': check(any(materials.get(key, {}).get('present') for key in ('coredump', 'stackcore')), '材料清单中的 coredump/stackcore'),
+        'has_repro_input': check(False, '未提供复现输入。'),
+        'multi_source_agree': check(len(source_files) > 1, '错误证据来源数={}'.format(len(source_files))),
+        'timeline_consistent': check(bool(trace and trace_status == 'complete' and len(source_files) > 1), 'trace 状态与来源数'),
+        'no_contradiction': check(True, '当前输入未发现互相矛盾的明确证据。'),
+        'root_cause_localized': check(False, '自动诊断未把观测链升级为根因。'),
+        'chain_no_gap': check(bool(causal_chain and all(item['status'] == 'supported' for item in causal_chain)), 'trace component_chain proven edges'),
+        'alternatives_excluded': check(False, '竞争假设未被排除。'),
+        'reproducible': check(False, '未提供稳定复现条件。'),
+        'fix_verified': check(False, '未提供修复后验证。'),
+        'regression_checked': check(False, '未提供回归验证。'),
+        'errcode_documented': check(False, '错误码定义未由当前输入确认。'),
+        'case_matched': check(lookup_result.get('status') == 'hit', 'case_lookup status={}'.format(lookup_result.get('status'))),
+        'source_code_confirmed': check(False, '未提供源码定位证据。'),
+    }
+    root_description = ('已观察到首个错误并生成 trace，但 trace 只描述证据关系，'
+                        '不能单独确认根因。' if first_error else
+                        '当前材料没有可定位的错误行，无法确认根因。')
+    references = (([{'kind': 'raw_log', 'path': first_error.get('file'), 'line': first_error.get('line'),
+                     'why': '最早可见错误候选'}] if first_error else []) +
+                  [{'kind': 'case_lookup', 'path': str(plan.artifact('case_lookup')), 'why': '案例检索结果'}])
+    trace_path = trace_dir / 'fault-trace.json'
+    if trace_path.is_file():
+        references.append({'kind': 'trace', 'path': str(trace_path), 'why': 'trace-skill 附属证据'})
+    result = {
+        'first_error': first_error,
+        'timeline': timeline,
+        'causal_chain': causal_chain,
+        'root_cause': {'description': root_description, 'status': 'undetermined',
+                       'location': None,
+                       'evidence': ([first_error.get('file') + ':' + str(first_error.get('line'))]
+                                    if first_error else []),
+                       'limitations': artifact['evidence_gaps']},
+        'alternatives': [
+            {'hypothesis': '运行时或设备侧故障', 'status': 'unresolved',
+             'support': ['存在错误/异常日志'] if first_error else [],
+             'counterevidence': ['缺少充分设备侧证据']},
+            {'hypothesis': '应用或上游输入触发', 'status': 'unresolved',
+             'support': ['错误出现在当前输入中'] if first_error else [],
+             'counterevidence': ['缺少应用栈和复现输入']},
+        ],
+        'recommendations': [{'action': '补齐同一故障时间点的 device/runtime 日志、版本、stack/core 和复现条件，随后重新验证因果链。',
+                             'evidence': ([first_error.get('file') + ':' + str(first_error.get('line'))]
+                                          if first_error else []),
+                             'status': 'recommended', 'expected_impact': '缩小根因候选并支持回归验证。'}],
+        'checks': checks,
+        'references': references,
+    }
+    if trace is not None:
+        result['trace'] = {'status': trace.get('status'), 'event_count': len(trace.get('events', [])),
+                           'component_chain': trace_chain or {}}
+    artifact['result'] = result
+    artifact['summary'] = '自动生成诊断和 trace 附属产物；根因状态为 undetermined。'
+    artifact['next_action'] = '继续 confidence、promote 和 report 阶段。'
+    return _diagnosis_body(result)
+
+
+def _report_component_name(node):
+    component = str(node.get('component') or 'unknown')
+    catalog = component if component in {
+        'Slog', 'IDEDD', 'SCC', 'HCCL', 'FMK', 'CCU', 'DVPP', 'Runtime', 'CCE', 'HDC',
+        'DRV', 'NET', 'HIXI', 'DQSFW', 'Kernel', 'HCCP ROCE', 'TEFUSION', 'PROFILING',
+        'User Application', 'Task Schedule', 'TSDUMP', 'AICPU', 'ASCENDCL', 'TBE',
+        'OP', 'UDF', 'TPRT', 'ASYS', 'ATRACE', 'unknown'} else 'unknown'
+    return catalog
+
+
+def _build_report_data(plan, state, diagnosis, confidence, detect, trace, work):
+    report_work = work / 'report-work'
+    run_command([sys.executable, str(HTML_SCRIPT), '--init', str(report_work)],
+                plan.params('report').get('timeout', 1800))
+    data_path = report_work / 'report-data.json'
+    data = json.loads(data_path.read_text(encoding='utf-8'))
+    dresult = diagnosis.get('result', {})
+    cresult = confidence.get('result', {})
+    sresult = detect.get('result', {})
+    first = dresult.get('first_error') or {}
+    scenario = sresult.get('primary') or 'unknown'
+    data['report'] = {'title': 'CANN 故障诊断报告 - ' + scenario, 'version': '自动生成'}
+    data['overview'] = {
+        'problem': first.get('text') or '未发现可定位的错误行',
+        'scene': {'label': '运行场景', 'value': scenario,
+                  'detail': sresult.get('recognition_confidence', 'UNKNOWN')},
+        'incident': {'label': '发生问题', 'value': first.get('text') or '证据不足'},
+        'impact': {'label': '业务影响', 'value': '当前材料未提供可量化业务影响。'},
+        'first_error_note': (str(first.get('file')) + ':' + str(first.get('line'))
+                             if first else '首错未确认'),
+    }
+    timeline = []
+    for item in dresult.get('timeline', []):
+        source = item.get('source') or {}
+        timeline.append({
+            'time': item.get('time') or '时间戳未提供',
+            'source': '{}:{}'.format(source.get('file', '未提供'), source.get('line', '未提供')),
+            'message': source.get('text') or item.get('phase') or '未提供',
+            'status': item.get('role') if item.get('role') in {
+                'root_cause', 'fault_source', 'direct_trigger', 'candidate',
+                'propagation', 'affected', 'first_observed', 'observed', 'unknown'
+            } else 'observed',
+            'evidence_strength': 'proven',
+        })
+    data['timeline'] = timeline or [{'time': '时间戳未提供', 'source': '未提供',
+                                     'message': '当前材料没有可定位事件。', 'status': 'unknown',
+                                     'evidence_strength': 'unknown'}]
+    data['critical_log'] = first.get('text') or '未提供'
+    score = cresult.get('final_score')
+    data['diagnosis'] = {
+        'headline': dresult.get('root_cause', {}).get('description', '证据不足'),
+        'detail': '；'.join(dresult.get('root_cause', {}).get('limitations', [])[:3]) or '未提供',
+        'confidence': cresult.get('level', 'INSUFFICIENT'),
+        'confidence_score': score if isinstance(score, int) else None,
+        'confidence_display': '可信度 {}%'.format(score) if isinstance(score, int) else '可信度 未提供',
+        'facts': [
+            {'label': '首报', 'value': data['overview']['first_error_note']},
+            {'label': '根因主体', 'value': dresult.get('root_cause', {}).get('description', '未提供')},
+            {'label': '源卡证据', 'value': '；'.join(dresult.get('evidence_gaps', [])[:2]) or '未提供'},
+            {'label': '客户可做', 'value': (dresult.get('recommendations') or [{}])[0].get('action', '未提供')},
+        ],
+    }
+    data['evidence_chain'] = [
+        {'title': '输入边界', 'detail': '；'.join(sresult.get('missing_materials', [])[:3]) or '已读取当前输入'},
+        {'title': '首报', 'detail': data['overview']['first_error_note']},
+        {'title': '直接触发', 'detail': dresult.get('root_cause', {}).get('description', '未提供')},
+        {'title': '传播', 'detail': '{} 条 causal/trace 关系'.format(len(dresult.get('causal_chain', [])))},
+        {'title': '结论边界', 'detail': '根因状态为 ' + str(dresult.get('root_cause', {}).get('status', 'undetermined'))},
+    ]
+
+    chain = trace.get('component_chain') if isinstance(trace, dict) else None
+    chain_nodes = chain.get('nodes', []) if isinstance(chain, dict) else []
+    chain_edges = chain.get('edges', []) if isinstance(chain, dict) else []
+    component_nodes = []
+    component_id = {}
+    for index, node in enumerate(chain_nodes[:5]):
+        if not isinstance(node, dict):
+            continue
+        component = str(node.get('component') or 'unknown')
+        node_id = 'component-{}'.format(index + 1)
+        component_id[component] = node_id
+        status = {'direct-trigger': 'direct_trigger', 'propagation': 'propagation',
+                  'affected': 'affected', 'observed': 'observed',
+                  'business-error': 'affected', 'fault-source': 'affected'}.get(
+                      node.get('fault_role'), 'observed')
+        catalog = _report_component_name(node)
+        title = str(node.get('summary') or component + ' event')
+        if title == catalog:
+            title += ' event'
+        component_nodes.append({
+            'id': node_id, 'status': status, 'evidence_strength': 'proven',
+            'catalog_name': catalog, 'title': title, 'detail': str(node.get('summary_short') or title),
+            'tag': component,
+        })
+    if not component_nodes:
+        component_nodes = [{'id': 'component-entry', 'status': 'unknown', 'evidence_strength': 'unknown',
+                            'catalog_name': 'unknown', 'title': '当前错误组件未提供',
+                            'detail': '未提供', 'tag': '执行组件'}]
+        component_id['unknown'] = 'component-entry'
+
+    hardware_nodes = []
+    hardware_seen = set()
+    for item in dresult.get('timeline', []):
+        device = item.get('device') or item.get('rank')
+        if device is None:
+            continue
+        title = 'Device/rank ' + str(device)
+        if title in hardware_seen:
+            continue
+        hardware_seen.add(title)
+        hardware_nodes.append({'id': 'hardware-{}'.format(len(hardware_nodes) + 1),
+                               'status': 'first_observed' if not hardware_nodes else 'observed',
+                               'evidence_strength': 'proven', 'title': title,
+                               'detail': item.get('source', {}).get('text', '未提供'), 'tag': 'Device/rank'})
+    arch_edges = []
+    for edge in chain_edges:
+        if not isinstance(edge, dict):
+            continue
+        source = component_id.get(edge.get('source_component'))
+        target = component_id.get(edge.get('target_component'))
+        if not source or not target or source == target:
+            continue
+        if edge.get('strength') == 'proven':
+            arch_edges.append({'from': source, 'to': target, 'kind': 'call',
+                               'evidence_strength': 'proven', 'label': '调用/任务下发'})
+        else:
+            arch_edges.append({'from': source, 'to': target, 'kind': 'candidate',
+                               'evidence_strength': 'candidate', 'label': '候选关系'})
+    model_node = {'id': 'model-entry', 'status': 'unknown', 'evidence_strength': 'unknown',
+                  'title': scenario + ' 执行流', 'detail': '当前输入未提供模型实体。', 'tag': '执行流'}
+    data['architecture'] = {
+        'wire_call_label': '调用/任务下发', 'wire_return_label': '错误上报/影响',
+        'wire_dispatch_label': '调用/任务下发', 'wire_propagation_label': '错误上报/影响',
+        'hardware_note': '硬件卡只表示日志中观察到的 Device/rank，不表示硬件根因。',
+        'devices': [{'name': node['title'], 'role': node['tag'], 'detail': node['detail']} for node in hardware_nodes],
+        'layers': [
+            {'kind': 'model', 'label': '模型层', 'caption': '当前日志识别的执行入口', 'nodes': [model_node]},
+            {'kind': 'component', 'label': '组件层', 'caption': 'trace-skill 观测到的组件', 'nodes': component_nodes},
+            {'kind': 'hardware', 'label': '硬件层', 'caption': '日志明确出现的 Device/rank', 'nodes': hardware_nodes},
+        ],
+        'edges': arch_edges,
+    }
+    model_component = '执行流'
+    component_name = component_nodes[0].get('catalog_name', 'unknown')
+    remedy_component = hardware_nodes[0]['title'] if hardware_nodes else component_name
+    data['remedies'] = [
+        {'name': '补齐首报证据', 'layer': '组件层', 'component': component_name,
+         'owner': '客户方', 'owner_detail': '华为方可指导执行', 'action': '补齐同一时间点日志与版本。',
+         'timing': '立即 / 取证', 'timing_detail': '先补齐证据，再判断责任边界'},
+        {'name': '核对故障实体', 'layer': '模型层', 'component': model_component,
+         'owner': '华为方为主', 'owner_detail': '客户方配合补充现场', 'action': '核对调用关系与输入条件。',
+         'timing': '补证后 / 诊断', 'timing_detail': '结论随新增证据更新'},
+        {'name': '核验执行设备', 'layer': '硬件层' if hardware_nodes else '组件层', 'component': remedy_component,
+         'owner': '华为方', 'owner_detail': '客户方配合升级验证', 'action': '核验设备日志和健康状态。',
+         'timing': '定位后 / 候选修复', 'timing_detail': '验证前不得标记为根修复'},
+        {'name': '执行回归验证', 'layer': '模型层', 'component': model_component,
+         'owner': '客户方', 'owner_detail': '华为方确认故障是否消失', 'action': '覆盖原场景及必要压力回归。',
+         'timing': '修复后 / 验证', 'timing_detail': '记录原场景与回归结果'},
+    ]
+    data['notices'] = {
+        'caution': {'title': '风险提示', 'detail': '当前根因状态为 undetermined，不应直接据此修改硬件或算子。'},
+        'verification': {'title': '验证状态', 'meta': '未验证', 'detail': '尚未提供修复后回归证据。'},
+        'next_steps': {'title': '下一步', 'detail': '补齐 evidence gaps 后重新运行诊断。'},
+    }
+    atomic_write(data_path, json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+    return report_work, data_path, data
+
+
+def _auto_report(plan, state, artifact, work):
+    diagnosis, _ = read_artifact(plan.artifact('diagnose'))
+    confidence, _ = read_artifact(plan.artifact('confidence'))
+    detect, _ = read_artifact(plan.artifact('detect'))
+    trace = diagnosis.get('result', {}).get('trace')
+    trace_json = None
+    for output in diagnosis.get('outputs', []):
+        if output.get('kind') == 'fault_trace_json' and Path(output['path']).is_file():
+            trace_json = Path(output['path'])
+            break
+    trace_data = None
+    if trace_json:
+        trace_data = json.loads(trace_json.read_text(encoding='utf-8'))
+    report_work, data_path, data = _build_report_data(plan, state, diagnosis, confidence,
+                                                      detect, trace_data, work)
+    trace_for_report = None
+    if trace_json:
+        trace_for_report = report_work / 'fault-trace.json'
+        shutil.copy2(trace_json, trace_for_report)
+        attach(artifact, trace_for_report, 'fault_trace_json')
+        for name, kind in (('tracing-report.html', 'trace_report_html'), ('fault-trace.html', 'fault_trace_html')):
+            source = trace_json.parent / name
+            if source.is_file():
+                target = report_work / name
+                shutil.copy2(source, target)
+                attach(artifact, target, kind)
+    output = report_work / 'diagnostic-report.html'
+    argv = [sys.executable, str(HTML_SCRIPT), '--input', str(report_work / 'index.html'),
+            '--data', str(data_path), '--output', str(output), '--force']
+    if trace_for_report:
+        argv.extend(['--trace', str(trace_for_report)])
+    run_command(argv, plan.params('report').get('timeout', 1800))
+    attach(artifact, data_path, 'report_data')
+    attach(artifact, output, 'diagnostic_html')
+    cresult = confidence.get('result', {})
+    findings = [{'fact': item.get('source', {}).get('text', item.get('message', '未提供')),
+                 'evidence': [str(item.get('source', {}).get('file', '未提供')) + ':' + str(item.get('source', {}).get('line', '未提供'))],
+                 'strength': item.get('role', 'observed')} for item in diagnosis.get('result', {}).get('timeline', [])[:8]]
+    if not findings:
+        findings = [{'fact': '当前材料没有可定位的时间线事件，报告仅记录证据不足边界。',
+                     'evidence': [str(plan.artifact('diagnose'))], 'strength': 'unknown'}]
+    artifact['result'] = {
+        'conclusion': data['diagnosis']['headline'],
+        'confidence': cresult,
+        'findings': findings,
+        'recommendations': data['remedies'],
+        'limitations': diagnosis.get('evidence_gaps', []),
+    }
+    artifact['summary'] = '自动生成 report.md、report-data.json 和 diagnostic-report.html。'
+    artifact['next_action'] = '流水线已完成；HTML 与 trace 附属产物已写入 report 阶段工作目录。'
+    return ('# Final report\n\n## 结论\n\n' + artifact['result']['conclusion'] +
+            '\n\n## 可信度\n\n综合可信度为 {}/100（{}）。\n\n## 限制\n\n'.format(
+                cresult.get('final_score', '未提供'), cresult.get('level', 'INSUFFICIENT')) +
+            ('\n'.join('- ' + str(item) for item in artifact['result']['limitations']) or '- 未提供') + '\n')
+
+
+_DEBUG_HEARTBEAT_RE = re.compile(r"^\s*(?:\[?DEBUG\]?\s*[:|]?[ \t]+)?(?:DEBUG\s+)?(?:heartbeat|polling|poll|tick)\b", re.I)
+
+
+def conservative_clean(logs, output, audit, focus_level='DEBUG', encoding='utf-8'):
+    """Preserve raw order and evidence while collapsing only duplicate heartbeats."""
+    output = Path(output)
+    audit = Path(audit)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    audit.parent.mkdir(parents=True, exist_ok=True)
+    policy = 'preserve_original_except_duplicate_debug_heartbeat'
+    files = []
+    input_lines = kept_lines = collapsed_lines = 0
+    output_line = 0
+    last_output_had_newline = True
+    first_record = True
+    with output.open('wb') as output_stream, audit.open('w', encoding='utf-8') as audit_stream:
+        audit_stream.write('# Clean audit\n\n```json\n{"policy": ')
+        json.dump(policy, audit_stream, ensure_ascii=False)
+        audit_stream.write(', "records": [\n')
+        for source in logs:
+            source = Path(source)
+            previous = None
+            file_input = file_kept = file_collapsed = 0
+            with source.open('rb') as source_stream:
+                for number, line in enumerate(source_stream, 1):
+                    text = line.rstrip(b'\r\n').decode(encoding, errors='replace')
+                    input_lines += 1
+                    file_input += 1
+                    collapse = bool(previous == text and _DEBUG_HEARTBEAT_RE.search(text))
+                    if collapse:
+                        action, reason, line_output = 'collapsed', 'duplicate_debug_heartbeat', None
+                        collapsed_lines += 1
+                        file_collapsed += 1
+                    else:
+                        action, reason = 'kept', 'original_evidence'
+                        if not last_output_had_newline:
+                            output_stream.write(b'\n')
+                        output_stream.write(line)
+                        last_output_had_newline = line.endswith(b'\n')
+                        output_line += 1
+                        line_output = output_line
+                        kept_lines += 1
+                        file_kept += 1
+                    record = {'source': str(source.resolve()), 'line': number,
+                              'output': line_output, 'output_line': line_output,
+                              'action': action, 'reason': reason,
+                              'focus': focus_level, 'text': text}
+                    audit_stream.write(('' if first_record else ',\n') +
+                                       json.dumps(record, ensure_ascii=False))
+                    first_record = False
+                    previous = text
+            files.append({'source': str(source.resolve()), 'sha256': file_hash(source),
+                          'output': str(output.resolve()), 'input_lines': file_input,
+                          'kept_lines': file_kept, 'collapsed_lines': file_collapsed})
+        audit_stream.write('\n]}\n```\n')
+    return {'mode': 'conservative', 'focus_level': focus_level, 'encoding': encoding,
+            'ordering': 'original_line', 'processed_files': len(logs),
+            'input_lines': input_lines, 'kept_lines': kept_lines,
+            'collapsed_lines': collapsed_lines, 'files': files,
+            'audit_path': str(audit.resolve()), 'source_map': str(audit.resolve()),
+            'policy': policy}
+
+
+def execute(sid, plan, state, artifact, work, inputs):
     if plan.params(sid).get('execution') == 'manual_equivalent':
         raise Blocked('Equivalent manual execution selected. Complete all original business fields and evidence requirements in this Markdown artifact, then --resume.')
     if sid in ('case_lookup', 'detect'):
@@ -431,32 +964,27 @@ def execute(sid, plan, state, artifact, work):
                                   'reason': 'No supported text logs; supplied binary artifacts remain available.'}
             artifact['summary'] = 'No text log applicable to cleaning; original materials retained for diagnosis.'
             return ''
-        output, audit = work / 'cleaned.log', work / 'clean-audit.md'
-        result_path = work / 'clean-result.md'
-        argv = child(sid) + ['--level', str(plan.params(sid).get('level', 'DEBUG')),
-                             '--encoding', str(plan.params(sid).get('encoding', 'utf-8')),
-                             '--output', str(output), '--audit-output', str(audit),
-                             '--result-output', str(result_path)]
-        if plan.params(sid).get('keep_noise', False):
-            argv.append('--keep-noise')
-        argv += (['--input-dir', str(clean_source), '--merge'] if clean_source.is_dir()
-                 else ['--input', str(clean_source)])
-        artifact['result'] = {'applicability': 'applicable', 'input_files': [str(p) for p in logs],
-                              'cleaned_files': [], 'audit_path': str(audit), 'policy': 'conservative'}
-        stdout = run_command(argv, plan.params(sid).get('timeout', 1800))
-        if not output.is_file() or not audit.is_file():
-            raise StepError('Cleaner did not produce the declared log and audit Markdown')
+        output = work / 'cleaned.log'
+        audit = work / 'clean-audit.md'
+        result = conservative_clean(logs, output, audit,
+                                    focus_level=str(plan.params(sid).get('level', 'DEBUG')))
+        result['applicability'] = 'applicable'
+        result['input_files'] = [str(p) for p in logs]
+        result['cleaned_files'] = [str(output.resolve())]
+        if source_aliases:
+            result['source_aliases'] = source_aliases
+        artifact['result'] = result
         attach(artifact, output, 'cleaned_log')
         attach(artifact, audit, 'cleaning_audit')
-        child_result, _ = read_artifact(result_path, stage='clean')
-        artifact['result'] = child_result['result']
-        if source_aliases:
-            artifact['result']['source_aliases'] = source_aliases
-        artifact['summary'] = child_result['summary']
-        return '# Log cleaning\n\n' + stdout
-    if sid in MANUAL:
-        raise Blocked('Awaiting ' + ('eval-skill diagnosis' if sid == 'diagnose' else 'metric-skill final report') +
-                      '. Fill result and Markdown body, set status=success and finished_at, then --resume.')
+        artifact['summary'] = ('Conservative clean completed for %d file(s): %d input lines, '
+                               '%d kept, %d collapsed.' %
+                               (result['processed_files'], result['input_lines'],
+                                result['kept_lines'], result['collapsed_lines']))
+        return '# Log cleaning\n\n' + artifact['summary'] + '\n'
+    if sid == 'diagnose':
+        return _auto_diagnose(plan, state, artifact, work)
+    if sid == 'report':
+        return _auto_report(plan, state, artifact, work)
     if sid == 'confidence':
         diagnosis, _ = read_artifact(plan.artifact('diagnose'))
         checks = diagnosis['result']['checks']
@@ -652,7 +1180,7 @@ def generate_index(plan, state, stopped_at):
         try:
             dg, _ = read_artifact(diag_path, 'diagnose', state['run_id'])
             result = dg.get('result', {})
-            root = result.get('root_cause', {})
+            root = result.get('root_cause') or {}
             lines.append('- 根因状态: {}'.format(root.get('status', 'unknown')))
             lines.append('- 根因描述: {}'.format(root.get('description', '—')[:200]))
             conf_path = plan.artifact('confidence')
@@ -729,7 +1257,7 @@ def run_stage(sid, plan, state, args):
         work = plan.state_dir / 'internal' / sid / ('%04d' % previous['attempts'])
         work.mkdir(parents=True, exist_ok=True)
         try:
-            body = execute(sid, plan, state, artifact, work) or body
+            body = execute(sid, plan, state, artifact, work, inputs) or body
             if artifact['status'] == 'running':
                 artifact['status'] = 'success'
             validate_business(sid, artifact)

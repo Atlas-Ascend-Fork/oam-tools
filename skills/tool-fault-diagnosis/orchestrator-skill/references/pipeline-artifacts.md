@@ -1,6 +1,6 @@
 # Pipeline 逐步产物契约
 
-本页是四个 skill 与调度层共享的产物定义。每个 stage 交付一个 Markdown，成功、等待、失败、重试和恢复均使用同一公共外壳与业务字段；重试记录不能另造只有错误摘要的 JSON/TXT。
+本页是五个 skill 与调度层共享的产物定义。每个 stage 交付一个 Markdown，成功、等待、失败、重试和恢复均使用同一公共外壳与业务字段；重试记录不能另造只有错误摘要的 JSON/TXT。
 
 ## 文件与消费者
 
@@ -13,7 +13,7 @@
 | 1 case_lookup | orchestrator-skill | `case-match.md` | detect、diagnose | 主案例库只读引用 |
 | 2 detect | orchestrator-skill | `scenario.md` | clean、diagnose、report | plan.json 为控制计划 |
 | 3 clean | eval-skill | `clean-result.md` | diagnose | `clean-audit.md`、清洗视图日志 |
-| 4 diagnose | eval-skill | `diagnosis.md` | confidence、promote、report | 已有堆栈解析、源码与证据引用 |
+| 4 diagnose | eval-skill + trace-skill | `diagnosis.md` | confidence、promote、report | fault-trace.json、时间线、调用链与证据引用 |
 | 5 confidence | eval-skill | `confidence.md` | promote、report | 内部兼容评分输入 |
 | 6 promote | eval-skill | `promotion.md` | report、后续任务 | 可选案例写入回执 |
 | 7 report | metric-skill | `report.md` | 用户 | 可选 HTML 与图表 |
@@ -79,7 +79,7 @@
 | materials | plog/device_log/coredump/stackcore/asys_output/npu_smi/app_log/profiling，每项 present/count/samples |
 | errors | 原始输入中识别到的错误证据数组；与 case_lookup.errors 一致，供场景与首错分析使用 |
 | missing_materials | 当前未发现的材料 key 数组；仅盘点，不安排补采 |
-| route | skills、references、pipeline_stages；固定七步，references 覆盖主/次场景 |
+| route | entry_skill、downstream_skills、selection_reason、skills、references、pipeline_stages；固定七步，references 覆盖主/次场景 |
 | input | path/kind/request/max_bytes/max_files/level、coverage 等扫描说明 |
 | case_lookup | 实际前驱检索结果，保留 hit/miss/unavailable 与候选 |
 | notes | 识别边界与限制 |

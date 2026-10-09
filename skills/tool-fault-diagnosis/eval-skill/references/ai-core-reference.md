@@ -164,17 +164,17 @@ step_id、检查内容、发现结果和下一步，便于追溯走到哪一步�
 
 | 编号 | 案例 | 首要识别特征 |
 | --- | --- | --- |
-| `0009` | HBM 比特 ECC 故障 | `event_id=0x80E01809/0x80E01801`、`multi-bit ECC` |
-| `0010` | icache 数据校验故障 | `event_id=0x80C98000`、`compare_fail_num != 0` |
-| `0011` | AI Core 硬件故障 | data-cache 2-bit ECC、`ascend-dmi` 报 `EMERGENCY_WARN` |
-| `0012` | 索引类算子索引越界 | 索引类算子、`0x800000`、index 超出输入维度 |
-| `0013` | 系统环境/硬件问题 | `Failed to execute the built-in sample operator` |
-| `0014` | 单算子运行报错 | `Failed to execute the single-operator test case` |
-| `0015` | atomic add 精度溢出 | `Atomic add has a precision overflow` |
-| `0016` | 算子输入输出数据地址异常 | `input/output ... is abnormal`、地址超出已分配范围 |
-| `0017` | 算子输入 args 下发前后不一致 | `args before execute` 与 `args after execute` 不同 |
-| `0018` | Dump 数据失败 | `Failed to get dump data of error op` |
-| `0019` | 算子输入 args 错误 | `args ... after execute` 中存在错误的 Host/Device 地址 |
+| `OFFICIAL-0009` | HBM 比特 ECC 故障 | `event_id=0x80E01809/0x80E01801`、`multi-bit ECC` |
+| `OFFICIAL-0010` | icache 数据校验故障 | `event_id=0x80C98000`、`compare_fail_num != 0` |
+| `OFFICIAL-0011` | AI Core 硬件故障 | data-cache 2-bit ECC、`ascend-dmi` 报 `EMERGENCY_WARN` |
+| `OFFICIAL-0012` | 索引类算子索引越界 | 索引类算子、`0x800000`、index 超出输入维度 |
+| `OFFICIAL-0013` | 系统环境/硬件问题 | `Failed to execute the built-in sample operator` |
+| `OFFICIAL-0014` | 单算子运行报错 | `Failed to execute the single-operator test case` |
+| `OFFICIAL-0015` | atomic add 精度溢出 | `Atomic add has a precision overflow` |
+| `OFFICIAL-0016` | 算子输入输出数据地址异常 | `input/output ... is abnormal`、地址超出已分配范围 |
+| `OFFICIAL-0017` | 算子输入 args 下发前后不一致 | `args before execute` 与 `args after execute` 不同 |
+| `OFFICIAL-0018` | Dump 数据失败 | `Failed to get dump data of error op` |
+| `OFFICIAL-0019` | 算子输入 args 错误 | `args ... after execute` 中存在错误的 Host/Device 地址 |
 
 ### 案例详解
 
@@ -231,9 +231,10 @@ errorStr: A 2-bit ECC error occurs in the data-cache data-ram.
 
 **故障根因**
 
-使用 `ascend-dmi --dg -i aicore` 压测 AI Core，结果出现 `EMERGENCY_WARN`，
-可确认 AI Core 硬件故障。日志中的单条 ECC 文字仍应与压测结果
-结合，不能省略验证步骤。
+已有 `ascend-dmi --dg -i aicore` 压测结果出现 `EMERGENCY_WARN` 时，才能确认
+AI Core 硬件故障。确认条件包括：同一 device 映射、压测时间与故障相关、ECC 日志
+与压测异常可关联。仅有单条 data-cache 2-bit ECC 文字时，结论只能保留为硬件故障
+候选，不能直接写成已确认根因。
 
 **处理方法**
 

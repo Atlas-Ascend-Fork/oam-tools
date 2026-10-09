@@ -1,0 +1,2 @@
+[INFO] RUNTIME(4242,fixture_app):2026-09-08-10:11:12.123450 [runtime.cc:70]Launch task, stream_id=3, task_id=19
+[FATAL] RUNTIME(4242,fixture_app):2026-09-08-10:11:12.123456 [runtime.cc:77]Process abort, error code=507035

@@ -28,15 +28,13 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE_CANDIDATES = (
-    SKILL_ROOT.parent / "template",
-    SKILL_ROOT / "template",
-)
+TEMPLATE_DIR = SKILL_ROOT / "template"
 LOCAL_REF_RE = re.compile(
-    r"(?P<prefix>\b(?:src|href)\s*=\s*['\"])(?P<path>(?!data:|https?://|#)[^'\"]+)(?P<suffix>['\"])",
+    r"(?P<prefix>\b(?:src|href)\s*=\s*['\"])(?P<path>(?!data:|https?://|#|tracing-report\.html\?)[^'\"]+)(?P<suffix>['\"])",
     flags=re.IGNORECASE,
 )
 CSS_URL_RE = re.compile(
@@ -47,11 +45,14 @@ REQUIRED_MARKERS = (
     'id="environment-title"',
     'id="overview-title"',
     'id="chain-title"',
+    'id="component-chain-title"',
     'id="map-title"',
     'id="architecture-wires"',
     'id="report-data-template"',
     "<!-- REPORT_TIMELINE_START -->",
     "<!-- REPORT_TIMELINE_END -->",
+    "<!-- REPORT_COMPONENT_CHAIN_START -->",
+    "<!-- REPORT_COMPONENT_CHAIN_END -->",
     "<!-- REPORT_ARCHITECTURE_GRAPH_START -->",
     "<!-- REPORT_ARCHITECTURE_GRAPH_END -->",
 )
@@ -80,6 +81,11 @@ VISUAL_CONTRACT_MARKERS = (
     ".remedy-head { min-height: 32px; padding: 4px 0 7px;",
     ".left-column > .panel { min-height: 0; }",
     ".flow-stack > .node + .node { margin-top: 20px; }",
+    ".report-component-chain-stage { position: relative; min-width: 100%; min-height: 150px; padding-top: 10px; }",
+    'data-component-chain-edge',
+    "function drawComponentChainWires() {",
+    "return label;",
+    "const hardwareRouteGroups = new Map();",
     ".connector { height: 40px;",
     ".map-panel { min-height: 0;",
     '<div class="legend"><span><i></i>调用/任务下发</span><span><i class="error-line"></i>错误上报/影响</span></div>',
@@ -96,6 +102,7 @@ VISUAL_CONTRACT_MARKERS = (
     'data-report-icon="component-layer"',
     'data-report-icon="hardware-layer"',
     'data-report-icon="device"',
+    '<symbol id="confidence" viewBox="0 0 24 24" aria-hidden="true">',
     ".layer-icon { width: 16px; height: 16px; flex: 0 0 16px; object-fit: contain; }",
     ".hardware-layer-icon { filter: invert(1); }",
     'html[data-theme="dark"] .hardware-layer-icon { filter: none; }',
@@ -152,6 +159,12 @@ TYPOGRAPHY_CONTRACT_MARKERS = (
     "-webkit-line-clamp: 2;",
     ".node-title { font-size: 14px; line-height: 22px; font-weight: 600; }",
     ".device-data { color: var(--muted); font-size: 12px; line-height: 18px;",
+    ".confidence-badge {",
+    ".confidence-icon {",
+    "transform: translateY(5px);",
+    ".confidence-text {",
+    "font-weight: 700;",
+    "white-space: nowrap;",
 )
 REPORT_DATA_TEMPLATE_RE = re.compile(
     r'<script\s+id="report-data-template"\s+type="application/json">(?P<data>.*?)</script>',
@@ -167,6 +180,10 @@ TIMELINE_BLOCK_RE = re.compile(
 )
 ARCHITECTURE_BLOCK_RE = re.compile(
     r"<!-- REPORT_ARCHITECTURE_GRAPH_START -->.*?<!-- REPORT_ARCHITECTURE_GRAPH_END -->",
+    flags=re.DOTALL,
+)
+COMPONENT_CHAIN_BLOCK_RE = re.compile(
+    r"<!-- REPORT_COMPONENT_CHAIN_START -->.*?<!-- REPORT_COMPONENT_CHAIN_END -->",
     flags=re.DOTALL,
 )
 NODE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,63}$")
@@ -219,6 +236,7 @@ NODE_STATUS_STRENGTH = {
     "observed": "proven",
     "unknown": "unknown",
 }
+NODE_STATUS_LABELS = set(NODE_STATUS_META)
 EDGE_KIND_META = {
     "root_cause": ("已证实根因链", "root-cause"),
     "call": ("调用/任务下发", "call"),
@@ -247,11 +265,9 @@ class ReportBuildError(RuntimeError):
 
 
 def find_template_dir() -> Path:
-    for candidate in TEMPLATE_CANDIDATES:
-        if (candidate / "index.html").is_file():
-            return candidate
-    searched = ", ".join(str(path) for path in TEMPLATE_CANDIDATES)
-    raise ReportBuildError(f"未找到共享报告模板，已检查: {searched}")
+    if (TEMPLATE_DIR / "index.html").is_file():
+        return TEMPLATE_DIR
+    raise ReportBuildError(f"未找到 metric-skill 报告模板: {TEMPLATE_DIR}")
 
 
 def load_embedded_report_data(template: str, source: Path) -> dict[str, object]:
@@ -389,9 +405,9 @@ def prepare_diagnosis_display(data: object, confidence: str) -> None:
 
     if score is not None:
         diagnosis["confidence_score"] = score
-        diagnosis["confidence_display"] = f"可信度 {score}/100 · {confidence}"
+        diagnosis["confidence_display"] = f"可信度 {score}%"
     else:
-        diagnosis["confidence_display"] = f"可信度 未提供 · {confidence}"
+        diagnosis["confidence_display"] = "可信度 未提供"
 
     aliases = {
         "首报": {"首报"},
@@ -418,6 +434,111 @@ def prepare_diagnosis_display(data: object, confidence: str) -> None:
             for canonical, fact in zip(aliases, fact_records)
         ]
     diagnosis["facts"] = normalized
+
+
+def reject_status_tag_reuse(data: object) -> None:
+    """Keep node tags semantic: status words must not masquerade as components."""
+    root = require_mapping(data, "report-data")
+    architecture = require_mapping(root.get("architecture"), "architecture")
+    layers = require_list(architecture.get("layers"), "architecture.layers")
+    for layer_index, raw_layer in enumerate(layers):
+        layer_path = f"architecture.layers.{layer_index}"
+        layer = require_mapping(raw_layer, layer_path)
+        nodes = require_list(layer.get("nodes"), f"{layer_path}.nodes")
+        for node_index, raw_node in enumerate(nodes):
+            node_path = f"{layer_path}.nodes.{node_index}"
+            node = require_mapping(raw_node, node_path)
+            status = require_text(node, "status", node_path)
+            tag = require_text(node, "tag", node_path)
+            if tag in NODE_STATUS_LABELS:
+                raise ReportBuildError(
+                    f"{node_path}.tag 不能复用状态词 '{tag}'；请填写组件短名"
+                )
+
+
+def normalize_legacy_hardware_devices(root: dict[str, object]) -> None:
+    """Promote populated legacy architecture.devices into the layered graph.
+
+    Older report data filled the template's four ``devices`` cards but left
+    ``layers.hardware.nodes`` as its single placeholder.  Keep the layered
+    schema as the rendering source, while accepting that older producer
+    format when the layered nodes are still clearly placeholders.
+    """
+    architecture_value = root.get("architecture")
+    if not isinstance(architecture_value, dict):
+        return
+    devices_value = architecture_value.get("devices")
+    if not isinstance(devices_value, list):
+        return
+    devices = [item for item in devices_value if isinstance(item, dict)]
+    if not devices or not any(
+        str(item.get("name") or "").strip() not in {"", "Device", "未提供"}
+        or str(item.get("role") or "").strip() not in {"", "未提供"}
+        or str(item.get("detail") or "").strip() not in {"", "未提供"}
+        for item in devices
+    ):
+        return
+
+    layers_value = architecture_value.get("layers")
+    if not isinstance(layers_value, list):
+        return
+    hardware = next(
+        (layer for layer in layers_value
+         if isinstance(layer, dict) and layer.get("kind") == "hardware"),
+        None,
+    )
+    if hardware is None or not isinstance(hardware.get("nodes"), list):
+        return
+    nodes = hardware["nodes"]
+    placeholder = not nodes or all(
+        isinstance(node, dict)
+        and str(node.get("title") or "").strip() in {"", "Device", "未提供"}
+        and str(node.get("detail") or "").strip() in {"", "未提供"}
+        and str(node.get("tag") or "").strip() in {"", "未提供"}
+        for node in nodes
+    )
+    if not placeholder:
+        return
+
+    layer_node_ids = {
+        str(node.get("id"))
+        for layer in layers_value
+        if isinstance(layer, dict) and layer.get("kind") != "hardware"
+        for node in (layer.get("nodes") or [])
+        if isinstance(node, dict) and node.get("id")
+    }
+    referenced_hardware_ids = []
+    for edge in architecture_value.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        for endpoint in (edge.get("from"), edge.get("to")):
+            if (isinstance(endpoint, str) and endpoint
+                    and endpoint not in layer_node_ids
+                    and endpoint not in referenced_hardware_ids):
+                referenced_hardware_ids.append(endpoint)
+    if nodes and isinstance(nodes[0], dict) and nodes[0].get("id"):
+        first_id = str(nodes[0]["id"])
+    else:
+        first_id = "hardware-entry"
+    hardware_ids = referenced_hardware_ids or [first_id]
+    if first_id not in hardware_ids and len(hardware_ids) < len(devices):
+        hardware_ids.insert(0, first_id)
+    normalized = []
+    for index, device in enumerate(devices):
+        name = str(device.get("name") or "Device").strip() or "Device"
+        role = str(device.get("role") or "未提供").strip() or "未提供"
+        detail = str(device.get("detail") or "未提供").strip() or "未提供"
+        status = "first_observed" if "首报" in role else "observed"
+        normalized.append({
+            "id": hardware_ids[index] if index < len(hardware_ids)
+            else "hardware-device-{}".format(index),
+            "status": status,
+            "evidence_strength": "proven",
+            "title": name,
+            "detail": detail,
+            "tag": role,
+        })
+    hardware["nodes"] = normalized
 
 
 def reject_insufficient_causal_status(status: str, confidence: str, path: str) -> None:
@@ -752,13 +873,302 @@ def render_architecture(data: object, confidence: str) -> str:
     return "".join(rendered_layers) + '<div hidden>' + "".join(rendered_edges) + "</div>"
 
 
-def render_report_data(template: str, data: object) -> str:
+_RAW_CLOCK_RE = re.compile(
+    r"^(?:(\d{4})-(\d{2})-(\d{2})-)?(\d{2}):(\d{2}):(\d{2})\.(\d{3})"
+)
+_COMPACT_CLOCK_RE = re.compile(r"^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{3})")
+
+
+def short_clock(raw: str, anchor_date: str = "") -> str:
+    """Render HH:MM:SS.mmm from a raw CANN timestamp, prefixed with MM-DD
+    when the event date differs from the anchor date."""
+    text = str(raw or "").strip()
+    m = _RAW_CLOCK_RE.match(text)
+    if m:
+        year, month, day, hh, mm, ss, ms = m.groups()
+        date = f"{year}-{month}-{day}" if year else ""
+    else:
+        c = _COMPACT_CLOCK_RE.match(text)
+        if not c:
+            return ""
+        year, month, day, hh, mm, ss, ms = c.groups()
+        date = f"{year}-{month}-{day}"
+    prefix = f"{month}-{day} " if date and anchor_date and date != anchor_date else ""
+    return f"{prefix}{hh}:{mm}:{ss}.{ms}"
+
+
+def anchor_date_of(events: list, anchor_id: str = "") -> str:
+    by_id = {str(e.get("id")): e for e in events if isinstance(e, dict) and e.get("id")}
+    if anchor_id and anchor_id in by_id:
+        raw = str(((by_id[anchor_id].get("timestamp") or {}).get("raw")) or "")
+        m = _RAW_CLOCK_RE.match(raw)
+        if m and m.group(1):
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        c = _COMPACT_CLOCK_RE.match(raw)
+        if c:
+            return f"{c.group(1)}-{c.group(2)}-{c.group(3)}"
+    for event in events:
+        raw = str(((event or {}).get("timestamp") or {}).get("raw") or "")
+        m = _RAW_CLOCK_RE.match(raw)
+        if m and m.group(1):
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        c = _COMPACT_CLOCK_RE.match(raw)
+        if c:
+            return f"{c.group(1)}-{c.group(2)}-{c.group(3)}"
+    return ""
+
+
+def synchronize_architecture_edges(root: dict[str, object]) -> None:
+    """Map proven component calls onto existing layered-report nodes.
+
+    The component-chain panel keeps its own proven/inferred presentation.  The
+    layered architecture graph only accepts proven call edges, so inferred
+    relationships must not be upgraded here.
+    """
+    architecture_value = root.get("architecture")
+    chain_value = root.get("component_chain")
+    if not isinstance(architecture_value, dict) or not isinstance(chain_value, dict):
+        return
+
+    architecture = architecture_value
+    chain = chain_value
+    layers_value = architecture.get("layers")
+    chain_nodes_value = chain.get("nodes")
+    chain_edges_value = chain.get("edges")
+    if not isinstance(layers_value, list) or not isinstance(chain_nodes_value, list):
+        return
+    if not isinstance(chain_edges_value, list):
+        return
+
+    node_ids_by_component: dict[str, str] = {}
+    for raw_layer in layers_value:
+        if not isinstance(raw_layer, dict):
+            continue
+        nodes_value = raw_layer.get("nodes")
+        if not isinstance(nodes_value, list):
+            continue
+        for raw_node in nodes_value:
+            if not isinstance(raw_node, dict):
+                continue
+            node_id = raw_node.get("id")
+            if not isinstance(node_id, str) or not node_id:
+                continue
+            for field in ("catalog_name", "title", "tag"):
+                component = raw_node.get(field)
+                if isinstance(component, str) and component:
+                    node_ids_by_component.setdefault(component, node_id)
+
+    edges_value = architecture.get("edges")
+    edges = edges_value if isinstance(edges_value, list) else []
+    existing = {
+        (edge.get("from"), edge.get("to"), edge.get("kind"))
+        for edge in edges
+        if isinstance(edge, dict)
+    }
+    for raw_edge in chain_edges_value:
+        if not isinstance(raw_edge, dict):
+            continue
+        if raw_edge.get("kind") not in {"call", "notification"}:
+            continue
+        if raw_edge.get("strength") != "proven":
+            continue
+        source = raw_edge.get("source_component")
+        target = raw_edge.get("target_component")
+        if not isinstance(source, str) or not isinstance(target, str):
+            continue
+        source_id = node_ids_by_component.get(source)
+        target_id = node_ids_by_component.get(target)
+        if not source_id or not target_id or source_id == target_id:
+            continue
+        key = (source_id, target_id, "call")
+        if key in existing:
+            continue
+        edges.append(
+            {
+                "from": source_id,
+                "to": target_id,
+                "kind": "call",
+                "evidence_strength": "proven",
+                "label": "调用/任务下发",
+            }
+        )
+        existing.add(key)
+    architecture["edges"] = edges
+
+
+def render_component_chain(data: object, trace_events: object = None) -> str:
+    root = require_mapping(data, "report-data")
+    raw_chain = root.get("component_chain")
+    start = "<!-- REPORT_COMPONENT_CHAIN_START -->"
+    end = "<!-- REPORT_COMPONENT_CHAIN_END -->"
+    if raw_chain is None:
+        return f'{start}<p class="report-component-empty">调用链未提供</p>{end}'
+
+    chain = require_mapping(raw_chain, "component_chain")
+    version = require_text(chain, "schema_version", "component_chain")
+    if version != "1.0.0":
+        raise ReportBuildError("component_chain.schema_version 必须是 1.0.0")
+    anchor_id = require_text(chain, "anchor_id", "component_chain")
+    events = trace_events if isinstance(trace_events, list) else []
+    event_raw = {
+        str(event.get("id")): str(((event.get("timestamp") or {}).get("raw")) or "")
+        for event in events
+        if isinstance(event, dict) and event.get("id")
+    }
+    anchor_date = anchor_date_of(events, anchor_id)
+    raw_nodes = require_list(chain.get("nodes"), "component_chain.nodes")
+    raw_edges = require_list(chain.get("edges"), "component_chain.edges")
+    gaps = require_list(chain.get("gaps"), "component_chain.gaps")
+    allowed_roles = {
+        "fault-source": "故障源",
+        "direct-trigger": "直接触发",
+        "propagation": "传播节点",
+        "affected": "受影响",
+        "business-error": "业务报错",
+        "observed": "已观测",
+    }
+    nodes: list[dict[str, object]] = []
+    component_names: set[str] = set()
+    for index, raw_node in enumerate(raw_nodes):
+        path = f"component_chain.nodes.{index}"
+        node = require_mapping(raw_node, path)
+        node_id = require_text(node, "id", path)
+        component = require_text(node, "component", path)
+        member_event_ids = require_list(node.get("member_event_ids"), f"{path}.member_event_ids")
+        if not member_event_ids or not all(isinstance(item, str) and item for item in member_event_ids):
+            raise ReportBuildError(f"{path}.member_event_ids 必须是非空事件 ID 数组")
+        representative_event_id = require_text(node, "representative_event_id", path)
+        if representative_event_id not in member_event_ids:
+            raise ReportBuildError(f"{path}.representative_event_id 必须属于 member_event_ids")
+        fault_role = require_text(node, "fault_role", path)
+        if fault_role not in allowed_roles:
+            raise ReportBuildError(f"{path}.fault_role 不受支持: {fault_role}")
+        if component in component_names:
+            raise ReportBuildError(f"component_chain.nodes 组件重复: {component}")
+        component_names.add(component)
+        deep_link = require_mapping(node.get("deep_link"), f"{path}.deep_link")
+        link_view = require_text(deep_link, "view", f"{path}.deep_link")
+        link_anchor = require_text(deep_link, "anchor", f"{path}.deep_link")
+        link_component = require_text(deep_link, "component", f"{path}.deep_link")
+        link_event = require_text(deep_link, "event", f"{path}.deep_link")
+        if (
+            link_view != "fault"
+            or link_anchor != anchor_id
+            or link_component != component
+            or link_event != representative_event_id
+        ):
+            raise ReportBuildError(f"{path}.deep_link 与组件节点身份不一致")
+        href = "tracing-report.html?" + urlencode(
+            {
+                "view": link_view,
+                "anchor": link_anchor,
+                "component": link_component,
+                "event": link_event,
+            }
+        )
+        nodes.append(
+            {
+                "id": node_id,
+                "component": component,
+                "member_count": len(member_event_ids),
+                "fault_role": fault_role,
+                "fault_role_label": allowed_roles[fault_role],
+                "summary": require_text(node, "summary", path),
+                "summary_short": str(node.get("summary_short") or ""),
+                "representative_event_id": representative_event_id,
+                "href": href,
+            }
+        )
+
+    edge_markup: list[str] = []
+    allowed_strengths = {"proven", "inferred"}
+    allowed_kinds = {"call", "notification"}
+    for index, raw_edge in enumerate(raw_edges):
+        path = f"component_chain.edges.{index}"
+        edge = require_mapping(raw_edge, path)
+        source = require_text(edge, "source_component", path)
+        target = require_text(edge, "target_component", path)
+        strength = require_text(edge, "strength", path)
+        kind = require_text(edge, "kind", path)
+        if source not in component_names or target not in component_names or source == target:
+            raise ReportBuildError(f"{path} 必须连接两个不同且已存在的组件")
+        if strength not in allowed_strengths:
+            raise ReportBuildError(f"{path}.strength 只能是 proven 或 inferred")
+        if kind not in allowed_kinds:
+            raise ReportBuildError(f"{path}.kind 只能是 call 或 notification")
+        edge_markup.append(
+            '<span data-component-chain-edge data-component-chain-strength="{}" '
+            'data-edge-from="{}" data-edge-to="{}" data-edge-strength="{}" '
+            'data-edge-kind="{}"></span>'.format(
+                html.escape(strength, quote=True),
+                html.escape(source, quote=True),
+                html.escape(target, quote=True),
+                html.escape(strength, quote=True),
+                html.escape(kind, quote=True),
+            )
+        )
+
+    if not nodes:
+        return f'{start}<p class="report-component-empty">组件调用关系证据未提供</p>{end}'
+
+    stage_width = len(nodes) * 138 + max(0, len(nodes) - 1) * 34
+    card_markup = "".join(
+        '<a class="report-component-card" data-component-chain-component="{}" '
+        'data-fault-role="{}" href="{}"><span class="report-component-name">{}</span>'
+        '<span class="report-component-count" title="该组件块共包含 {} 条日志事件">{} 个事件</span>'
+        '<span class="report-component-role">{}</span>'
+        '<span class="report-component-summary" title="{}">{}</span>'
+        '<span class="report-component-time" title="{}">{}</span></a>'.format(
+            html.escape(str(node["component"]), quote=True),
+            html.escape(str(node["fault_role"]), quote=True),
+            html.escape(str(node["href"]), quote=True),
+            html.escape(str(node["component"])),
+            node["member_count"],
+            node["member_count"],
+            html.escape(str(node["fault_role_label"])),
+            html.escape(str(node["summary"]), quote=True),
+            html.escape(str(node["summary_short"] or node["summary"])[:64]),
+            html.escape(str(event_raw.get(str(node["representative_event_id"]), "")), quote=True),
+            html.escape(short_clock(event_raw.get(str(node["representative_event_id"]), ""), anchor_date)),
+        )
+        for node in nodes
+    )
+    gap_markup = ""
+    if gaps:
+        if not all(isinstance(gap, str) for gap in gaps):
+            raise ReportBuildError("component_chain.gaps 必须是字符串数组")
+        gap_markup = (
+            '<p class="report-component-gap">调用关系证据不足：保留已观测组件，'
+            "未按架构自动补线。</p>"
+        )
+    return (
+        f'{start}<div class="report-component-chain-scroll"><div '
+        f'class="report-component-chain-stage" id="report-component-chain-stage" '
+        f'style="width:{stage_width}px"><div class="report-component-chain-row">'
+        f'{card_markup}</div><svg class="report-component-wires" '
+        'id="report-component-chain-wires" aria-label="组件正常调用方向">'
+        '<defs><marker id="component-arrow-proven" viewBox="0 0 10 10" refX="9" '
+        'refY="5" markerWidth="7" markerHeight="7" orient="auto"><path '
+        'd="M 0 0 L 10 5 L 0 10 z" fill="var(--green)"/></marker><marker '
+        'id="component-arrow-inferred" viewBox="0 0 10 10" refX="9" refY="5" '
+        'markerWidth="7" markerHeight="7" orient="auto"><path '
+        'd="M 0 0 L 10 5 L 0 10 z" fill="var(--blue)"/></marker></defs>'
+        '<g id="report-component-chain-paths"></g></svg><div hidden>'
+        f'{"".join(edge_markup)}</div></div></div><div class="report-component-legend">'
+        '<span><i></i>proven 调用</span><span><i class="inferred"></i>'
+        f'inferred 调用</span></div>{gap_markup}{end}'
+    )
+
+
+def render_report_data(template: str, data: object, trace_events: object = None) -> str:
     missing: set[str] = set()
 
     if not TIMELINE_BLOCK_RE.search(template):
         raise ReportBuildError("报告模板缺少动态首错预览替换块")
     if not ARCHITECTURE_BLOCK_RE.search(template):
         raise ReportBuildError("报告模板缺少动态架构预览替换块")
+    if not COMPONENT_CHAIN_BLOCK_RE.search(template):
+        raise ReportBuildError("报告模板缺少动态调用链替换块")
     template = REPORT_DATA_TEMPLATE_RE.sub("", template, count=1)
     root = require_mapping(data, "report-data")
     environment = require_mapping(root.get("environment"), "environment")
@@ -859,11 +1269,16 @@ def render_report_data(template: str, data: object) -> str:
             )
 
     confidence = require_confidence(data)
+    normalize_legacy_hardware_devices(root)
     prepare_diagnosis_display(data, confidence)
+    reject_status_tag_reuse(data)
+    synchronize_architecture_edges(root)
     timeline = render_timeline(data, confidence)
     architecture_graph = render_architecture(data, confidence)
+    component_chain = render_component_chain(data, trace_events)
     template = TIMELINE_BLOCK_RE.sub(timeline, template, count=1)
     template = ARCHITECTURE_BLOCK_RE.sub(architecture_graph, template, count=1)
+    template = COMPONENT_CHAIN_BLOCK_RE.sub(component_chain, template, count=1)
 
     def replace(match: re.Match[str]) -> str:
         path = match.group("path")
@@ -957,7 +1372,13 @@ def embed_local_assets(html: str, source: Path) -> str:
     return CSS_URL_RE.sub(replace, LOCAL_REF_RE.sub(replace, html))
 
 
-def package_report(source: Path, output: Path, force: bool, data_path: Path | None = None) -> None:
+def package_report(
+    source: Path,
+    output: Path,
+    force: bool,
+    data_path: Path | None = None,
+    trace_path: Path | None = None,
+) -> None:
     if source.resolve() == output.resolve():
         raise ReportBuildError("输出文件不能覆盖输入模板；请为 --output 使用独立路径")
     if output.exists() and not force:
@@ -968,8 +1389,20 @@ def package_report(source: Path, output: Path, force: bool, data_path: Path | No
     html = source.read_text(encoding="utf-8")
     validate_structure(html, source)
     icons = load_icon_data(html, source)
-    if data_path is not None:
-        html = render_report_data(html, load_report_data(data_path))
+    report_data: object | None = load_report_data(data_path) if data_path is not None else None
+    trace_events: object = None
+    if trace_path is not None:
+        if report_data is None:
+            report_data = load_embedded_report_data(html, source)
+        report_root = require_mapping(report_data, "report-data")
+        trace_root = require_mapping(load_report_data(trace_path), "fault-trace")
+        component_chain = trace_root.get("component_chain")
+        if component_chain is None:
+            raise ReportBuildError("fault-trace.json 缺少 component_chain")
+        report_root["component_chain"] = component_chain
+        trace_events = trace_root.get("events")
+    if report_data is not None:
+        html = render_report_data(html, report_data, trace_events)
     html = apply_embedded_icons(html, icons)
     html = REPORT_DATA_TEMPLATE_RE.sub("", html, count=1)
     validate_no_placeholders(html, check_semantic=data_path is None)
@@ -996,12 +1429,15 @@ def parse_args() -> argparse.Namespace:
     action.add_argument("--output", type=Path, metavar="HTML", help="输出独立 HTML")
     parser.add_argument("--input", type=Path, metavar="HTML", help="报告模板或编辑后的 HTML，默认使用内置空白模板")
     parser.add_argument("--data", type=Path, metavar="JSON", help="填充模板语义字段的结构化 JSON")
+    parser.add_argument("--trace", type=Path, metavar="JSON", help="从 fault-trace.json 注入已校验的 component_chain")
     parser.add_argument("--force", action="store_true", help="覆盖已存在的目标")
     args = parser.parse_args()
     if args.init and args.input:
         parser.error("--input 只能与 --output 一起使用")
     if args.init and args.data:
         parser.error("--data 只能与 --output 一起使用")
+    if args.init and args.trace:
+        parser.error("--trace 只能与 --output 一起使用")
     return args
 
 
@@ -1013,7 +1449,14 @@ def main() -> int:
         else:
             source = (args.input or (find_template_dir() / "index.html")).expanduser().resolve()
             data_path = args.data.expanduser().resolve() if args.data else None
-            package_report(source, args.output.expanduser().resolve(), args.force, data_path)
+            trace_path = args.trace.expanduser().resolve() if args.trace else None
+            package_report(
+                source,
+                args.output.expanduser().resolve(),
+                args.force,
+                data_path,
+                trace_path,
+            )
         return 0
     except ReportBuildError as exc:
         print(f"ERROR {exc}", file=sys.stderr)

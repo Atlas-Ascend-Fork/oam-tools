@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cann:fault-trace-inventory:1",
+  "title": "CANN fault trace ingestion inventory v1",
+  "type": "object",
+  "required": [
+    "artifact_kind", "inventory_schema_version", "status", "metadata", "input"
+  ],
+  "properties": {
+    "artifact_kind": { "const": "fault-trace-inventory" },
+    "inventory_schema_version": { "const": "1.0.0" },
+    "status": { "const": "no_trace" },
+    "metadata": {
+      "type": "object",
+      "required": ["generator_version", "redaction_scope"],
+      "properties": {
+        "generator_version": { "type": "string" },
+        "redaction_scope": { "$ref": "#/$defs/redactionScope" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["boundary", "inventory"],
+      "properties": {
+        "boundary": { "type": "string" },
+        "inventory": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } }
+      }
+    }
+  },
+  "$defs": {
+    "inventoryEntry": {
+      "type": "object",
+      "required": ["source_path", "status", "parsed_records", "unparsed_records"],
+      "properties": {
+        "source_path": { "type": "string" },
+        "status": { "enum": ["parsed", "unsupported", "unreadable", "rejected", "archive"] },
+        "parser": { "type": ["string", "null"] },
+        "reason": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "parsed_records": { "type": "integer", "minimum": 0 },
+        "unparsed_records": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "redactionScope": {
+      "type": "object",
+      "required": ["kind", "scope_id"],
+      "properties": {
+        "kind": { "const": "package-local" },
+        "scope_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+      }
+    }
+  }
+}

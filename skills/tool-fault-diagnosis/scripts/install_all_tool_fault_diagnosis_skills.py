@@ -33,9 +33,10 @@ SUB_SKILLS = [
     ("orchestrator-skill", "orchestrator-skill"),
     ("collect-skill", "collect-skill"),
     ("eval-skill", "eval-skill"),
+    ("trace-skill", "trace-skill"),
     ("metric-skill", "metric-skill"),
 ]
-SHARED_TEMPLATE_DIR = "template"
+TEMPLATE_DIR = "template"
 TEMPLATE_MODULE_FILES = ("report-template-rules.md", "index.html")
 
 
@@ -125,22 +126,6 @@ def copy_skill(src: Path, dest: Path, overwrite: bool, dry_run: bool) -> str:
     return "installed"
 
 
-def copy_shared_template(src_root: Path, metric_dest: Path, dry_run: bool) -> str:
-    src = src_root / SHARED_TEMPLATE_DIR
-    dest = metric_dest / SHARED_TEMPLATE_DIR
-    missing = [name for name in TEMPLATE_MODULE_FILES if not (src / name).is_file()]
-    if missing:
-        raise InstallError(f"缺少报告模板参考: {', '.join(str(src / name) for name in missing)}")
-    if dry_run:
-        return "would-install"
-    if dest.exists():
-        shutil.rmtree(dest)
-    dest.mkdir(parents=True)
-    for name in TEMPLATE_MODULE_FILES:
-        shutil.copyfile(src / name, dest / name)
-    return "installed"
-
-
 def verify_installation(src_root: Path, dest_root: Path) -> list[str]:
     problems: list[str] = []
     for subdir, fallback_name in SUB_SKILLS:
@@ -155,7 +140,7 @@ def verify_installation(src_root: Path, dest_root: Path) -> list[str]:
             if script.is_file() and script.suffix in {".py", ".sh"} and not os.access(installed_script, os.X_OK):
                 problems.append(f"脚本不可执行: {installed_script}")
     metric_name = verify_skill_name(src_root / "metric-skill" / "SKILL.md", "metric-skill")
-    installed_template_dir = dest_root / metric_name / SHARED_TEMPLATE_DIR
+    installed_template_dir = dest_root / metric_name / TEMPLATE_DIR
     installed_entries = {
         str(path.relative_to(installed_template_dir))
         for path in installed_template_dir.rglob("*")
@@ -180,26 +165,12 @@ def install_to_dest(src_root: Path, dest_root: Path, overwrite: bool, dry_run: b
         dest_root.mkdir(parents=True, exist_ok=True)
 
     rows: list[tuple[str, str, str]] = []
-    metric_dest = None
-    metric_status = ""
     for subdir, _ in SUB_SKILLS:
         src = src_root / subdir
         name = read_skill_name(src / "SKILL.md")
         dest = dest_root / name
         status = copy_skill(src, dest, overwrite, dry_run)
         rows.append((name, str(dest), status))
-        if subdir == "metric-skill":
-            metric_dest = dest
-            metric_status = status
-
-    if metric_dest is None:
-        raise InstallError("未找到 metric-skill 安装目标")
-    template_dest = metric_dest / SHARED_TEMPLATE_DIR
-    if metric_status == "skip-existing":
-        template_status = "skip-existing"
-    else:
-        template_status = copy_shared_template(src_root, metric_dest, dry_run)
-    rows.append(("shared-template", str(template_dest), template_status))
 
     for name, dest, status in rows:
         print(f"{status:15} {name:20} {dest}")

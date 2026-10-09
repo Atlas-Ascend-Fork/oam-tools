@@ -1,0 +1,2 @@
+[2026-08-30-14:24:22.940590] [439.288679] [ascend] [hdcdrv] [INFO] [hdcdrv_notify 42] <app:77034:77036> Notify process. (dev_id=0)
+[2026-08-30-14:24:22.940610] [439.288699] [ascend] [hdcdrv] [INFO] [hdcdrv_notify 43] <other:99000:99001> Unrelated kernel work. (dev_id=0)

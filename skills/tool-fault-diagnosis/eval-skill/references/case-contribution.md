@@ -132,16 +132,30 @@ grep -ni "layernorm\|allreduce timeout" eval-skill/references/cases.md
 
 ## 5. 脱敏检查
 
-写入前必须清理：
+写入前必须清理。入库检查会扫描最终写入的完整案例块；规则包括：
 
 - 内网 IP、主机名、集群名 → `<host>` / `10.x.x.x`
 - 用户名、绝对家目录路径 → `$HOME` / `<user>`
 - token、密钥、证书路径 → `<redacted>`
 - 业务模型名、数据集名（如涉密）→ 泛化为 `<大模型>` / `<业务数据集>`
 
+新增扫描还包括：认证信息（Authorization/Bearer/Cookie/Session）、私钥或证书材料（.pem/.crt/.key/.p12/.pfx）、`/root/<path>` 与 `/Users/<user>`、`host/hostname/node/cluster/server/pod/rack` 标识，以及 model/dataset 名称或路径。
+
 保留对诊断有价值的信息：错误码、算子名、CANN/Driver 版本、shape、dtype、device/stream/task ID。
 
 ---
+
+## 5.1 只读脱敏扫描
+
+入库前检查覆盖最终写入的完整案例块，包括问题描述、关键日志、根因、方案和元信息。除入库检查外，可用以下命令只读扫描既有 Markdown，不修改文件：
+
+```bash
+python3 scripts/promote_case.py --check --files \
+    references/cases.md \
+    references/cases-pending.md
+```
+
+输出为 `文件:行号 类型 片段`。命中的内容只表示疑似敏感信息，仍需人工确认后修改；脚本不会自动替换。扫描范围包括 IP、用户目录、凭据/认证信息、邮箱、SSH 公钥、私钥或证书材料、主机或集群标识，以及业务模型或数据集标识。
 
 ## 6. 脚本用法
 

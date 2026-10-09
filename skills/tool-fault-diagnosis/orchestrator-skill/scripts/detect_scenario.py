@@ -43,9 +43,12 @@ SCENARIOS = {
     "oom": ("内存不足", ["app_log"], ["fault-flows/oom-flow.md"]),
     "hang": ("进程卡住", ["app_log"], ["fault-flows/hang-flow.md"]),
     "comm_timeout": ("通信超时", ["plog", "device_log"], ["fault-flows/hang-flow.md", "fault-handling.md"]),
+    "card_drop": ("掉卡", ["device_log", "app_log"], ["fault-flows/card-drop-flow.md", "card-drop-reference.md"]),
     "compile_error": ("编译失败", ["app_log"], ["background.md"]),
-    "precision": ("精度异常", ["app_log"], ["background.md"]),
-    "perf_degradation": ("性能问题", ["profiling"], ["background.md"]),
+    "precision": ("精度异常", ["app_log"], ["fault-flows/precision-flow.md"]),
+    "perf_degradation": ("性能问题", ["profiling"], ["fault-flows/performance-flow.md"]),
+    "offline_inference": ("离线推理/ATC", ["app_log"], ["fault-flows/offline-inference-flow.md"]),
+    "network": ("网络故障", ["plog", "device_log"], ["fault-flows/network-flow.md"]),
     "generic_error": ("待分类错误", ["app_log"], []),
     "unknown": ("场景未明确", [], []),
 }
@@ -68,8 +71,10 @@ ERROR_TEXT_RE = re.compile(
     r"segmentation fault|sig(?:segv|abrt)|out of memory|memory allocation failed|"
     r"timeout|timed out|deadlock|hang|crash(?:ed)?)\b", re.I)
 TIMESTAMP_RE = re.compile(
-    r"\b(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}[ T]\d{1,2}:\d{2}:\d{2}(?:\.\d+)?|"
-    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\b")
+    # CANN plog commonly uses YYYY-MM-DD-HH:MM:SS.fff.fff, while
+    # generic logs use a space/T separator and usually one fractional part.
+    r"\b\d{4}[-/]\d{1,2}[-/]\d{1,2}[ T-]\d{1,2}:\d{2}:\d{2}"
+    r"(?:\.\d+)*(?:Z|[+-]\d{2}:?\d{2})?\b")
 OPERATIONS = {
     "allreduce": r"\bAllReduce\b", "allgather": r"\bAllGather\b",
     "broadcast": r"\bBroadcast\b", "reducescatter": r"\bReduceScatter\b",
@@ -86,6 +91,50 @@ SYMPTOMS = {
     "segfault": r"\bSIGSEGV\b|\bSegmentation fault\b",
     "aborted": r"\bSIGABRT\b|\bcore dumped\b",
 }
+
+
+def select_entry_route(request):
+    """Select the public entry skill without replacing the scenario pipeline.
+
+    The platform chooses a skill from its description before this script runs.
+    Keeping the same boundary in the generated plan makes that decision
+    inspectable and prevents a generic log/report request from looking like a
+    direct eval invocation. Direct specialist entry is reserved for an
+    explicit skill request (or an already-produced eval result for metric).
+    """
+    text = (request or "").strip()
+    lower = text.lower()
+    asks_report = bool(re.search(r"诊断报告|完整报告|正式报告|根因报告|html|度量报告|report", lower, re.I))
+    explicit_orchestrator = bool(re.search(r"orchestrator(?:-skill)?|统一调度|统一编排", lower, re.I))
+    explicit_collect = bool(re.search(r"collect(?:-skill)?|采集日志|收集日志", lower, re.I))
+    explicit_eval = bool(re.search(r"eval(?:-skill)?|日志评估技能|评估技能", lower, re.I))
+    specialist_terms = (
+        r"ai\s*core(?:\s*error)?|aicore|oom|out\s+of\s+memory|coredump|core\s+dump|"
+        r"stackcore|sigsegv|sigabrt|通信超时|进程崩溃|任务卡住|hang|precision|精度异常|"
+        r"掉卡|卡不在位|\bATC\b|soc_version|离线推理|网络故障"
+    )
+    explicit_specialist_scenario = bool(re.search(
+        r"(?:分析|诊断|排查|定位|处理|专项).{0,8}(?:" + specialist_terms + r")|"
+        r"(?:" + specialist_terms + r").{0,8}(?:专项|故障|问题)",
+        lower, re.I))
+    has_eval_artifact = bool(re.search(
+        r"(?:已有|提供了|根据|基于|existing|provided|with|using|based\s+on).*(?:diagnosis(?:\.md)?|confidence(?:\.md)?|评估结论|诊断结论)",
+        lower, re.I))
+
+    if explicit_orchestrator:
+        return "orchestrator-skill", ["eval-skill", "trace-skill", "metric-skill"], "user_explicitly_requested_orchestrator"
+    if explicit_collect and not asks_report:
+        return "collect-skill", [], "user_explicitly_requested_collection"
+    if has_eval_artifact and asks_report:
+        return "metric-skill", [], "existing_eval_artifacts_ready_for_reporting"
+    if explicit_eval or explicit_specialist_scenario:
+        downstream = ["metric-skill"] if asks_report else []
+        reason = "user_explicitly_requested_eval" if explicit_eval else "user_named_single_specialist_scenario"
+        return "eval-skill", downstream, reason
+    # A raw log plus a generic analysis/diagnosis/report request is the
+    # orchestrator boundary. It is a semantic default, not a global force:
+    # explicit specialist requests above still take their direct path.
+    return "orchestrator-skill", ["eval-skill", "trace-skill", "metric-skill"], "generic_or_multi_stage_log_request"
 
 
 def _hash(value):
@@ -340,6 +389,7 @@ def lookup_cases(input_or_scan, request="", max_bytes=MAX_BYTES_DEFAULT,
             "differences": {"unmatched_signature_features": unmatched,
                             "version_applicability": "unverified", "environment_applicability": "unverified"},
             "root_cause_status": "candidate_only"})
+
     if result["matches"]:
         result["status"] = "hit"
         result["limitations"].append("Signature similarity does not verify case root cause, environment or version applicability.")
@@ -376,6 +426,13 @@ CONTENT_SIGNALS = [
     ("compile_failed", "compile_error", 60, r"\b(?:compile\s+op|graph\s+(?:compile|build)|build\s+graph|compilation)\b.{0,60}\b(?:failed|error)\b|\bUB memory overflow\b|\bEB\d{4}\b"),
     ("precision_nonfinite", "precision", 60, r"\bcontains\s+(?:inf/nan|nan|inf)\b|\bloss\s*[=:]\s*(?:nan|[-+]?inf)\b|\b(?:precision|numeric) overflow detected\b"),
     ("perf_regression", "perf_degradation", 50, r"\bperformance regression\b|性能(?:劣化|下降)|吞吐(?:下降|降低)"),
+    ("card_drop_device", "card_drop", 60, r"\bEL0001\b|\bDevice_Absent\b|\bDevice_Abnormal\b|卡不在位"),
+    ("card_drop_pcie", "card_drop", 50, r"\bPCIe\s+link\s+down\b"),
+    ("atc_conversion_failed", "offline_inference", 55, r"\bmodel\s+conversion\s+failed\b|\bATC\b.{0,50}\b(?:failed|error)\b"),
+    ("atc_soc_version", "offline_inference", 55, r"\bsoc_version\b"),
+    ("offline_inference_error", "offline_inference", 50, r"\bduring\s+ATC\b|\bduring\s+inference\b|\bparameter\s+validation\s+failed\b"),
+    ("network_ei0013", "network", 60, r"\bEI0013\b|\bROCE\s+CQE\b"),
+    ("network_link_flap", "network", 50, r"端口闪断|网络诊断异常|\blink\s+flap\b|丢包|\bpacket\s+loss\b"),
     ("generic_code", "generic_error", 35, r"\bE[A-Z0-9]\d{4}\b"),
     ("generic_failure", "generic_error", 25, r"\bfailed to\s+\w+|\bFATAL\b|\bRuntimeError:"),
 ]
@@ -388,6 +445,9 @@ REQUEST_SIGNALS = {
     "compile_error": r"编译失败|编译错误|\bcompile\s+(?:error|failed)\b",
     "precision": r"精度异常|精度不达标|不收敛|\bloss\b.*\bnan\b",
     "perf_degradation": r"性能下降|性能劣化|变慢|吞吐下降|\bslow(?:er)?\b",
+    "card_drop": r"掉卡|卡消失|查不到卡|卡不在位",
+    "offline_inference": r"离线推理|模型转换|\bATC\b|soc_version",
+    "network": r"网络故障|丢包|端口闪断|网络排查",
 }
 
 
@@ -485,6 +545,11 @@ def build_plan(input_path, request="", max_bytes=MAX_BYTES_DEFAULT, max_files=MA
     if "perf_degradation" in [primary] + secondary:
         references.extend(["metric-skill/references/baseline-data.md", "metric-skill/references/metric-analysis.md"])
     missing = [key for key in MATERIAL_PATTERNS if not materials[key]["present"]]
+    entry_skill, downstream_skills, route_reason = select_entry_route(request)
+    skills = []
+    for skill in [entry_skill] + downstream_skills:
+        if skill not in skills:
+            skills.append(skill)
     return {"schema_version": SCHEMA_VERSION, "generated_at": datetime.now(timezone.utc).isoformat(),
             "input": {"path": scan["path"], "kind": scan["kind"], "request": request,
                       "max_bytes": scan["max_bytes"], "max_files": scan["max_files"], "level": "DEBUG",
@@ -495,7 +560,8 @@ def build_plan(input_path, request="", max_bytes=MAX_BYTES_DEFAULT, max_files=MA
             "errors": scan.get("errors", []),
             "recognition_confidence": confidence, "uncertain": uncertain,
             "scenarios": scored, "materials": materials, "missing_materials": missing,
-            "route": {"skills": ["eval-skill", "metric-skill"], "references": references,
+            "route": {"entry_skill": entry_skill, "downstream_skills": downstream_skills,
+                      "selection_reason": route_reason, "skills": skills, "references": references,
                       "pipeline_stages": list(ALL_STAGES)},
             "stages": {"clean": {"level": "DEBUG", "mode": "conservative"}, "promote": {"enabled": False}},
             "notes": notes + list(scan["limitations"]) + [
@@ -524,6 +590,8 @@ def render(plan):
         "- 主场景：" + plan["primary"], "- 竞争场景：" + (", ".join(plan["secondary"]) or "无"),
         "- 识别可信度：" + plan["recognition_confidence"],
         "- 待核实：" + str(plan["uncertain"]),
+        "- 入口：" + plan["route"].get("entry_skill", "orchestrator-skill"),
+        "- 下游：" + (" → ".join(plan["route"].get("downstream_skills", plan["route"].get("skills", []))) or "无"),
         "- 顺序：" + " → ".join(plan["route"]["pipeline_stages"]),
         "", "分类仅用于选择诊断路线，命中案例仍须核实现有证据和版本适用性。", "",
         "```json", json.dumps(plan, ensure_ascii=False, indent=2), "```"])

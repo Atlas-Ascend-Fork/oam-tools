@@ -302,8 +302,8 @@ device 侧 core 后进入销毁流程，销毁 hdc server 后 host 侧 opcode �
 ```text
 error cqe status: 0x15
 cqe error status[12]
-localIP[10.52.167.89]
-remoteIP[10.52.171.213]
+localIP[10.x.x.x]
+remoteIP[10.x.x.x]
 ```
 
 - 对端 plog 中 `Destructor` 时间早于本端 `error cqe` 时间。

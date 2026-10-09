@@ -1,16 +1,21 @@
-# 场景识别：案例检索在前，现场分类在后
-
+只检索 `eval-skill/references/cases.md` 的 CASE 块内“关键日志特征/日志特征签名/Signature”段。
+不搜索候选区，不从根因、解决方案段落反向吸取关键词。用户话术参与分类，但不冒充现场日志用于案例命中。
 识别决定分析入口，不决定根因。输入是已提供的目录、单文件或 ZIP 以及用户描述。
+泛化的“分析日志/诊断故障/生成完整诊断报告”请求入口固定记录为
+`route.entry_skill=orchestrator-skill`，下游按现场协调 eval-skill、trace-skill、metric-skill 等能力；用户明确指定
+专项 skill 或已提供上游评估产物时才允许专项直达。日志内容中的 AI Core Error、coredump 等词本身不改变入口。
 
 ## 1. 案例检索
 
-只检索 `eval-skill/references/cases.md` 的 CASE 块内“关键日志特征/日志特征签名/Signature”段。
-不搜索候选区，不从根因、解决方案段落反向吸取关键词。用户话术参与分类，但不冒充现场日志用于案例命中。
+已验证案例只检索 `eval-skill/references/cases.md` 的 CASE 块内“关键日志特征/日志特征签名/Signature”段。
+不从根因、解决方案段落反向吸取关键词。用户话术参与分类，但不冒充现场日志用于案例命中。
 
 每个签名行与当前原始日志行核对：除 EZ9999 外的相同明确错误码，或同一行同时包含相同模块、操作和故障特征，才生成候选。
 单个 ERROR、HBM、timeout 等泛词不足以命中。EZ9999 是外层包裹码，不能单独定位案例。
 命中后记录实际日志位置、匹配特征、未匹配签名、版本/环境适用性未核实项，root_cause_status=candidate_only。
 未命中记 miss；案例库不可读或无可解析签名记 unavailable 并说明原因。三种结果都继续现场分类。
+
+自动命中只允许读取主案例库 `cases.md`。`cases-pending.md` 是补证候选区，专项 reference 案例是人工排查知识库，二者都不参与自动命中；后续若要复用其中高价值案例，必须先补证、重评并按流程转正为 CASE。用户描述只参与场景分类，不参与案例命中。命中案例仅代表日志签名相似，必须继续核对版本、环境和当前证据，不能直接作为根因。
 
 案例检索和现场分类都保留入口 `errors` 数组。数组逐条记录原始错误证据的位置、原文、级别、错误码、关键字和时间戳（如有），不因场景未知而丢弃未映射的错误码；否定描述和仅用于配置的超时文本不计入错误证据。
 
@@ -23,9 +28,12 @@
 | oom | 内存分配失败、EL0004、OOM Killer 明确事件 | fault-flows/oom-flow.md，侧别与细分交诊断核实 |
 | hang | no progress for/detected、deadlock detected、task not finish | fault-flows/hang-flow.md |
 | comm_timeout | HCCL/集合通信操作与 timeout 同行，或明确通信超时码 | fault-handling.md + hang-flow.md 通信竞争分支 |
+| card_drop | npu-smi 查不到卡、EL0001 Device_Absent/Abnormal、PCIe link down、BMC 告警卡消失 | fault-flows/card-drop-flow.md + card-drop-reference.md |
 | compile_error | 编译操作明确失败、UB memory overflow、EB 类编译码 | background.md + err-messages.md |
-| precision | 明确非有限数值结果，或 max_diff 实测超过同条记录给出的 threshold | background.md + err-messages.md |
-| perf_degradation | 明确性能下降/回归记录或用户描述 | metric 基线与分析文档 |
+| precision | 明确非有限数值结果，或 max_diff 实测超过同条记录给出的 threshold | fault-flows/precision-flow.md + err-messages.md |
+| perf_degradation | 明确性能下降/回归记录或用户描述 | fault-flows/performance-flow.md + metric 基线与分析文档 |
+| offline_inference | ATC 报错/模型转换失败、soc_version 不匹配、离线推理报错、参数校验失败 | fault-flows/offline-inference-flow.md |
+| network | EI0013 ROCE CQE 错误、端口闪断/Down、网络诊断异常、丢包记录；EI0002/HCCL 超时须有网络侧证据才归本场景 | fault-flows/network-flow.md |
 | generic_error | 有错误码/失败但未形成具体专题证据 | err-messages.md |
 | unknown | 无足够信号 | 原始证据盘点与一般诊断，禁止猜根因 |
 

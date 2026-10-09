@@ -1,0 +1,524 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cann:fault-trace:1",
+  "title": "CANN fault trace v1",
+  "type": "object",
+  "required": [
+    "schema_version", "status", "metadata", "input", "clock_domains",
+    "events", "evidence", "relationships", "spans", "fault_candidates",
+    "selected_anchor_id", "views", "diagnostics"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "status": { "enum": ["complete", "partial"] },
+    "metadata": {
+      "type": "object",
+      "required": ["generator_version", "parser_versions", "component_map_version", "severity_rules_version"],
+      "properties": {
+        "generator_version": { "type": "string" },
+        "parser_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+        "component_map_version": { "type": "string" },
+        "severity_rules_version": { "type": "string" },
+        "redaction_scope": { "$ref": "#/$defs/redactionScope" },
+        "anchor_request": { "$ref": "#/$defs/anchorRequest" },
+        "cann_version": { "$ref": "#/$defs/callerValue" },
+        "source_timezone": { "$ref": "#/$defs/callerValue" },
+        "redaction_rules": { "$ref": "#/$defs/redactionRules" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["boundary", "inventory"],
+      "properties": {
+        "boundary": { "type": "string" },
+        "inventory": { "type": "array", "items": { "$ref": "#/$defs/inventoryEntry" } }
+      }
+    },
+    "clock_domains": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/clockDomain" } },
+    "events": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/event" } },
+    "evidence": { "type": "object", "additionalProperties": { "$ref": "#/$defs/evidence" } },
+    "orphan_evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
+    "component_chain": { "$ref": "#/$defs/componentChain" },
+    "clock_alignments": { "type": "array", "items": { "$ref": "#/$defs/clockAlignment" } },
+    "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } },
+    "fault_candidates": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+    "selected_anchor_id": { "type": "string" },
+    "context_partitions": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/contextPartition" }
+    },
+    "views": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/view" } },
+    "diagnostics": {
+      "type": "object",
+      "required": ["gaps", "event_count", "fault_candidate_count"],
+      "properties": {
+        "gaps": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "event_count": { "type": "integer", "minimum": 0 },
+        "fault_candidate_count": { "type": "integer", "minimum": 0 },
+        "excluded_event_count": { "type": "integer", "minimum": 0 },
+        "anchor_selection": {
+          "type": "object",
+          "required": ["status", "reason", "domain_candidate_ids"],
+          "properties": {
+            "status": { "enum": ["selected", "ambiguous"] },
+            "reason": { "enum": ["single_clock_domain", "aligned_clock_domains", "unaligned_clock_domains", "explicit_event_id", "explicit_source_location"] },
+            "domain_candidate_ids": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        "parse_coverage": {
+          "type": "object",
+          "required": ["parsed_records", "unparsed_records"],
+          "properties": {
+            "parsed_records": { "type": "integer", "minimum": 0 },
+            "unparsed_records": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "context_window": { "$ref": "#/$defs/contextWindow" }
+      }
+    }
+  },
+  "$defs": {
+    "inventoryEntry": {
+      "type": "object",
+      "required": ["source_path", "status", "parsed_records", "unparsed_records"],
+      "properties": {
+        "source_path": { "type": "string" },
+        "status": { "enum": ["parsed", "unsupported", "unreadable", "rejected", "archive"] },
+        "parser": { "type": ["string", "null"] },
+        "reason": { "type": "string" },
+        "detail": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "parsed_records": { "type": "integer", "minimum": 0 },
+        "unparsed_records": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "redactionScope": {
+      "type": "object",
+      "required": ["kind", "scope_id"],
+      "properties": {
+        "kind": { "const": "package-local" },
+        "scope_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" }
+      }
+    },
+    "callerValue": {
+      "type": "object",
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "source": { "const": "caller" }
+      },
+      "additionalProperties": false
+    },
+    "anchorRequest": {
+      "type": "object",
+      "required": ["source", "selector"],
+      "properties": {
+        "source": { "enum": ["caller", "eval-skill"] },
+        "selector": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["kind", "value"],
+              "properties": {
+                "kind": { "const": "event_id" },
+                "value": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["kind", "source_path", "line"],
+              "properties": {
+                "kind": { "const": "source_location" },
+                "source_path": { "type": "string", "minLength": 1 },
+                "line": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "redactionRules": {
+      "type": "object",
+      "required": ["builtin_profile", "additional_pattern_names", "source"],
+      "properties": {
+        "builtin_profile": { "const": "cann-trace-default-v1" },
+        "additional_pattern_names": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,31}$" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source": { "const": "caller" }
+      },
+      "additionalProperties": false
+    },
+    "clockDomain": {
+      "type": "object",
+      "required": ["id", "kind", "origin_raw", "aligned_to"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "origin_raw": { "type": "string" },
+        "aligned_to": { "type": ["string", "null"] }
+      }
+    },
+    "timestamp": {
+      "type": "object",
+      "required": ["raw", "clock_domain_id", "offset_us", "precision"],
+      "properties": {
+        "raw": { "type": "string" },
+        "clock_domain_id": { "type": "string" },
+        "offset_us": { "type": "integer" },
+        "precision": { "const": "microsecond" },
+        "epoch_us": { "type": "string", "pattern": "^-?[0-9]+$" },
+        "monotonic_raw": { "type": "string" },
+        "aligned_clock_domain_id": { "type": "string" },
+        "aligned_offset_us": { "type": "integer" },
+        "alignment_uncertainty_us": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["id", "kind", "level", "component", "raw_component", "message", "location", "execution", "timestamp", "evidence_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "observed" },
+        "level": { "type": "string" },
+        "component": { "type": "string" },
+        "raw_component": { "type": "string" },
+        "component_mapping_rule": { "type": "string" },
+        "fault_rule_id": { "type": "string" },
+        "correlation": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": ["stream_id", "task_id", "event_id", "node_id", "assertion", "alarm_raised_time", "device_id", "error_code", "hccl_ret", "rank_id"]
+          },
+          "additionalProperties": { "type": "string" }
+        },
+        "interaction": { "enum": ["dispatch", "notify-host", "receive-device-event", "return", "error-source", "error-propagation"] },
+        "clock_alignment": {
+          "type": "object",
+          "required": ["target_clock_domain_id", "offset_us", "uncertainty_us", "method"],
+          "properties": {
+            "target_clock_domain_id": { "type": "string" },
+            "offset_us": { "type": "integer" },
+            "uncertainty_us": { "type": "integer", "minimum": 0 },
+            "method": { "type": "string", "minLength": 1 }
+          }
+        },
+        "message": { "type": "string" },
+        "location": { "enum": ["host", "device"] },
+        "execution": {
+          "type": "object",
+          "properties": {
+            "pid": { "type": "string" },
+            "tid": { "type": "string" },
+            "process": { "type": "string" },
+            "device": { "$ref": "#/$defs/deviceIdentity" }
+          }
+        },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["id", "source_path", "line", "record_sha256", "excerpt"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "record_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "excerpt": { "type": "string" }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "required": ["id", "source_event_id", "target_event_id", "strength", "evidence_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_event_id": { "type": "string" },
+        "target_event_id": { "type": "string" },
+        "kind": { "enum": ["notification", "same-execution", "hypothesis", "evidence-conflict", "error-propagation"] },
+        "strength": { "enum": ["proven", "inferred", "conflict"] },
+        "rule_id": { "type": "string" },
+        "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "componentChain": {
+      "type": "object",
+      "required": ["schema_version", "anchor_id", "execution_event_ids", "nodes", "edges", "gaps"],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "anchor_id": { "type": "string" },
+        "execution_event_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/componentChainNode" },
+          "minItems": 1
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/componentChainEdge" }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "enum": ["call_relationship_evidence_insufficient", "unconnected_observed_components"]
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "componentChainNode": {
+      "type": "object",
+      "required": ["id", "component", "member_event_ids", "representative_event_id", "fault_role", "summary", "evidence_ids", "deep_link"],
+      "properties": {
+        "id": { "type": "string" },
+        "component": { "type": "string", "minLength": 1 },
+        "member_event_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "representative_event_id": { "type": "string" },
+        "fault_role": {
+          "enum": ["fault-source", "direct-trigger", "propagation", "affected", "business-error", "observed"]
+        },
+        "summary": { "type": "string" },
+        "summary_short": { "type": "string" },
+        "evidence_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "deep_link": { "$ref": "#/$defs/componentChainDeepLink" }
+      },
+      "additionalProperties": false
+    },
+    "componentChainEdge": {
+      "type": "object",
+      "required": ["id", "source_component", "target_component", "kind", "strength", "rule_ids", "event_relationship_ids", "evidence_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_component": { "type": "string", "minLength": 1 },
+        "target_component": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["call", "notification"] },
+        "strength": { "enum": ["proven", "inferred"] },
+        "rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "event_relationship_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "componentChainDeepLink": {
+      "type": "object",
+      "required": ["view", "anchor", "component", "event"],
+      "properties": {
+        "view": { "const": "fault" },
+        "anchor": { "type": "string" },
+        "component": { "type": "string" },
+        "event": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "clockAlignment": {
+      "type": "object",
+      "required": ["id", "source_clock_domain_id", "target_clock_domain_id", "method", "offset_us", "uncertainty_us", "evidence_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "source_clock_domain_id": { "type": "string" },
+        "target_clock_domain_id": { "type": "string" },
+        "method": { "type": "string", "minLength": 1 },
+        "offset_us": { "type": "integer" },
+        "uncertainty_us": { "type": "integer", "minimum": 0 },
+        "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+      }
+    },
+    "span": {
+      "type": "object",
+      "required": ["id", "start_event_id", "end_event_id", "duration_us", "evidence_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "start_event_id": { "type": "string" },
+        "end_event_id": { "type": "string" },
+        "duration_us": { "type": "integer", "minimum": 0 },
+        "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+      }
+    },
+    "view": {
+      "type": "object",
+      "required": ["anchor_id", "highlighted_event_ids"],
+      "properties": {
+        "anchor_id": { "type": "string" },
+        "highlighted_event_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+        "context_event_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+        "context_partition_id": { "type": "string" },
+        "excluded_event_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "excluded_event_count": { "type": "integer", "minimum": 0 },
+        "scope": { "$ref": "#/$defs/executionScope" },
+        "context_window": { "$ref": "#/$defs/contextWindow" }
+      },
+      "anyOf": [
+        { "required": ["context_event_ids"] },
+        { "required": ["context_partition_id"] }
+      ]
+    },
+    "contextPartition": {
+      "type": "object",
+      "required": ["id", "kind", "pid", "location", "clock_domain_id", "event_ids"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "process" },
+        "pid": { "type": "string" },
+        "location": { "enum": ["host", "device"] },
+        "clock_domain_id": { "type": "string" },
+        "event_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+      }
+    },
+    "contextWindow": {
+      "type": "object",
+      "required": [
+        "clock_domain_id", "requested", "requested_start_offset_us",
+        "requested_end_offset_us", "effective_start_offset_us",
+        "effective_end_offset_us", "scope_event_count",
+        "included_non_chain_event_count", "excluded_outside_window_count",
+        "excluded_by_limit_count", "preserved_chain_event_count", "truncated"
+      ],
+      "properties": {
+        "clock_domain_id": { "type": "string" },
+        "requested": {
+          "type": "object",
+          "required": ["before_us", "after_us", "non_chain_event_limit"],
+          "properties": {
+            "before_us": { "type": "integer", "minimum": 0 },
+            "after_us": { "type": "integer", "minimum": 0 },
+            "non_chain_event_limit": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "requested_start_offset_us": { "type": "integer" },
+        "requested_end_offset_us": { "type": "integer" },
+        "effective_start_offset_us": { "type": "integer" },
+        "effective_end_offset_us": { "type": "integer" },
+        "scope_event_count": { "type": "integer", "minimum": 1 },
+        "included_non_chain_event_count": { "type": "integer", "minimum": 0 },
+        "excluded_outside_window_count": { "type": "integer", "minimum": 0 },
+        "excluded_by_limit_count": { "type": "integer", "minimum": 0 },
+        "preserved_chain_event_count": { "type": "integer", "minimum": 1 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "executionScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "pid", "evidence_ids"],
+          "properties": {
+            "kind": { "const": "process" },
+            "pid": { "type": "string" },
+            "location": { "enum": ["host", "device"] },
+            "clock_domain_id": { "type": "string" },
+            "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "anchor_event_id", "evidence_ids"],
+          "properties": {
+            "kind": { "const": "anchor-only" },
+            "anchor_event_id": { "type": "string" },
+            "evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+          }
+        }
+      ]
+    },
+    "deviceIdentity": {
+      "type": "object",
+      "properties": {
+        "logical_id": { "type": "string" },
+        "physical_id": { "type": "string" },
+        "mapping_strength": { "const": "proven" },
+        "mapping_evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+        "path_physical_id": { "type": "string" },
+        "reported_physical_id": { "type": "string" },
+        "identity_status": { "const": "conflict" },
+        "conflict_evidence_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+      },
+      "oneOf": [
+        {
+          "anyOf": [
+            { "required": ["logical_id"] },
+            { "required": ["physical_id"] }
+          ],
+          "not": {
+            "anyOf": [
+              { "required": ["path_physical_id"] },
+              { "required": ["reported_physical_id"] },
+              { "required": ["identity_status"] },
+              { "required": ["conflict_evidence_ids"] }
+            ]
+          }
+        },
+        {
+          "required": [
+            "logical_id", "path_physical_id", "reported_physical_id",
+            "identity_status", "conflict_evidence_ids"
+          ],
+          "not": {
+            "anyOf": [
+              { "required": ["physical_id"] },
+              { "required": ["mapping_strength"] },
+              { "required": ["mapping_evidence_ids"] }
+            ]
+          }
+        }
+      ],
+      "dependentRequired": {
+        "mapping_strength": ["logical_id", "physical_id", "mapping_evidence_ids"],
+        "mapping_evidence_ids": ["logical_id", "physical_id", "mapping_strength"],
+        "identity_status": ["logical_id", "path_physical_id", "reported_physical_id", "conflict_evidence_ids"],
+        "conflict_evidence_ids": ["logical_id", "path_physical_id", "reported_physical_id", "identity_status"]
+      },
+      "allOf": [
+        {
+          "if": { "required": ["logical_id", "physical_id"] },
+          "then": { "required": ["mapping_strength", "mapping_evidence_ids"] }
+        }
+      ]
+    }
+  }
+}

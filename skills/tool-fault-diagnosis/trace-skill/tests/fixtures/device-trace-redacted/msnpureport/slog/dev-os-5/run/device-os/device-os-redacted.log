@@ -1,0 +1,2 @@
+[INFO] ATRACE(3850,slogd):2026-09-05-21:04:54.528.267 [ktrace_ts.c:178](tid:3885) ktrace ts thread start, local device id = 0, physical device id = 5.
+[ERROR] DRV(3908,dmp_daemon):2026-09-05-21:04:54.528.329 [hdc_server.c:302][hdc] Accept failed. (dev_id=0; ret=10)

@@ -23,7 +23,11 @@
 
 **识别优先级**：强现场信号（错误码原文 + 模块 + 故障特征同行）优先于话术和文件名；多个强场景同时出现时保留 `secondary` 和 `uncertain`，不静默丢弃。同一信号只贡献一次分值，重复报错只增加 hit_count。具体强弱与冲突规则见 orchestrator 的 [场景识别规范](../../../orchestrator-skill/references/scenario-recognition.md)。
 
-> **同步要求**：orchestrator-skill 的 `scenario-recognition.md` 分类表需同步新增 `card_drop`/`offline_inference`/`network` 场景，并将 `precision`/`performance`(原 `perf_degradation`) 的路由指向对应 fault-flow 文件。详见本文件 §6 场景剧本索引。
+> **同步状态**：orchestrator-skill 的 `scenario-recognition.md` 分类表已同步 `card_drop`/`offline_inference`/`network` 场景，`precision`/`perf_degradation`（flow 文件为 performance-flow.md）的路由已指向对应 fault-flow 文件。详见本文件 §6 场景剧本索引。
+
+## 知识库索引边界
+
+知识库分三层使用：`cases.md` 是唯一参与自动命中的正式案例库；`cases-pending.md` 只存放待补证候选，不参与自动命中；各专项 reference 的“案例索引/案例详解”供诊断阶段人工核对和流程引用，也不直接参与自动命中。高价值 reference 或候选案例须先补齐证据并按入库流程转正为 CASE，才能进入自动匹配。诊断可信度只依据 `diagnosis.md` 的 `causal_chain` 及证据字段；产物索引中的阶段链路仅表示流水线依赖，不表示故障因果。
 
 ## 0. 找到报错的首节点
 

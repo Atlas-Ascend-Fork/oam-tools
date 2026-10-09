@@ -1,6 +1,6 @@
 ---
 name: eval-skill
-description: 对 Ascend NPU 的完整运行日志和崩溃现场进行清洗、评估和诊断分析。当用户说“分析 xx 日志”“帮我看 xx 日志”“诊断 xx 日志”“排查 xx 日志”等请求时使用此技能，其中 xx 可以是日志目录、zip 压缩包或单个日志文件。当用户提到 coredump、core dump、core文件、Stackcore、stackcore文件、CANN崩溃、Segmentation fault、SIGSEGV、SIGABRT、msnpureport、asys analyze、debug so、CANN 符号解析或要求输出崩溃根因报告时，也使用此技能。技能将清洗日志噪声、结合领域背景知识、比对已知错误库和历史案例，定位算子执行异常、性能问题、图编译错误或 Host/Device 崩溃的根本原因，对诊断结论做可信度评估（五维打分），并把高可信报告沉淀到案例库供后续诊断复用，最终输出评估结论供度量报告 Skill 使用。当用户提到诊断可信度、结论可信吗、证据是否充分、案例入库、沉淀案例时也使用此技能。
+description: 对 Ascend NPU 的已有日志和故障现场进行清洗、专项评估和诊断分析。当用户明确指定 eval-skill、已经由 orchestrator-skill 路由到本技能，或明确指定单一故障类型（如 AI Core Error、OOM、coredump、通信超时）时使用；仅从日志内容看到这些词不构成直接触发，缺少明确专项或上游编排结果时由 orchestrator-skill 先处理。技能结合领域知识、错误库和历史案例定位根因，评估诊断可信度并输出供度量报告使用的评估结论。
 license: Apache-2.0
 ---
 
@@ -8,11 +8,16 @@ license: Apache-2.0
 
 ## 适用场景
 
-- 已有完整日志（msnpureprot / host / plog 或其组合），需要分析问题根因
-- 用户要求“分析 xx 日志”“帮我看 xx 日志”“诊断 xx 日志”“排查 xx 日志”，且 xx 是日志目录、zip 压缩包或单个日志文件
+- 已有完整日志（msnpureport / host / plog 或其组合），需要分析问题根因
+- orchestrator-skill 已完成案例检索和场景识别，并路由到本技能进行清洗、诊断或可信度评估
+- 用户明确指定单一故障类型、专项分析或直接使用 eval-skill；泛化的“分析/诊断日志”请求先走 orchestrator-skill
 - 用户提供或提到 coredump / Linux core / Stackcore / msnpureport / asys 输出，需要分析 CANN 崩溃根因
 - 算子执行失败、训练 loss 异常、精度不达标、任务挂死或性能劣化
 - 需要将日志信息映射到具体算子/代码位置
+
+## 与统一调度的边界
+
+本技能负责被路由后的日志清洗、专项诊断、可信度评估和案例处置，不负责决定是否需要多个专项 skill 协作。没有上游 `scenario.md` 时，遇到泛化日志分析请求应先让 orchestrator-skill 完成入口检索和场景分类；本技能的 `diagnosis.md` 必须保留证据时间线，供最终报告汇总。
 
 ## 评估流程
 

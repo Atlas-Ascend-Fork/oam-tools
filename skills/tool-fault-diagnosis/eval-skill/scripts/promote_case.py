@@ -55,6 +55,11 @@ SENSITIVE_PATTERNS = [
     (r"(?i)\b(?:password|passwd|secret|token|api[_-]?key)\s*[=:]\s*\S+", "凭据信息"),
     (r"(?i)\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", "邮箱地址"),
     (r"(?i)\bssh-(?:rsa|ed25519)\s+\S+", "SSH 公钥"),
+    (r"(?i)\b(?:Authorization|Bearer|Cookie|Session[_-]?Id)\s*[=:]\s*\S+", "认证信息"),
+    (r"(?i)\bprivate[_-]?key\b|\.(?:pem|crt|key|p12|pfx)\b", "私钥或证书材料"),
+    (r"(?i)\b(?:host|hostname|node|cluster|server|pod|rack)\s*[=:]\s*[A-Za-z][A-Za-z0-9._-]{2,}", "主机或集群标识"),
+    (r"/root/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+", "用户绝对路径"),
+    (r"(?i)\b(?:model|dataset)(?:[_-](?:name|path|file))?\s*[=:]\s*(?!<)[\w./-]{4,}", "业务模型或数据集标识"),
 ]
 
 # IP 白名单：文档中常见的示例/占位地址不算敏感
@@ -163,6 +168,15 @@ def check_sensitive(text: str) -> list[tuple[str, str]]:
                 continue
             found.append((label, hit))
     return found
+
+
+def scan_sensitive_lines(text: str):
+    """Return line-numbered sensitive findings for read-only checks."""
+    findings = []
+    for number, line in enumerate(text.splitlines(), 1):
+        for label, hit in check_sensitive(line):
+            findings.append((number, label, hit))
+    return findings
 
 
 def next_case_id(content: str, prefix: str) -> str:
@@ -300,6 +314,12 @@ def do_promote(case_ref: str, cases_dir: Path, conf: dict | None = None) -> None
         )
     promoted = promoted.rstrip() + f"\n- 转正日期：{date.today().isoformat()}（原 {case_ref}）\n"
 
+    sensitive = check_sensitive(promoted)
+    if sensitive:
+        labels = ", ".join(sorted({label for label, _ in sensitive}))
+        print(f"[STOP] 候选案例含疑似敏感信息（{labels}），请先脱敏后转正。", file=sys.stderr)
+        sys.exit(3)
+
     append_case(cases_path, promoted)
     pending_path.write_text("\n---\n".join(b for b in rest).rstrip() + "\n", encoding="utf-8")
     print(f"[DONE] {case_ref} → {new_id}，已写入 {cases_path}")
@@ -322,11 +342,34 @@ def main():
     )
     parser.add_argument("--dry-run", action="store_true", help="只打印将写入的内容")
     parser.add_argument("--force", action="store_true", help="跳过重复案例提示，强制新增")
+    parser.add_argument("--check", action="store_true", help="只读扫描文件中的敏感信息")
+    parser.add_argument("--files", nargs="+", type=Path, help="配合 --check 指定待扫描文件")
     args = parser.parse_args()
+
+    if args.check and args.promote:
+        parser.error("--check 与 --promote 不能同时使用")
 
     if args.promote:
         conf = json.loads(read_text(args.confidence)) if args.confidence else None
         do_promote(args.promote, args.cases_dir, conf)
+        return
+
+    if args.check:
+        if not args.files:
+            parser.error("--check 需要至少一个 --files 文件")
+        findings = 0
+        for file_path in args.files:
+            try:
+                content = read_text(file_path)
+            except SystemExit:
+                raise
+            for number, label, hit in scan_sensitive_lines(content):
+                findings += 1
+                print(f"[WARN] {file_path}:{number} {label}: {hit}", file=sys.stderr)
+        if findings:
+            print(f"[STOP] 检测到 {findings} 处疑似敏感信息，请人工确认后处理。", file=sys.stderr)
+            sys.exit(10)
+        print("[OK] 未检测到疑似敏感信息。")
         return
 
     if not args.report or not args.confidence:
@@ -353,19 +396,6 @@ def main():
     fields["log_block"] = extract_log_block(report_md)
     fields["error_code"] = find_error_code(report_md)
 
-    # 脱敏检查
-    candidate_text = "\n".join(str(v) for v in fields.values())
-    sensitive = check_sensitive(candidate_text)
-    if sensitive:
-        print("[STOP] 检测到敏感信息，请先脱敏后重试：", file=sys.stderr)
-        seen = set()
-        for label, hit in sensitive:
-            if (label, hit) in seen:
-                continue
-            seen.add((label, hit))
-            print(f"  - {label}: {hit}", file=sys.stderr)
-        sys.exit(3)
-
     is_accept = gate == "accept"
     target = args.cases_dir / (CASES_FILE if is_accept else PENDING_FILE)
     prefix = "CASE" if is_accept else "PCASE"
@@ -386,7 +416,18 @@ def main():
         print("       确认为不同根因时用 --force 强制新增。", file=sys.stderr)
         sys.exit(4)
 
+    # 脱敏检查必须覆盖最终写入正文，包括元信息和日志块。
     block = build_case_block(case_id, fields, conf, args.report.name)
+    sensitive = check_sensitive(block)
+    if sensitive:
+        print("[STOP] 检测到敏感信息，请先脱敏后重试：", file=sys.stderr)
+        seen = set()
+        for label, hit in sensitive:
+            if (label, hit) in seen:
+                continue
+            seen.add((label, hit))
+            print(f"  - {label}: {hit}", file=sys.stderr)
+        sys.exit(3)
 
     if args.dry_run:
         print(f"\n[DRY-RUN] 目标文件：{target}")

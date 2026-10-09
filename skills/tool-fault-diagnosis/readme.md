@@ -1,9 +1,11 @@
-算子执行/训推模型->采集skill（可选） ->完整的日志->评估skill->度量报告skill->按度量结果分析修改->重头开始
+用户请求 -> orchestrator-skill 统一检索/识别/路由 ->（可选）采集 skill ->完整日志->eval-skill 评估->metric-skill 度量报告->按度量结果分析修改->重头开始
 
 说明：
 采集skill包含（msnpureprot采集文档，host日志采集文档，plog日志采集文档，采集脚本）
+orchestrator-skill包含（案例检索、场景识别、流水线编排和可追溯产物）
 评估skill包含（清洗脚本，prompt背景介绍，errMsg文档，日志规范，故障处理参考，coredump/Stackcore分析手册，coredump报告模板，代码仓地址，常见案例库）
 度量报告skill包含（展示格式，基线数据，度量结果文档，度量结果分析文档）
+仓库包含独立的 trace-skill：orchestrator 在 diagnose 阶段调用它生成时间线和调用链，再由 metric-skill 汇总 Markdown/HTML 报告。
 
 输出工作流和架构图，展示整个流程和各个组件之间的关系。
 
@@ -19,18 +21,26 @@ flowchart TB
         A["🔧 算子执行<br/>训推模型"]
         B["📋 完整日志"]
         EV["🧭 评估结论"]
+        TR["🧵 时间线与调用链"]
         CF["🎯 可信度评估<br/>HIGH / MEDIUM / LOW"]
         MR["📈 度量报告"]
         FX["✏️ 修复优化"]
         A ==>|"原始日志"| B
         B ==>|"清洗 + 诊断"| EV
-        EV ==>|"五维打分"| CF
+        EV ==>|"trace-skill"| TR
+        TR ==>|"五维打分"| CF
         CF ==>|"量化 + 基线对比"| MR
         MR ==>|"问题清单 + 建议"| FX
     end
     FX -.->|"🔁 迭代闭环：重跑 → 复测"| A
 
-    %% ===== 下层：三个 Skill 的能力组件 =====
+    %% ===== 下层：五个 Skill 的能力组件 =====
+    subgraph ORCH["🧭 编排 Skill · 统一入口"]
+        direction TB
+        OG1["案例检索 · 场景识别 · 路由"]
+        OG2["时间线证据 → diagnosis.md"]
+    end
+
     subgraph COLLECT["📥 采集 Skill · 可选"]
         direction TB
         C1["msnpureport / host / plog 采集文档"]
@@ -44,6 +54,11 @@ flowchart TB
         EG3["崩溃专项<br/>coredump/Stackcore 手册 · 报告模板"]
         EG4["可信度评估<br/>五维评分规范 · assess_confidence.py"]
         EG5["案例沉淀<br/>入库规范 · promote_case.py"]
+    end
+
+    subgraph TRACE["🧵 Trace Skill · 时间线与调用链"]
+        direction TB
+        TR1["fault-trace.json · tracing-report.html"]
     end
 
     subgraph KBS["🧠 诊断知识库回流"]
@@ -63,8 +78,10 @@ flowchart TB
     CF -.->|"LOW / 证据不足：补采日志"| B
 
     %% ===== 能力层驱动主线 =====
+    ORCH -. 驱动 .-> EV
     COLLECT -. 驱动 .-> B
     EVAL -. 驱动 .-> EV
+    TRACE -. 驱动 .-> TR
     EG4 -. 驱动 .-> CF
     EG5 -. 驱动 .-> KB
     METRIC -. 驱动 .-> MR
@@ -74,6 +91,7 @@ flowchart TB
     classDef collect fill:#edf5ff,stroke:#1677ff,color:#171a1d;
     classDef eval fill:#fdeef0,stroke:#e6002d,color:#171a1d;
     classDef metric fill:#eef9f4,stroke:#18a66b,color:#171a1d;
+    classDef trace fill:#fff2e8,stroke:#fa8c16,color:#171a1d;
     classDef gate fill:#fff7e6,stroke:#d48806,stroke-width:2px,color:#171a1d,font-weight:bold;
     classDef kb fill:#f0e6ff,stroke:#722ed1,color:#171a1d;
     class A,B,EV,MR,FX flow;
@@ -84,11 +102,13 @@ flowchart TB
     class EG5 kb;
     class KB kb;
     class MG1,MG2 metric;
+    class TR1 trace;
     style PIPE fill:#f4f5f2,stroke:#171a1d,stroke-width:2px;
     style COLLECT fill:#edf5ff,stroke:#1677ff,stroke-dasharray:6 4;
     style EVAL fill:#fdeef0,stroke:#e6002d;
     style KBS fill:#f0e6ff,stroke:#722ed1;
     style METRIC fill:#eef9f4,stroke:#18a66b;
+    style TRACE fill:#fff2e8,stroke:#fa8c16;
 ```
 
 ---
@@ -97,7 +117,7 @@ flowchart TB
 
 ### 安装
 
-没有下载本仓时，可直接用独立脚本安装本 skill 组。安装内容包括 `collect-skill`、`eval-skill`、`metric-skill` 三个子 skill。
+没有下载本仓时，可直接用独立脚本安装本 skill 组。安装内容包括 `orchestrator-skill`、`collect-skill`、`eval-skill`、`trace-skill`、`metric-skill` 五个子 skill。
 
 安装到 Codex：
 
@@ -157,6 +177,8 @@ python3 skills/tool-fault-diagnosis/scripts/install_all_tool_fault_diagnosis_ski
 
 ### 触发方式
 
+对“分析当前目录日志”“诊断故障”“生成完整诊断报告”等未明确专项的请求，先触发 `orchestrator-skill`。它会先检索主案例库、识别场景，再按需调用 eval-skill、trace-skill 和 metric-skill；日志中的 AI Core Error、coredump 等词不会跳过统一调度。
+
 安装后，以下表达会触发本 skill 组的 `collect-skill`，执行全量日志采集：
 
 ```text
@@ -171,16 +193,15 @@ python3 skills/tool-fault-diagnosis/scripts/install_all_tool_fault_diagnosis_ski
 
 全量流程包括 `collect.sh --all`、补齐已有日志及现场、使用可用的 `msnpureport` / `asys` 工具导出，并检查节点、设备和 rank 覆盖情况。采集完成后交付目录、文件清单和各来源状态；工具缺失、权限不足或日志未生成时会明确列出缺口。详细步骤见 [全量采集流程](collect-skill/references/full-log-collection.md)。已安装旧版本时，需更新并重启客户端，使新的触发描述生效。
 
-安装后，可直接用以下表达触发日志评估 Skill：
+只有用户明确指定单一故障专项，或已经提供编排产出的上游材料时，才直接进入日志评估 Skill：
 
 ```text
-分析 xx 日志
-帮我看 xx 日志
-诊断 xx 日志
-排查 xx 日志
+分析 AI Core Error 日志
+排查通信超时
+直接使用 eval-skill 评估这份 coredump
 ```
 
-其中 `xx` 可以是日志目录、zip 压缩包或单个日志文件。
+泛化的“分析 xx 日志/帮我看 xx 日志/诊断 xx 日志”没有明确专项时，按上面的统一调度入口处理；`xx` 可以是日志目录、zip 压缩包或单个日志文件。
 
 崩溃场景也会触发该 Skill，常见触发词包括：
 
@@ -580,11 +601,17 @@ tool-fault-diagnosis/
 │       └── promote_case.py         # 高可信报告沉淀到案例库
 ├── metric-skill/           # 度量报告 Skill
 │   ├── SKILL.md
+│   ├── template/
+│   │   ├── index.html                 # 离线 HTML 空白模板
+│   │   └── report-template-rules.md  # 模板与验收规则
+│   ├── scripts/
+│   │   └── build_html_report.py      # HTML 报告打包脚本
 │   └── references/
 │       ├── display-format.md   # 报告模板（含 errMsg 质量 + 诊断可信度章节）
 │       ├── baseline-data.md    # 基线数据 + errMsg 达标标准 + 可信度达标标准
 │       ├── metric-results.md   # 度量结果 JSON 规范（含 diagnosis_confidence）
-│       └── metric-analysis.md  # 深度分析框架（含 errMsg 质量 + 可信度分析）
+│       ├── metric-analysis.md  # 深度分析框架（含 errMsg 质量 + 可信度分析）
+│       └── analysis-record.md  # 报告字段来源与证据记录
 └── docs/
     ├── architecture.md     # 完整架构说明
     └── architecture.drawio # 架构图源文件

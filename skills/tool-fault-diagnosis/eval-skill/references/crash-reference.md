@@ -234,6 +234,8 @@ Python 异常栈只反映解释器层面的退出路径；除非有 native 信�
 
 #### C001：device core dump（aicpu）
 
+> 本案例与 [coredump-reference](coredump-reference.md) 的 CD001 同源，专项排查以 CD001 为准。
+
 **问题现象**
 
 - 报错码为 `E39999`。
@@ -252,6 +254,8 @@ device 侧 aicpu 发生 core dump。`E39999` 表示 device 侧 aicpu 异常，pl
 4. 使用 `stackview.sh` 或 `asys analyze` 解析 core 文件，由组件研发根据堆栈分析原因。
 
 #### C002：device core dump（无 E39999）
+
+> 本案例与 [coredump-reference](coredump-reference.md) 的 CD002 同源，专项排查以 CD002 为准。
 
 **问题现象**
 
@@ -296,6 +300,8 @@ session 已被关闭。
 
 #### C004：TDT 组件 device core dump
 
+> 本案例与 [coredump-reference](coredump-reference.md) 的 CD005 同源，专项排查以 CD005 为准。
+
 **问题现象**
 
 - plog 显示 device6 coredump，plog 在 22:36:33 报错。
@@ -318,6 +324,8 @@ TDT 组件在 device 侧发生 core dump。通过 `subProcPid` 匹配到文件�
 5. 将 so 文件和 core 文件放在同级目录，运行 `stackview.sh` 解析。
 
 #### C005：core 文件缺失
+
+> 本案例与 [coredump-reference](coredump-reference.md) 的 CD006 同源，专项排查以 CD006 为准。
 
 **问题现象**
 

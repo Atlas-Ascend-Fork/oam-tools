@@ -1,6 +1,6 @@
 ---
 name: metric-skill
-description: 基于评估 Skill 的分析结论，生成结构化度量报告或可离线打开的单文件 HTML 故障报告。报告包含基线对比、度量结果、深度分析，或测试环境、证据链、分层故障传播、根因和处置方案。当需要将评估结论转化为可读、可追踪的度量报告，或用户要求生成正式故障报告、诊断报告、根因报告、HTML 报告、离线报告和可视化交付报告时使用此技能。
+description: 基于已有 eval-skill 评估结论，生成结构化度量报告或可离线打开的单文件 HTML 故障报告。仅在用户明确要求度量、HTML 或可视化交付且已有评估/诊断上游产物时使用；缺少上游结论时由 orchestrator-skill 先处理入口和诊断。
 license: Apache-2.0
 ---
 
@@ -9,9 +9,15 @@ license: Apache-2.0
 ## 适用场景
 
 - 评估 Skill 已输出评估结论，需要生成正式的度量报告
+- orchestrator-skill 已完成诊断和可信度阶段，并提供 `diagnosis.md`/`confidence.md` 等上游产物
+- 用户明确要求 HTML、离线、可视化或基线度量交付
 - 需要与历史基线数据进行对比，量化性能/精度的变化
 - 需要将分析结果结构化呈现，便于团队共享和问题追踪
 - 迭代优化完成后，验证修改效果
+
+### 与统一调度的边界
+
+本技能只负责消费已有评估结论、时间线和可信度结果并生成报告。没有这些上游产物时，不把“生成完整诊断报告”解释成直接度量请求；先由 orchestrator-skill 完成检索、场景识别和 eval-skill 诊断。
 
 ## 子组件
 
@@ -21,7 +27,7 @@ license: Apache-2.0
 | 基线数据 | `references/baseline-data.md` | 用于对比的基准性能、精度及 errMsg 质量指标 |
 | 度量结果文档 | `references/metric-results.md` | 本次度量原始结果记录规范（含 errMsg 分析字段） |
 | 度量结果分析文档 | `references/metric-analysis.md` | 深度分析框架，含 errMsg 质量分析与改进建议模板 |
-| HTML 报告模板模块 | 仓库态 `../template/report-template-rules.md`；安装态 `template/report-template-rules.md` | HTML 作图与交付的唯一使用规范；同目录包含空白模板 |
+| HTML 报告模板模块 | 仓库态 `metric-skill/template/report-template-rules.md`；安装态 `metric-skill/template/report-template-rules.md` | HTML 作图与交付的唯一使用规范；同目录包含空白模板 |
 | HTML 打包脚本 | `scripts/build_html_report.py` | 初始化工作副本、校验并填充结构化数据、内嵌素材为单文件 HTML |
 
 ## 度量维度
@@ -55,6 +61,8 @@ license: Apache-2.0
 - 诊断可信度（来自评估 Skill 的可信度评估结果）
 - 改进建议（参考 `references/metric-analysis.md`）
 
+报告完成后按 `references/analysis-record.md` 生成本次分析记录副本，写明字段来源、计算或判断过程、证据和限制，与报告一同交付。
+
 ### 4. 按可信度标注结论强度
 
 评估 Skill 会随评估结论给出诊断可信度（见 eval-skill 的 `references/confidence-assessment.md`）。
@@ -79,8 +87,8 @@ license: Apache-2.0
 
 用户要求正式故障、诊断、根因、HTML、离线或可视化交付报告时，必须调用报告模板模块。先按以下顺序定位并完整读取第一个存在的文件：
 
-1. 仓库态：`../template/report-template-rules.md`
-2. 安装态：`template/report-template-rules.md`
+1. 仓库态：`metric-skill/template/report-template-rules.md`
+2. 安装态：`metric-skill/template/report-template-rules.md`
 
 模板模块是 HTML 版式、图例、着色、布线、案例隔离和验收规则的唯一来源。metric-skill 只向它传递当前 eval 结论、可信度和报告数据，不在本文件复制或另造作图规则。
 
