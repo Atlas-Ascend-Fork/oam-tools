@@ -32,6 +32,85 @@ from common import consts
 from testcase.conftest import AssertTest
 
 
+@pytest.mark.parametrize(
+    "file_name,category",
+    [
+        ("ge_proto_00292_Build.txt", "ge"),
+        ("ge_onnx_00292_Build.pbtxt", "ge"),
+        ("TF_GeOp_00292_Build.pbtxt", "tf"),
+    ],
+)
+def test_graph_files_keep_process_device_directories(tmp_path, file_name, category):
+    from collect.graph.graph_collect import collect_graph_files
+
+    source = tmp_path / "graphs"
+    target = tmp_path / "collected"
+    for device in (0, 1):
+        directory = source / f"pid_53343_deviceid_{device}"
+        directory.mkdir(parents=True)
+        (directory / file_name).write_bytes(f"device{device}_graph".encode("ascii"))
+
+    assert collect_graph_files(str(source), str(target))
+    assert {graph.read_bytes() for graph in target.rglob(file_name)} == {
+        b"device0_graph",
+        b"device1_graph",
+    }
+    for device in (0, 1):
+        relative = f"pid_53343_deviceid_{device}/{file_name}"
+        expected = f"device{device}_graph".encode("ascii")
+        assert (target / category / relative).read_bytes() == expected
+        assert (source / relative).read_bytes() == expected
+
+
+def test_graph_files_keep_flat_source_layout(tmp_path):
+    from collect.graph.graph_collect import collect_graph_files
+
+    source = tmp_path / "graphs"
+    source.mkdir()
+    graph = source / "ge_proto_00292_Build.txt"
+    graph.write_bytes(b"single_process_graph")
+    target = tmp_path / "collected"
+
+    assert collect_graph_files(str(source), str(target))
+    assert (target / "ge" / graph.name).read_bytes() == graph.read_bytes()
+
+
+def test_collect_graph_keeps_multiple_device_dumps(tmp_path, monkeypatch):
+    import sys
+
+    from cmdline import CommandLineParser
+    from common import RetCode
+
+    for device in (0, 1):
+        directory = tmp_path / "graphs" / f"pid_53343_deviceid_{device}"
+        directory.mkdir(parents=True)
+        (directory / "ge_proto_00292_Build.txt").write_bytes(
+            f"device{device}_graph".encode("ascii")
+        )
+    # Isolate the shared command state while using the real CLI parser and files.
+    params = ParamDict()
+    monkeypatch.setattr(params, "_ParamDict__args", {})
+    monkeypatch.setattr(params, "_ParamDict__command", None)
+    monkeypatch.setattr(params, "_ParamDict__env_type", "EP")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["asys", "collect", "--task_dir", "graphs"])
+    assert CommandLineParser().parse() == RetCode.SUCCESS
+
+    collect_graph("output")
+
+    assert {
+        graph.read_bytes() for graph in (tmp_path / "output").rglob("ge_proto*.txt")
+    } == {b"device0_graph", b"device1_graph"}
+    for device in (0, 1):
+        graph = (
+            tmp_path
+            / "output/dfx/graph/ge"
+            / f"pid_53343_deviceid_{device}"
+            / "ge_proto_00292_Build.txt"
+        )
+        assert graph.read_bytes() == f"device{device}_graph".encode("ascii")
+
+
 def setup_module():
     print("TestGraphCollect ut test start.")  # noqa: T201  # test diagnostic output
 

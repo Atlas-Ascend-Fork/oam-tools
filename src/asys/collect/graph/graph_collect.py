@@ -48,11 +48,17 @@ def collect_graph_files(source_dir, target_dir):
 
     ret = True
     for file_path in ge_res:
-        ge_file_ret = f.collect_file_to_dir(file_path, ge_target_dir_path, COPY_MODE)
+        source_subdir = os.path.relpath(os.path.dirname(file_path), source_dir)
+        ge_file_ret = f.collect_file_to_dir(
+            file_path, os.path.join(ge_target_dir_path, source_subdir), COPY_MODE
+        )
         ret = ret and ge_file_ret
 
     for file_path in tf_res:
-        tf_file_ret = f.collect_file_to_dir(file_path, tf_target_dir_path, COPY_MODE)
+        source_subdir = os.path.relpath(os.path.dirname(file_path), source_dir)
+        tf_file_ret = f.collect_file_to_dir(
+            file_path, os.path.join(tf_target_dir_path, source_subdir), COPY_MODE
+        )
         ret = ret and tf_file_ret
     return ret
 
