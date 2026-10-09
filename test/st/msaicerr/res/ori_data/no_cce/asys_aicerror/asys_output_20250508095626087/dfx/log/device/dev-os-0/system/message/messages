@@ -1,27 +1,27 @@
-May  8 09:05:00 (none) cron.info crond[4829]: USER root pid 9536 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:06:00 (none) cron.info crond[4829]: USER root pid 9589 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:07:00 (none) cron.info crond[4829]: USER root pid 9641 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:08:00 (none) cron.info crond[4829]: USER root pid 9693 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:09:00 (none) cron.info crond[4829]: USER root pid 9745 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:10:00 (none) cron.info crond[4829]: USER root pid 9798 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:11:00 (none) cron.info crond[4829]: USER root pid 9850 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:12:00 (none) cron.info crond[4829]: USER root pid 9902 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:13:00 (none) cron.info crond[4829]: USER root pid 9955 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:14:00 (none) cron.info crond[4829]: USER root pid 10008 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:15:00 (none) cron.info crond[4829]: USER root pid 10060 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:16:00 (none) cron.info crond[4829]: USER root pid 10113 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:17:00 (none) cron.info crond[4829]: USER root pid 10165 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:18:00 (none) cron.info crond[4829]: USER root pid 10217 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:19:00 (none) cron.info crond[4829]: USER root pid 10269 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:20:00 (none) cron.info crond[4829]: USER root pid 10321 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:21:00 (none) cron.info crond[4829]: USER root pid 10374 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:22:00 (none) cron.info crond[4829]: USER root pid 10427 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:23:00 (none) cron.info crond[4829]: USER root pid 10479 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:24:00 (none) cron.info crond[4829]: USER root pid 10531 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:05:00 (none) cron.info crond[4829]: USER root pid 9536 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:06:00 (none) cron.info crond[4829]: USER root pid 9589 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:07:00 (none) cron.info crond[4829]: USER root pid 9641 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:08:00 (none) cron.info crond[4829]: USER root pid 9693 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:09:00 (none) cron.info crond[4829]: USER root pid 9745 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:10:00 (none) cron.info crond[4829]: USER root pid 9798 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:11:00 (none) cron.info crond[4829]: USER root pid 9850 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:12:00 (none) cron.info crond[4829]: USER root pid 9902 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:13:00 (none) cron.info crond[4829]: USER root pid 9955 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:14:00 (none) cron.info crond[4829]: USER root pid 10008 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:15:00 (none) cron.info crond[4829]: USER root pid 10060 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:16:00 (none) cron.info crond[4829]: USER root pid 10113 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:17:00 (none) cron.info crond[4829]: USER root pid 10165 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:18:00 (none) cron.info crond[4829]: USER root pid 10217 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:19:00 (none) cron.info crond[4829]: USER root pid 10269 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:20:00 (none) cron.info crond[4829]: USER root pid 10321 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:21:00 (none) cron.info crond[4829]: USER root pid 10374 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:22:00 (none) cron.info crond[4829]: USER root pid 10427 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:23:00 (none) cron.info crond[4829]: USER root pid 10479 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:24:00 (none) cron.info crond[4829]: USER root pid 10531 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 17:24:32 (none) kern.warn kernel: [48596.522791][T10066] [ascend] [icm] [icm_ipc_msg_send_sync 560] <kworker/0:0:10066> wait response time too long.(time=218(ms), chan_id=13)
-May  8 09:25:00 (none) cron.info crond[4829]: USER root pid 10584 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:26:00 (none) cron.info crond[4829]: USER root pid 10636 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:27:00 (none) cron.info crond[4829]: USER root pid 10688 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:25:00 (none) cron.info crond[4829]: USER root pid 10584 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:26:00 (none) cron.info crond[4829]: USER root pid 10636 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:27:00 (none) cron.info crond[4829]: USER root pid 10688 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:27:34 (none) user.info aicpu_scheduler: (10726)dlog_core.c:462: dlog has been inited.
 May  8 09:27:34 (none) user.info aicpu_scheduler: (10726)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:27:34 (none) user.info aicpu_scheduler: (10726)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(136667), save mode(4269108841).
@@ -60,8 +60,8 @@ May  8 17:27:35 (none) kern.info kernel: [48779.528865][T10727] [ascend] [xsmem]
 May  8 17:27:35 (none) kern.info kernel: [48779.529043][T10727] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:10726,10727> Devmm notifier unreg.(hostpid=136667; devpid=10726; devid=0; vfid=0; status=0x0; proc_idx=0x33; msg=0; other_proc=0)
 May  8 17:27:35 (none) kern.info kernel: [48779.533852][T10727] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:10726,10727> App exited destroy mem begin.
 May  8 17:27:35 (none) kern.info kernel: [48779.533879][T10727] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:10726,10727> App exited destroy mem end. (hostpid=136667; devpid=10726; devid=0; vfid=0)
-May  8 09:28:00 (none) cron.info crond[4829]: USER root pid 10776 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:29:00 (none) cron.info crond[4829]: USER root pid 10828 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:28:00 (none) cron.info crond[4829]: USER root pid 10776 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:29:00 (none) cron.info crond[4829]: USER root pid 10828 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:29:04 (none) user.info aicpu_scheduler: (10842)dlog_core.c:462: dlog has been inited.
 May  8 09:29:04 (none) user.info aicpu_scheduler: (10842)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:29:04 (none) user.info aicpu_scheduler: (10842)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(139596), save mode(4269108841).
@@ -138,15 +138,15 @@ May  8 17:29:27 (none) kern.info kernel: [48891.518364][T10898] [ascend] [xsmem]
 May  8 17:29:27 (none) kern.info kernel: [48891.518545][T10898] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:10897,10898> Devmm notifier unreg.(hostpid=139765; devpid=10897; devid=0; vfid=0; status=0x0; proc_idx=0x35; msg=0; other_proc=0)
 May  8 17:29:27 (none) kern.info kernel: [48891.523385][T10898] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:10897,10898> App exited destroy mem begin.
 May  8 17:29:27 (none) kern.info kernel: [48891.523409][T10898] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:10897,10898> App exited destroy mem end. (hostpid=139765; devpid=10897; devid=0; vfid=0)
-May  8 09:30:00 (none) cron.info crond[4829]: USER root pid 10950 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:31:00 (none) cron.info crond[4829]: USER root pid 11002 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:32:00 (none) cron.info crond[4829]: USER root pid 11054 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:33:00 (none) cron.info crond[4829]: USER root pid 11107 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:34:00 (none) cron.info crond[4829]: USER root pid 11159 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:35:00 (none) cron.info crond[4829]: USER root pid 11212 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:36:00 (none) cron.info crond[4829]: USER root pid 11264 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:37:00 (none) cron.info crond[4829]: USER root pid 11316 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:38:00 (none) cron.info crond[4829]: USER root pid 11368 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:30:00 (none) cron.info crond[4829]: USER root pid 10950 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:31:00 (none) cron.info crond[4829]: USER root pid 11002 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:32:00 (none) cron.info crond[4829]: USER root pid 11054 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:33:00 (none) cron.info crond[4829]: USER root pid 11107 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:34:00 (none) cron.info crond[4829]: USER root pid 11159 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:35:00 (none) cron.info crond[4829]: USER root pid 11212 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:36:00 (none) cron.info crond[4829]: USER root pid 11264 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:37:00 (none) cron.info crond[4829]: USER root pid 11316 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:38:00 (none) cron.info crond[4829]: USER root pid 11368 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:38:33 (none) user.info aicpu_scheduler: (11407)dlog_core.c:462: dlog has been inited.
 May  8 09:38:33 (none) user.info aicpu_scheduler: (11407)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:38:33 (none) user.info aicpu_scheduler: (11407)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(145889), save mode(4269108841).
@@ -185,8 +185,8 @@ May  8 17:38:35 (none) kern.info kernel: [49438.812539][T11408] [ascend] [xsmem]
 May  8 17:38:35 (none) kern.info kernel: [49438.812944][T11408] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:11407,11408> Devmm notifier unreg.(hostpid=145889; devpid=11407; devid=0; vfid=0; status=0x0; proc_idx=0x36; msg=0; other_proc=0)
 May  8 17:38:35 (none) kern.info kernel: [49438.817777][T11408] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:11407,11408> App exited destroy mem begin.
 May  8 17:38:35 (none) kern.info kernel: [49438.817804][T11408] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:11407,11408> App exited destroy mem end. (hostpid=145889; devpid=11407; devid=0; vfid=0)
-May  8 09:39:00 (none) cron.info crond[4829]: USER root pid 11457 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:40:00 (none) cron.info crond[4829]: USER root pid 11509 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:39:00 (none) cron.info crond[4829]: USER root pid 11457 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:40:00 (none) cron.info crond[4829]: USER root pid 11509 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:40:59 (none) user.info aicpu_scheduler: (11569)dlog_core.c:462: dlog has been inited.
 May  8 09:40:59 (none) user.info aicpu_scheduler: (11569)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:40:59 (none) user.info aicpu_scheduler: (11569)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(147108), save mode(4269108841).
@@ -237,7 +237,7 @@ May  8 17:40:59 (none) kern.warn kernel: [49583.295095][ T4713] [ascend] [hdcdrv
 May  8 17:40:59 (none) kern.warn kernel: [49583.295109][ T4713] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <TraceServerSend:4680:4713> Session has closed. (l_session=772; r_session=772; pid=2147483646, dev_id=0; service_type="service_bbox"; l_close="remot
 May  8 17:40:59 (none) kern.info kernel: [49583.324752][T10335] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <kworker/0:1:10335,10335> App exited destroy mem end. (hostpid=147108; devpid=11569; devid=0; vfid=0)
 May  8 17:40:59 (none) kern.warn kernel: [49583.376862][T11565] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <tsdaemon:4866:11565> Session has closed. (l_session=774; r_session=774; pid=2147483646, dev_id=0; service_type="service_TSD"; l_close="remote_close
-May  8 09:41:00 (none) cron.info crond[4829]: USER root pid 11597 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:41:00 (none) cron.info crond[4829]: USER root pid 11597 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 17:41:00 (none) kern.warn kernel: [49584.245916][ T4688] [ascend] [hdcdrv] [hdcdrv_session_para_check 1091] <LogFlushCommon:4680:4688> session_fd is invalid. (session_fd=770; session_status=0; dev_id=0; service_type="service_log";l_close_state="remote_close_post
 May  8 17:41:00 (none) kern.warn kernel: [49584.245981][ T4688] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <LogFlushCommon:4680:4688> Session has closed. (l_session=770; r_session=770; pid=2147483646, dev_id=0; service_type="service_log"; l_close="remote_
 May  8 09:41:57 (none) user.info aicpu_scheduler: (11655)dlog_core.c:462: dlog has been inited.
@@ -292,7 +292,7 @@ May  8 17:41:57 (none) kern.info kernel: [49641.248723][T10335] [ascend] [devmm]
 May  8 17:41:57 (none) kern.warn kernel: [49641.251217][ T4688] [ascend] [hdcdrv] [hdcdrv_session_para_check 1091] <LogFlushCommon:4680:4688> session_fd is invalid. (session_fd=775; session_status=0; dev_id=0; service_type="service_log";l_close_state="remote_close_post
 May  8 17:41:57 (none) kern.warn kernel: [49641.251277][ T4688] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <LogFlushCommon:4680:4688> Session has closed. (l_session=775; r_session=775; pid=2147483646, dev_id=0; service_type="service_log"; l_close="remote_
 May  8 17:41:57 (none) kern.warn kernel: [49641.301463][T11651] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <tsdaemon:4866:11651> Session has closed. (l_session=779; r_session=779; pid=2147483646, dev_id=0; service_type="service_TSD"; l_close="remote_close
-May  8 09:42:00 (none) cron.info crond[4829]: USER root pid 11686 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:42:00 (none) cron.info crond[4829]: USER root pid 11686 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:42:29 (none) user.info aicpu_scheduler: (11722)dlog_core.c:462: dlog has been inited.
 May  8 09:42:29 (none) user.info aicpu_scheduler: (11722)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:42:29 (none) user.info aicpu_scheduler: (11722)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(147159), save mode(4269108841).
@@ -315,7 +315,7 @@ May  8 17:42:30 (none) kern.info kernel: [49673.733309][ T8199] [ascend] [devmm]
 May  8 17:42:30 (none) kern.info kernel: [49673.733312][ T8199] [ascend] [devmm] [devmm_split_dvpp_mem_area_first 94] <kworker/u16:0:8199,8199> Split dvpp memory area. (devpid=11722; hostpid=147159; devid=0; vfid=0)
 May  8 17:42:30 (none) kern.info kernel: [49673.766656][    C5] [ascend] [tsmng] [tsmng_ipc_chan_proc 135] <swapper/5:0> Ipc notifier process. (dev_id=0; cmd_type=33)
 May  8 17:42:30 (none) kern.info kernel: [49673.766694][    C5] [ascend] [tsmng] [tsmng_ts_req_mem 281] <swapper/5:0> Ts mem ops. (devid=0; cmd=33; sub_cmd=151; vfid=0; mem_size=0x10000)
-May  8 09:43:00 (none) cron.info crond[4829]: USER root pid 11766 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:43:00 (none) cron.info crond[4829]: USER root pid 11766 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 17:43:14 (none) kern.info kernel: [49718.009806][    C5] [ascend] [tsmng] [tsmng_ipc_chan_proc 135] <swapper/5:0> Ipc notifier process. (dev_id=0; cmd_type=35)
 May  8 17:43:14 (none) kern.info kernel: [49718.009824][    C5] [ascend] [tsmng] [tsmng_ts_release_mem 228] <swapper/5:0> Ts mem ops. (udevid=0; cmd=35; sub_cmd=152; mem_size=0x10000)
 May  8 17:43:14 (none) kern.warn kernel: [49718.173092][T11732] [ascend] [event_sched] [sched_wait_for_publish_event 1129] <aicpu_scheduler:11722:11732:2> Show warning details. (pid=11722; gid=0; tid=0; ret=-512)
@@ -346,7 +346,7 @@ May  8 17:43:14 (none) kern.info kernel: [49718.249529][T11372] [ascend] [devmm]
 May  8 17:43:14 (none) kern.warn kernel: [49718.262194][ T4688] [ascend] [hdcdrv] [hdcdrv_session_para_check 1091] <LogFlushCommon:4680:4688> session_fd is invalid. (session_fd=780; session_status=0; dev_id=0; service_type="service_log";l_close_state="remote_close_post
 May  8 17:43:14 (none) kern.warn kernel: [49718.262264][ T4688] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <LogFlushCommon:4680:4688> Session has closed. (l_session=780; r_session=780; pid=2147483646, dev_id=0; service_type="service_log"; l_close="remote_
 May  8 17:43:14 (none) kern.warn kernel: [49718.301961][T11718] [ascend] [hdcdrv] [hdcdrv_session_state_to_closing 1038] <tsdaemon:4866:11718> Session has closed. (l_session=784; r_session=784; pid=2147483646, dev_id=0; service_type="service_TSD"; l_close="remote_close
-May  8 09:44:00 (none) cron.info crond[4829]: USER root pid 11827 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:44:00 (none) cron.info crond[4829]: USER root pid 11827 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:44:07 (none) user.info aicpu_scheduler: (11845)dlog_core.c:462: dlog has been inited.
 May  8 09:44:07 (none) user.info aicpu_scheduler: (11845)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:44:07 (none) user.info aicpu_scheduler: (11845)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(148401), save mode(4269108841).
@@ -423,10 +423,10 @@ May  8 17:44:57 (none) kern.info kernel: [49821.454163][T11922] [ascend] [xsmem]
 May  8 17:44:57 (none) kern.info kernel: [49821.454353][T11922] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:11921,11922> Devmm notifier unreg.(hostpid=149655; devpid=11921; devid=0; vfid=0; status=0x0; proc_idx=0x3b; msg=0; other_proc=0)
 May  8 17:44:57 (none) kern.info kernel: [49821.459171][T11922] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:11921,11922> App exited destroy mem begin.
 May  8 17:44:57 (none) kern.info kernel: [49821.459196][T11922] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:11921,11922> App exited destroy mem end. (hostpid=149655; devpid=11921; devid=0; vfid=0)
-May  8 09:45:00 (none) cron.info crond[4829]: USER root pid 11950 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:46:00 (none) cron.info crond[4829]: USER root pid 12002 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:47:00 (none) cron.info crond[4829]: USER root pid 12054 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:48:00 (none) cron.info crond[4829]: USER root pid 12106 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:45:00 (none) cron.info crond[4829]: USER root pid 11950 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:46:00 (none) cron.info crond[4829]: USER root pid 12002 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:47:00 (none) cron.info crond[4829]: USER root pid 12054 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:48:00 (none) cron.info crond[4829]: USER root pid 12106 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:48:16 (none) user.info aicpu_scheduler: (12132)dlog_core.c:462: dlog has been inited.
 May  8 09:48:16 (none) user.info aicpu_scheduler: (12132)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:48:16 (none) user.info aicpu_scheduler: (12132)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(152144), save mode(4269108841).
@@ -612,7 +612,7 @@ May  8 17:48:43 (none) kern.info kernel: [50047.185369][T11429] [ascend] [devmm]
 May  8 17:48:43 (none) kern.info kernel: [50047.185372][T11429] [ascend] [devmm] [devmm_split_dvpp_mem_area_first 94] <kworker/u16:2:11429,11429> Split dvpp memory area. (devpid=12257; hostpid=152287; devid=0; vfid=0)
 May  8 17:48:43 (none) kern.info kernel: [50047.218459][    C5] [ascend] [tsmng] [tsmng_ipc_chan_proc 135] <swapper/5:0> Ipc notifier process. (dev_id=0; cmd_type=33)
 May  8 17:48:43 (none) kern.info kernel: [50047.218497][    C5] [ascend] [tsmng] [tsmng_ts_req_mem 281] <swapper/5:0> Ts mem ops. (devid=0; cmd=33; sub_cmd=151; vfid=0; mem_size=0x10000)
-May  8 17:48:43 (none) kern.err kernel: [50047.252723][    C0] [ascend] [ERROR] [tsdrv] [tsdrv_hb_cq_callback 332] <kworker/u16:2:11429> receive ts exception msg, call excep_code=0xb4060006, time=1746697723.659997783s, devid=0 tsid=0 
+May  8 17:48:43 (none) kern.err kernel: [50047.252723][    C0] [ascend] [ERROR] [tsdrv] [tsdrv_hb_cq_callback 332] <kworker/u16:2:11429> receive ts exception msg, call excep_code=0xb4060006, time=1746697723.659997783s, devid=0 tsid=0
 May  8 17:48:43 (none) kern.info kernel: [50047.252730][    C0] [bbox] [device-0] blackbox receive [TS] exception at 1746697723.659997, exception id is [0xb4060006], status: atomic[1], irqs disabled[0], irq[0].
 May  8 17:48:43 (none) kern.info kernel: [50047.252763][ T3255] [bbox] start saving data.
 May  8 17:48:43 (none) kern.info kernel: [50047.252765][ T3255] [bbox]  excepid:        [0xb4060006]
@@ -783,7 +783,7 @@ May  8 17:48:53 (none) kern.info kernel: [50057.153136][T12336] [ascend] [xsmem]
 May  8 17:48:53 (none) kern.info kernel: [50057.153317][T12336] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:12335,12336> Devmm notifier unreg.(hostpid=152336; devpid=12335; devid=0; vfid=0; status=0x0; proc_idx=0x41; msg=0; other_proc=0)
 May  8 17:48:53 (none) kern.info kernel: [50057.158129][T12336] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:12335,12336> App exited destroy mem begin.
 May  8 17:48:53 (none) kern.info kernel: [50057.158156][T12336] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:12335,12336> App exited destroy mem end. (hostpid=152336; devpid=12335; devid=0; vfid=0)
-May  8 17:48:58 (none) kern.err kernel: [50062.356643][    C0] [ascend] [ERROR] [tsdrv] [tsdrv_hb_cq_callback 332] <swapper/0:0> receive ts exception msg, call excep_code=0xb4060006, time=1746697738.763997783s, devid=0 tsid=0 
+May  8 17:48:58 (none) kern.err kernel: [50062.356643][    C0] [ascend] [ERROR] [tsdrv] [tsdrv_hb_cq_callback 332] <swapper/0:0> receive ts exception msg, call excep_code=0xb4060006, time=1746697738.763997783s, devid=0 tsid=0
 May  8 17:48:58 (none) kern.info kernel: [50062.356651][    C0] [bbox] [device-0] blackbox receive [TS] exception at 1746697738.763997, exception id is [0xb4060006], status: atomic[1], irqs disabled[0], irq[0].
 May  8 17:48:58 (none) kern.info kernel: [50062.356674][ T3255] [bbox] start saving data.
 May  8 17:48:58 (none) kern.info kernel: [50062.356676][ T3255] [bbox]  excepid:        [0xb4060006]
@@ -813,9 +813,9 @@ May  8 17:48:58 (none) kern.info kernel: [50062.357502][ T3263] [bbox] dump modu
 May  8 17:48:58 (none) kern.info kernel: [50062.357507][ T3259] [bbox] add seq map from 12 to 12.
 May  8 17:48:58 (none) kern.info kernel: [50062.357509][ T3259] [bbox] update timestamp from 763997012 to 763997012.
 May  8 17:48:59 (none) kern.info kernel: [50062.868585][ T3255] [bbox] dump done. use time:[500], cur_mask[0x4]
-May  8 09:49:00 (none) cron.info crond[4829]: USER root pid 12370 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:50:00 (none) cron.info crond[4829]: USER root pid 12422 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:51:00 (none) cron.info crond[4829]: USER root pid 12474 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:49:00 (none) cron.info crond[4829]: USER root pid 12370 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:50:00 (none) cron.info crond[4829]: USER root pid 12422 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:51:00 (none) cron.info crond[4829]: USER root pid 12474 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:51:02 (none) user.info aicpu_scheduler: (12486)dlog_core.c:462: dlog has been inited.
 May  8 09:51:02 (none) user.info aicpu_scheduler: (12486)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:51:02 (none) user.info aicpu_scheduler: (12486)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(154791), save mode(4269108841).
@@ -854,12 +854,12 @@ May  8 17:51:03 (none) kern.info kernel: [50187.361049][T12487] [ascend] [xsmem]
 May  8 17:51:03 (none) kern.info kernel: [50187.361223][T12487] [ascend] [devmm] [devmm_svm_mmu_notifier_unreg 54] <LogLevelWatcher:12486,12487> Devmm notifier unreg.(hostpid=154791; devpid=12486; devid=0; vfid=0; status=0x0; proc_idx=0x42; msg=0; other_proc=0)
 May  8 17:51:03 (none) kern.info kernel: [50187.366031][T12487] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2019] <LogLevelWatcher:12486,12487> App exited destroy mem begin.
 May  8 17:51:03 (none) kern.info kernel: [50187.366058][T12487] [ascend] [devmm] [devmm_destory_all_self_mem_by_proc 2042] <LogLevelWatcher:12486,12487> App exited destroy mem end. (hostpid=154791; devpid=12486; devid=0; vfid=0)
-May  8 09:52:00 (none) cron.info crond[4829]: USER root pid 12561 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:53:00 (none) cron.info crond[4829]: USER root pid 12613 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:54:00 (none) cron.info crond[4829]: USER root pid 12665 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:52:00 (none) cron.info crond[4829]: USER root pid 12561 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:53:00 (none) cron.info crond[4829]: USER root pid 12613 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:54:00 (none) cron.info crond[4829]: USER root pid 12665 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 17:54:32 (none) kern.warn kernel: [50396.542789][T12161] [ascend] [icm] [icm_ipc_msg_send_sync 560] <kworker/0:2:12161> wait response time too long.(time=238(ms), chan_id=13)
-May  8 09:55:00 (none) cron.info crond[4829]: USER root pid 12718 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
-May  8 09:56:00 (none) cron.info crond[4829]: USER root pid 12768 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/mdc/base-plat/process-manager/pm_child
+May  8 09:55:00 (none) cron.info crond[4829]: USER root pid 12718 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
+May  8 09:56:00 (none) cron.info crond[4829]: USER root pid 12768 cmd ps -ef | grep -v grep | grep -Eq "process-manager/process-manager|pm_child" || /usr/bin/platform/base-plat/process-manager/pm_child
 May  8 09:56:12 (none) user.info aicpu_scheduler: (12790)dlog_core.c:462: dlog has been inited.
 May  8 09:56:12 (none) user.info aicpu_scheduler: (12790)dlog_attr.c:205: can't set mode by env ASCEND_LOG_SAVE_MODE, use original value.
 May  8 09:56:12 (none) user.info aicpu_scheduler: (12790)dlog_attr.c:221: set log attr, type(0), deviceId(0), host pid(155320), save mode(4269108841).

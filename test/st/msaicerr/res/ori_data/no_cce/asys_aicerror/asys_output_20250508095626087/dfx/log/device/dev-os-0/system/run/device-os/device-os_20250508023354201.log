@@ -1379,7 +1379,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.802.387 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:28095] before Call bind device id[0], host pid[7005], mode[0], cp type[0] vf id[0] devpid[28097]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.822.030 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:28095] Call drvBindHostPidsuccess device id[0], host pid[7005], mode[0], cp type[0] vf id[0] devpid[28097]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.822.117 [tsd_common.cpp:1305][ExecuteStart][tid:28095] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[7005] vfId[0] fatherPid[4866] subPid[28097] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.822.163 [tsd_common.cpp:1318][ExecuteStart][tid:28095] [TSDaemon] get pid[28097], sub process name[aicpu_sd_28097] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.822.163 [tsd_common.cpp:1318][ExecuteStart][tid:28095] [TSDaemon] get pid[28097], sub process name[aicpu_sd_28097]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.836.300 [tsdaemon.cpp:1661][CheckEventClientHeartbeat][tid:4920] heart beat running impl size:1
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.836.415 [process_util_server.cpp:526][GetProcessRunningStat][tid:4920] vmRss:12184 KB, vmHwm:68192 KB, thread count:12.
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:43:57.849.064 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:28097, timestamp[1746672237849062]
@@ -1415,11 +1415,11 @@
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.473 [sys_cpu_monitor.c:199][tid:4753]  4866  4672 HwHiAiUs S<    836m  1.3   0  1.2 /var/tsdaemon
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.479 [sys_cpu_monitor.c:199][tid:4753] 28126 28125 HwHiAiUs R    11744  0.0   0  1.2 top -bn1
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.547 [sys_cpu_monitor.c:199][tid:4753] 28097  4866 HwHiAiUs S<   14.0t22938.8   0  0.0 aicpu_scheduler --deviceId=0 --pid=7005 --pidSign=000000000000000000000000000000000000000000000000 --profilingMode=0 --vfId=0 --logLevelInPid=103 --ccecpuLogLevel= --aicpuLogLevel= --deviceMode=0 --aicpuSchedMode=0 --groupNameList= --groupNameNum=0 --hostProcName=
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.554 [sys_cpu_monitor.c:199][tid:4753]  4794  4672 HwBaseUs S    1109m  1.7   0  0.0 /usr/bin/mdc/base-plat/process-manager/proc_launcher
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.554 [sys_cpu_monitor.c:199][tid:4753]  4794  4672 HwBaseUs S    1109m  1.7   0  0.0 /usr/bin/platform/base-plat/process-manager/proc_launcher
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.561 [sys_cpu_monitor.c:199][tid:4753]  4680  4672 HwHiAiUs S    1069m  1.6   0  0.0 /var/slogd -n
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.566 [sys_cpu_monitor.c:199][tid:4753]  4728  4672 HwDmUser S<    964m  1.5   0  0.0 /var/resource_mgr
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.572 [sys_cpu_monitor.c:199][tid:4753]  4696  4672 HwBaseUs S     828m  1.2   0  0.0 /usr/bin/mdc/base-plat/aosservice/iammgr
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.578 [sys_cpu_monitor.c:199][tid:4753]  4672     1 root     S     820m  1.2   0  0.0 /usr/bin/mdc/base-plat/process-manager/process-manager /etc/mdc/base-plat/process-manager/startup_procmgr.yaml
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.572 [sys_cpu_monitor.c:199][tid:4753]  4696  4672 HwBaseUs S     828m  1.2   0  0.0 /usr/bin/platform/base-plat/aosservice/iammgr
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.578 [sys_cpu_monitor.c:199][tid:4753]  4672     1 root     S     820m  1.2   0  0.0 /usr/bin/platform/base-plat/process-manager/process-manager /etc/platform/base-plat/process-manager/startup_procmgr.yaml
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:44:05.577.583 [sys_cpu_monitor.c:199][tid:4753]  4736  4672 HwHiAiUs S     732m  1.1   0  0.0 /var/log-daemon -n
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:44:46.495.535 [grp_owner_client.cpp:169][KickTheThreadDog][tid:4921] loop cnt:2460
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:45:05.439.395 [sys_memory_monitor.c:242][tid:4753] memory usage alarm: 92.7%
@@ -1535,7 +1535,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.534.299 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:29070] before Call bind device id[0], host pid[8009], mode[0], cp type[0] vf id[0] devpid[29072]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.553.917 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:29070] Call drvBindHostPidsuccess device id[0], host pid[8009], mode[0], cp type[0] vf id[0] devpid[29072]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.554.003 [tsd_common.cpp:1305][ExecuteStart][tid:29070] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[8009] vfId[0] fatherPid[4866] subPid[29072] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.554.041 [tsd_common.cpp:1318][ExecuteStart][tid:29070] [TSDaemon] get pid[29072], sub process name[aicpu_sd_29072] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.554.041 [tsd_common.cpp:1318][ExecuteStart][tid:29070] [TSDaemon] get pid[29072], sub process name[aicpu_sd_29072]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.578.101 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:29072, timestamp[1746672430578099]
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.578.129 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[29072] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:47:10.578.147 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[6] fmkPid[8009] CheckSubProcPid: subProcPid[29072] procType[1], current aicpu-sd[29072] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -1569,10 +1569,10 @@
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.011 [sys_cpu_monitor.c:199][tid:4753] 29104 29103 HwHiAiUs R    11744  0.0   0  1.2 top -bn1
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.017 [sys_cpu_monitor.c:199][tid:4753] 29072  4866 HwHiAiUs S<   14.0t22938.8   0  0.0 aicpu_scheduler --deviceId=0 --pid=8009 --pidSign=000000000000000000000000000000000000000000000000 --profilingMode=0 --vfId=0 --logLevelInPid=103 --ccecpuLogLevel= --aicpuLogLevel= --deviceMode=0 --aicpuSchedMode=0 --groupNameList= --groupNameNum=0 --hostProcName=
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.023 [sys_cpu_monitor.c:199][tid:4753]  4680  4672 HwHiAiUs S    1205m  1.8   0  0.0 /var/slogd -n
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.029 [sys_cpu_monitor.c:199][tid:4753]  4794  4672 HwBaseUs S    1109m  1.7   0  0.0 /usr/bin/mdc/base-plat/process-manager/proc_launcher
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.029 [sys_cpu_monitor.c:199][tid:4753]  4794  4672 HwBaseUs S    1109m  1.7   0  0.0 /usr/bin/platform/base-plat/process-manager/proc_launcher
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.035 [sys_cpu_monitor.c:199][tid:4753]  4728  4672 HwDmUser S<    964m  1.5   0  0.0 /var/resource_mgr
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.041 [sys_cpu_monitor.c:199][tid:4753]  4696  4672 HwBaseUs S     828m  1.2   0  0.0 /usr/bin/mdc/base-plat/aosservice/iammgr
-[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.046 [sys_cpu_monitor.c:199][tid:4753]  4672     1 root     S     820m  1.2   0  0.0 /usr/bin/mdc/base-plat/process-manager/process-manager /etc/mdc/base-plat/process-manager/startup_procmgr.yaml
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.041 [sys_cpu_monitor.c:199][tid:4753]  4696  4672 HwBaseUs S     828m  1.2   0  0.0 /usr/bin/platform/base-plat/aosservice/iammgr
+[INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.046 [sys_cpu_monitor.c:199][tid:4753]  4672     1 root     S     820m  1.2   0  0.0 /usr/bin/platform/base-plat/process-manager/process-manager /etc/platform/base-plat/process-manager/startup_procmgr.yaml
 [INFO] SYSMONITOR(4736,log-daemon):2025-05-08-02:47:25.577.053 [sys_cpu_monitor.c:199][tid:4753]  4736  4672 HwHiAiUs S     732m  1.1   0  0.0 /var/log-daemon -n
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:48:57.925.985 [tsdaemon.cpp:1661][CheckEventClientHeartbeat][tid:4920] heart beat running impl size:1
 [INFO] TDT(4866,tsdaemon):2025-05-08-02:48:57.926.151 [process_util_server.cpp:526][GetProcessRunningStat][tid:4920] vmRss:12236 KB, vmHwm:68192 KB, thread count:12.
@@ -1691,7 +1691,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:46.969.932 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19432] before Call bind device id[0], host pid[20225], mode[0], cp type[0] vf id[0] devpid[19434]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:46.989.710 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19432] Call drvBindHostPidsuccess device id[0], host pid[20225], mode[0], cp type[0] vf id[0] devpid[19434]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:46.989.794 [tsd_common.cpp:1305][ExecuteStart][tid:19432] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20225] vfId[0] fatherPid[4866] subPid[19434] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:18:46.989.832 [tsd_common.cpp:1318][ExecuteStart][tid:19432] [TSDaemon] get pid[19434], sub process name[aicpu_sd_19434] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:18:46.989.832 [tsd_common.cpp:1318][ExecuteStart][tid:19432] [TSDaemon] get pid[19434], sub process name[aicpu_sd_19434]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:47.014.083 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19434, timestamp[1746674327014081]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:47.014.109 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19434] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:47.014.127 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[8] fmkPid[20225] CheckSubProcPid: subProcPid[19434] procType[1], current aicpu-sd[19434] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -1818,7 +1818,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.139.919 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19468] before Call bind device id[0], host pid[20225], mode[0], cp type[0] vf id[0] devpid[19470]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.157.505 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19468] Call drvBindHostPidsuccess device id[0], host pid[20225], mode[0], cp type[0] vf id[0] devpid[19470]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.157.589 [tsd_common.cpp:1305][ExecuteStart][tid:19468] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20225] vfId[0] fatherPid[4866] subPid[19470] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.157.626 [tsd_common.cpp:1318][ExecuteStart][tid:19468] [TSDaemon] get pid[19470], sub process name[aicpu_sd_19470] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.157.626 [tsd_common.cpp:1318][ExecuteStart][tid:19468] [TSDaemon] get pid[19470], sub process name[aicpu_sd_19470]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.183.208 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19470, timestamp[1746674329183205]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.183.236 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19470] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:18:49.183.253 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[10] fmkPid[20225] CheckSubProcPid: subProcPid[19470] procType[1], current aicpu-sd[19470] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -1950,7 +1950,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.918.031 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19819] before Call bind device id[0], host pid[20717], mode[0], cp type[0] vf id[0] devpid[19821]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.937.521 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19819] Call drvBindHostPidsuccess device id[0], host pid[20717], mode[0], cp type[0] vf id[0] devpid[19821]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.937.604 [tsd_common.cpp:1305][ExecuteStart][tid:19819] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20717] vfId[0] fatherPid[4866] subPid[19821] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.937.648 [tsd_common.cpp:1318][ExecuteStart][tid:19819] [TSDaemon] get pid[19821], sub process name[aicpu_sd_19821] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.937.648 [tsd_common.cpp:1318][ExecuteStart][tid:19819] [TSDaemon] get pid[19821], sub process name[aicpu_sd_19821]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.962.323 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19821, timestamp[1746674692962321]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.962.351 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19821] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:52.962.368 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[12] fmkPid[20717] CheckSubProcPid: subProcPid[19821] procType[1], current aicpu-sd[19821] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2077,7 +2077,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.091.912 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19856] before Call bind device id[0], host pid[20717], mode[0], cp type[0] vf id[0] devpid[19858]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.109.516 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19856] Call drvBindHostPidsuccess device id[0], host pid[20717], mode[0], cp type[0] vf id[0] devpid[19858]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.109.599 [tsd_common.cpp:1305][ExecuteStart][tid:19856] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20717] vfId[0] fatherPid[4866] subPid[19858] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.109.637 [tsd_common.cpp:1318][ExecuteStart][tid:19856] [TSDaemon] get pid[19858], sub process name[aicpu_sd_19858] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.109.637 [tsd_common.cpp:1318][ExecuteStart][tid:19856] [TSDaemon] get pid[19858], sub process name[aicpu_sd_19858]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.135.034 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19858, timestamp[1746674695135031]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.135.063 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19858] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:24:55.135.080 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[14] fmkPid[20717] CheckSubProcPid: subProcPid[19858] procType[1], current aicpu-sd[19858] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2204,7 +2204,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.888.363 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19902] before Call bind device id[0], host pid[20766], mode[0], cp type[0] vf id[0] devpid[19904]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.906.233 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19902] Call drvBindHostPidsuccess device id[0], host pid[20766], mode[0], cp type[0] vf id[0] devpid[19904]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.906.314 [tsd_common.cpp:1305][ExecuteStart][tid:19902] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20766] vfId[0] fatherPid[4866] subPid[19904] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.906.350 [tsd_common.cpp:1318][ExecuteStart][tid:19902] [TSDaemon] get pid[19904], sub process name[aicpu_sd_19904] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.906.350 [tsd_common.cpp:1318][ExecuteStart][tid:19902] [TSDaemon] get pid[19904], sub process name[aicpu_sd_19904]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.931.939 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19904, timestamp[1746674700931937]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.931.968 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19904] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:00.931.985 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[16] fmkPid[20766] CheckSubProcPid: subProcPid[19904] procType[1], current aicpu-sd[19904] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2331,7 +2331,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.026.334 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19939] before Call bind device id[0], host pid[20766], mode[0], cp type[0] vf id[0] devpid[19941]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.045.534 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19939] Call drvBindHostPidsuccess device id[0], host pid[20766], mode[0], cp type[0] vf id[0] devpid[19941]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.045.618 [tsd_common.cpp:1305][ExecuteStart][tid:19939] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20766] vfId[0] fatherPid[4866] subPid[19941] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.045.656 [tsd_common.cpp:1318][ExecuteStart][tid:19939] [TSDaemon] get pid[19941], sub process name[aicpu_sd_19941] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.045.656 [tsd_common.cpp:1318][ExecuteStart][tid:19939] [TSDaemon] get pid[19941], sub process name[aicpu_sd_19941]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.069.599 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19941, timestamp[1746674703069597]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.069.625 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19941] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:03.069.642 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[18] fmkPid[20766] CheckSubProcPid: subProcPid[19941] procType[1], current aicpu-sd[19941] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2474,7 +2474,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.462.131 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:19981] before Call bind device id[0], host pid[20814], mode[0], cp type[0] vf id[0] devpid[19983]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.481.521 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:19981] Call drvBindHostPidsuccess device id[0], host pid[20814], mode[0], cp type[0] vf id[0] devpid[19983]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.481.605 [tsd_common.cpp:1305][ExecuteStart][tid:19981] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[20814] vfId[0] fatherPid[4866] subPid[19983] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.481.643 [tsd_common.cpp:1318][ExecuteStart][tid:19981] [TSDaemon] get pid[19983], sub process name[aicpu_sd_19983] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.481.643 [tsd_common.cpp:1318][ExecuteStart][tid:19981] [TSDaemon] get pid[19983], sub process name[aicpu_sd_19983]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.506.104 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:19983, timestamp[1746674708506102]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.506.133 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[19983] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:25:08.506.150 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[20] fmkPid[20814] CheckSubProcPid: subProcPid[19983] procType[1], current aicpu-sd[19983] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2608,7 +2608,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.759.650 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:20770] before Call bind device id[0], host pid[21094], mode[0], cp type[0] vf id[0] devpid[20772]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.777.538 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:20770] Call drvBindHostPidsuccess device id[0], host pid[21094], mode[0], cp type[0] vf id[0] devpid[20772]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.777.615 [tsd_common.cpp:1305][ExecuteStart][tid:20770] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[21094] vfId[0] fatherPid[4866] subPid[20772] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.777.650 [tsd_common.cpp:1318][ExecuteStart][tid:20770] [TSDaemon] get pid[20772], sub process name[aicpu_sd_20772] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.777.650 [tsd_common.cpp:1318][ExecuteStart][tid:20770] [TSDaemon] get pid[20772], sub process name[aicpu_sd_20772]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.803.415 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:20772, timestamp[1746675576803412]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.803.442 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[20772] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:39:36.803.459 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[22] fmkPid[21094] CheckSubProcPid: subProcPid[20772] procType[1], current aicpu-sd[20772] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2735,7 +2735,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.495.125 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:20876] before Call bind device id[0], host pid[21224], mode[0], cp type[0] vf id[0] devpid[20878]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.513.549 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:20876] Call drvBindHostPidsuccess device id[0], host pid[21224], mode[0], cp type[0] vf id[0] devpid[20878]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.513.631 [tsd_common.cpp:1305][ExecuteStart][tid:20876] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[21224] vfId[0] fatherPid[4866] subPid[20878] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.513.670 [tsd_common.cpp:1318][ExecuteStart][tid:20876] [TSDaemon] get pid[20878], sub process name[aicpu_sd_20878] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.513.670 [tsd_common.cpp:1318][ExecuteStart][tid:20876] [TSDaemon] get pid[20878], sub process name[aicpu_sd_20878]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.538.961 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:20878, timestamp[1746675655538959]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.538.989 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[20878] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:40:55.539.006 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[24] fmkPid[21224] CheckSubProcPid: subProcPid[20878] procType[1], current aicpu-sd[20878] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -2867,7 +2867,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.165.495 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:21405] before Call bind device id[0], host pid[21607], mode[0], cp type[0] vf id[0] devpid[21407]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.185.625 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:21405] Call drvBindHostPidsuccess device id[0], host pid[21607], mode[0], cp type[0] vf id[0] devpid[21407]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.185.709 [tsd_common.cpp:1305][ExecuteStart][tid:21405] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[21607] vfId[0] fatherPid[4866] subPid[21407] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.185.745 [tsd_common.cpp:1318][ExecuteStart][tid:21405] [TSDaemon] get pid[21407], sub process name[aicpu_sd_21407] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.185.745 [tsd_common.cpp:1318][ExecuteStart][tid:21405] [TSDaemon] get pid[21407], sub process name[aicpu_sd_21407]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.209.642 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:21407, timestamp[1746676225209640]
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.209.670 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[21407] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-03:50:25.209.686 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[26] fmkPid[21607] CheckSubProcPid: subProcPid[21407] procType[1], current aicpu-sd[21407] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3009,7 +3009,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.515.698 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23174] before Call bind device id[0], host pid[22323], mode[0], cp type[0] vf id[0] devpid[23176]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.533.528 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23174] Call drvBindHostPidsuccess device id[0], host pid[22323], mode[0], cp type[0] vf id[0] devpid[23176]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.533.603 [tsd_common.cpp:1305][ExecuteStart][tid:23174] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[22323] vfId[0] fatherPid[4866] subPid[23176] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.533.639 [tsd_common.cpp:1318][ExecuteStart][tid:23174] [TSDaemon] get pid[23176], sub process name[aicpu_sd_23176] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.533.639 [tsd_common.cpp:1318][ExecuteStart][tid:23174] [TSDaemon] get pid[23176], sub process name[aicpu_sd_23176]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.559.749 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23176, timestamp[1746678214559747]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.559.782 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23176] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:23:34.559.798 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[28] fmkPid[22323] CheckSubProcPid: subProcPid[23176] procType[1], current aicpu-sd[23176] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3146,7 +3146,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.715.515 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23563] before Call bind device id[0], host pid[23031], mode[0], cp type[0] vf id[0] devpid[23565]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.733.516 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23563] Call drvBindHostPidsuccess device id[0], host pid[23031], mode[0], cp type[0] vf id[0] devpid[23565]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.733.597 [tsd_common.cpp:1305][ExecuteStart][tid:23563] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23031] vfId[0] fatherPid[4866] subPid[23565] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.733.635 [tsd_common.cpp:1318][ExecuteStart][tid:23563] [TSDaemon] get pid[23565], sub process name[aicpu_sd_23565] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.733.635 [tsd_common.cpp:1318][ExecuteStart][tid:23563] [TSDaemon] get pid[23565], sub process name[aicpu_sd_23565]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.759.411 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23565, timestamp[1746678313759409]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.759.439 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23565] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:13.759.455 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[30] fmkPid[23031] CheckSubProcPid: subProcPid[23565] procType[1], current aicpu-sd[23565] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3273,7 +3273,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.894.900 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23602] before Call bind device id[0], host pid[23031], mode[0], cp type[0] vf id[0] devpid[23604]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.913.547 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23602] Call drvBindHostPidsuccess device id[0], host pid[23031], mode[0], cp type[0] vf id[0] devpid[23604]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.913.633 [tsd_common.cpp:1305][ExecuteStart][tid:23602] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23031] vfId[0] fatherPid[4866] subPid[23604] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.913.672 [tsd_common.cpp:1318][ExecuteStart][tid:23602] [TSDaemon] get pid[23604], sub process name[aicpu_sd_23604] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.913.672 [tsd_common.cpp:1318][ExecuteStart][tid:23602] [TSDaemon] get pid[23604], sub process name[aicpu_sd_23604]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.938.242 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23604, timestamp[1746678315938240]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.938.270 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23604] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:15.938.287 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[32] fmkPid[23031] CheckSubProcPid: subProcPid[23604] procType[1], current aicpu-sd[23604] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3414,7 +3414,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.203.556 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23653] before Call bind device id[0], host pid[23079], mode[0], cp type[0] vf id[0] devpid[23655]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.221.891 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23653] Call drvBindHostPidsuccess device id[0], host pid[23079], mode[0], cp type[0] vf id[0] devpid[23655]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.221.977 [tsd_common.cpp:1305][ExecuteStart][tid:23653] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23079] vfId[0] fatherPid[4866] subPid[23655] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.222.016 [tsd_common.cpp:1318][ExecuteStart][tid:23653] [TSDaemon] get pid[23655], sub process name[aicpu_sd_23655] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.222.016 [tsd_common.cpp:1318][ExecuteStart][tid:23653] [TSDaemon] get pid[23655], sub process name[aicpu_sd_23655]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.247.096 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23655, timestamp[1746678336247094]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.247.125 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23655] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:25:36.247.141 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[34] fmkPid[23079] CheckSubProcPid: subProcPid[23655] procType[1], current aicpu-sd[23655] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3541,7 +3541,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.128.199 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23816] before Call bind device id[0], host pid[23429], mode[0], cp type[0] vf id[0] devpid[23818]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.145.829 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23816] Call drvBindHostPidsuccess device id[0], host pid[23429], mode[0], cp type[0] vf id[0] devpid[23818]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.145.916 [tsd_common.cpp:1305][ExecuteStart][tid:23816] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23429] vfId[0] fatherPid[4866] subPid[23818] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.145.952 [tsd_common.cpp:1318][ExecuteStart][tid:23816] [TSDaemon] get pid[23818], sub process name[aicpu_sd_23818] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.145.952 [tsd_common.cpp:1318][ExecuteStart][tid:23816] [TSDaemon] get pid[23818], sub process name[aicpu_sd_23818]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.172.373 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23818, timestamp[1746678484172370]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.172.405 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23818] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:04.172.422 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[36] fmkPid[23429] CheckSubProcPid: subProcPid[23818] procType[1], current aicpu-sd[23818] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3668,7 +3668,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.597.205 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23857] before Call bind device id[0], host pid[23470], mode[0], cp type[0] vf id[0] devpid[23859]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.617.507 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23857] Call drvBindHostPidsuccess device id[0], host pid[23470], mode[0], cp type[0] vf id[0] devpid[23859]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.617.594 [tsd_common.cpp:1305][ExecuteStart][tid:23857] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23470] vfId[0] fatherPid[4866] subPid[23859] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.617.630 [tsd_common.cpp:1318][ExecuteStart][tid:23857] [TSDaemon] get pid[23859], sub process name[aicpu_sd_23859] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.617.630 [tsd_common.cpp:1318][ExecuteStart][tid:23857] [TSDaemon] get pid[23859], sub process name[aicpu_sd_23859]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.640.901 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23859, timestamp[1746678489640899]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.640.930 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23859] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:09.640.946 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[38] fmkPid[23470] CheckSubProcPid: subProcPid[23859] procType[1], current aicpu-sd[23859] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3796,7 +3796,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.149.151 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23894] before Call bind device id[0], host pid[23510], mode[0], cp type[0] vf id[0] devpid[23896]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.165.830 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23894] Call drvBindHostPidsuccess device id[0], host pid[23510], mode[0], cp type[0] vf id[0] devpid[23896]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.165.917 [tsd_common.cpp:1305][ExecuteStart][tid:23894] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23510] vfId[0] fatherPid[4866] subPid[23896] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.165.955 [tsd_common.cpp:1318][ExecuteStart][tid:23894] [TSDaemon] get pid[23896], sub process name[aicpu_sd_23896] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.165.955 [tsd_common.cpp:1318][ExecuteStart][tid:23894] [TSDaemon] get pid[23896], sub process name[aicpu_sd_23896]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.192.331 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23896, timestamp[1746678495192329]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.192.360 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23896] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:15.192.377 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[40] fmkPid[23510] CheckSubProcPid: subProcPid[23896] procType[1], current aicpu-sd[23896] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -3923,7 +3923,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.522.805 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:23935] before Call bind device id[0], host pid[23552], mode[0], cp type[0] vf id[0] devpid[23937]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.541.513 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:23935] Call drvBindHostPidsuccess device id[0], host pid[23552], mode[0], cp type[0] vf id[0] devpid[23937]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.541.598 [tsd_common.cpp:1305][ExecuteStart][tid:23935] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23552] vfId[0] fatherPid[4866] subPid[23937] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.541.635 [tsd_common.cpp:1318][ExecuteStart][tid:23935] [TSDaemon] get pid[23937], sub process name[aicpu_sd_23937] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.541.635 [tsd_common.cpp:1318][ExecuteStart][tid:23935] [TSDaemon] get pid[23937], sub process name[aicpu_sd_23937]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.565.620 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:23937, timestamp[1746678500565617]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.565.648 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[23937] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:28:20.565.670 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[42] fmkPid[23552] CheckSubProcPid: subProcPid[23937] procType[1], current aicpu-sd[23937] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4052,7 +4052,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:54.964.759 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24257] before Call bind device id[0], host pid[23968], mode[0], cp type[0] vf id[0] devpid[24259]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:54.982.100 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24257] Call drvBindHostPidsuccess device id[0], host pid[23968], mode[0], cp type[0] vf id[0] devpid[24259]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:54.982.170 [tsd_common.cpp:1305][ExecuteStart][tid:24257] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[23968] vfId[0] fatherPid[4866] subPid[24259] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:33:54.982.206 [tsd_common.cpp:1318][ExecuteStart][tid:24257] [TSDaemon] get pid[24259], sub process name[aicpu_sd_24259] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:33:54.982.206 [tsd_common.cpp:1318][ExecuteStart][tid:24257] [TSDaemon] get pid[24259], sub process name[aicpu_sd_24259]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:55.009.112 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24259, timestamp[1746678835009110]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:55.009.140 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24259] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:33:55.009.156 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[44] fmkPid[23968] CheckSubProcPid: subProcPid[24259] procType[1], current aicpu-sd[24259] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4181,7 +4181,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.176.243 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24321] before Call bind device id[0], host pid[24011], mode[0], cp type[0] vf id[0] devpid[24323]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.193.542 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24321] Call drvBindHostPidsuccess device id[0], host pid[24011], mode[0], cp type[0] vf id[0] devpid[24323]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.193.618 [tsd_common.cpp:1305][ExecuteStart][tid:24321] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24011] vfId[0] fatherPid[4866] subPid[24323] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.193.654 [tsd_common.cpp:1318][ExecuteStart][tid:24321] [TSDaemon] get pid[24323], sub process name[aicpu_sd_24323] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.193.654 [tsd_common.cpp:1318][ExecuteStart][tid:24321] [TSDaemon] get pid[24323], sub process name[aicpu_sd_24323]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.219.556 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24323, timestamp[1746678859219554]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.219.586 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24323] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:34:19.219.603 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[46] fmkPid[24011] CheckSubProcPid: subProcPid[24323] procType[1], current aicpu-sd[24323] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4311,7 +4311,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.905.202 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24766] before Call bind device id[0], host pid[24168], mode[0], cp type[0] vf id[0] devpid[24768]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.925.526 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24766] Call drvBindHostPidsuccess device id[0], host pid[24168], mode[0], cp type[0] vf id[0] devpid[24768]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.925.615 [tsd_common.cpp:1305][ExecuteStart][tid:24766] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24168] vfId[0] fatherPid[4866] subPid[24768] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.925.653 [tsd_common.cpp:1318][ExecuteStart][tid:24766] [TSDaemon] get pid[24768], sub process name[aicpu_sd_24768] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.925.653 [tsd_common.cpp:1318][ExecuteStart][tid:24766] [TSDaemon] get pid[24768], sub process name[aicpu_sd_24768]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.948.538 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24768, timestamp[1746679327948536]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.948.568 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24768] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:07.948.584 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[48] fmkPid[24168] CheckSubProcPid: subProcPid[24768] procType[1], current aicpu-sd[24768] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4438,7 +4438,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.783.500 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24834] before Call bind device id[0], host pid[24286], mode[0], cp type[0] vf id[0] devpid[24836]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.801.903 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24834] Call drvBindHostPidsuccess device id[0], host pid[24286], mode[0], cp type[0] vf id[0] devpid[24836]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.801.981 [tsd_common.cpp:1305][ExecuteStart][tid:24834] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24286] vfId[0] fatherPid[4866] subPid[24836] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.802.017 [tsd_common.cpp:1318][ExecuteStart][tid:24834] [TSDaemon] get pid[24836], sub process name[aicpu_sd_24836] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.802.017 [tsd_common.cpp:1318][ExecuteStart][tid:24834] [TSDaemon] get pid[24836], sub process name[aicpu_sd_24836]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.827.174 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24836, timestamp[1746679365827171]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.827.203 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24836] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:45.827.220 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[50] fmkPid[24286] CheckSubProcPid: subProcPid[24836] procType[1], current aicpu-sd[24836] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4565,7 +4565,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:47.963.217 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24869] before Call bind device id[0], host pid[24286], mode[0], cp type[0] vf id[0] devpid[24871]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:47.981.707 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24869] Call drvBindHostPidsuccess device id[0], host pid[24286], mode[0], cp type[0] vf id[0] devpid[24871]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:47.981.788 [tsd_common.cpp:1305][ExecuteStart][tid:24869] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24286] vfId[0] fatherPid[4866] subPid[24871] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:47.981.825 [tsd_common.cpp:1318][ExecuteStart][tid:24869] [TSDaemon] get pid[24871], sub process name[aicpu_sd_24871] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:47.981.825 [tsd_common.cpp:1318][ExecuteStart][tid:24869] [TSDaemon] get pid[24871], sub process name[aicpu_sd_24871]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:48.006.229 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24871, timestamp[1746679368006227]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:48.006.258 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24871] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:48.006.274 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[52] fmkPid[24286] CheckSubProcPid: subProcPid[24871] procType[1], current aicpu-sd[24871] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4714,7 +4714,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.731.069 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24908] before Call bind device id[0], host pid[24336], mode[0], cp type[0] vf id[0] devpid[24910]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.749.537 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24908] Call drvBindHostPidsuccess device id[0], host pid[24336], mode[0], cp type[0] vf id[0] devpid[24910]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.749.622 [tsd_common.cpp:1305][ExecuteStart][tid:24908] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24336] vfId[0] fatherPid[4866] subPid[24910] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.749.661 [tsd_common.cpp:1318][ExecuteStart][tid:24908] [TSDaemon] get pid[24910], sub process name[aicpu_sd_24910] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.749.661 [tsd_common.cpp:1318][ExecuteStart][tid:24908] [TSDaemon] get pid[24910], sub process name[aicpu_sd_24910]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.774.113 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24910, timestamp[1746679374774111]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.774.142 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24910] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:54.774.160 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[54] fmkPid[24336] CheckSubProcPid: subProcPid[24910] procType[1], current aicpu-sd[24910] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4841,7 +4841,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.862.296 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24947] before Call bind device id[0], host pid[24336], mode[0], cp type[0] vf id[0] devpid[24949]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.881.514 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24947] Call drvBindHostPidsuccess device id[0], host pid[24336], mode[0], cp type[0] vf id[0] devpid[24949]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.881.598 [tsd_common.cpp:1305][ExecuteStart][tid:24947] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24336] vfId[0] fatherPid[4866] subPid[24949] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.881.636 [tsd_common.cpp:1318][ExecuteStart][tid:24947] [TSDaemon] get pid[24949], sub process name[aicpu_sd_24949] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.881.636 [tsd_common.cpp:1318][ExecuteStart][tid:24947] [TSDaemon] get pid[24949], sub process name[aicpu_sd_24949]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.905.647 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24949, timestamp[1746679376905645]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.905.677 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24949] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:42:56.905.694 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[56] fmkPid[24336] CheckSubProcPid: subProcPid[24949] procType[1], current aicpu-sd[24949] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -4990,7 +4990,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.683.491 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:24991] before Call bind device id[0], host pid[24384], mode[0], cp type[0] vf id[0] devpid[24993]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.701.901 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:24991] Call drvBindHostPidsuccess device id[0], host pid[24384], mode[0], cp type[0] vf id[0] devpid[24993]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.701.983 [tsd_common.cpp:1305][ExecuteStart][tid:24991] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[24384] vfId[0] fatherPid[4866] subPid[24993] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.702.023 [tsd_common.cpp:1318][ExecuteStart][tid:24991] [TSDaemon] get pid[24993], sub process name[aicpu_sd_24993] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.702.023 [tsd_common.cpp:1318][ExecuteStart][tid:24991] [TSDaemon] get pid[24993], sub process name[aicpu_sd_24993]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.727.090 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:24993, timestamp[1746679383727088]
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.727.119 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[24993] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-04:43:03.727.137 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[58] fmkPid[24384] CheckSubProcPid: subProcPid[24993] procType[1], current aicpu-sd[24993] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -5190,7 +5190,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.370.961 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:304] before Call bind device id[0], host pid[92844], mode[0], cp type[0] vf id[0] devpid[306]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.389.512 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:304] Call drvBindHostPidsuccess device id[0], host pid[92844], mode[0], cp type[0] vf id[0] devpid[306]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.389.598 [tsd_common.cpp:1305][ExecuteStart][tid:304] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[92844] vfId[0] fatherPid[4866] subPid[306] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.389.636 [tsd_common.cpp:1318][ExecuteStart][tid:304] [TSDaemon] get pid[306], sub process name[aicpu_sd_306] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.389.636 [tsd_common.cpp:1318][ExecuteStart][tid:304] [TSDaemon] get pid[306], sub process name[aicpu_sd_306]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.414.313 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:306, timestamp[1746687918414310]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.414.339 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[306] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:05:18.414.355 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[60] fmkPid[92844] CheckSubProcPid: subProcPid[306] procType[1], current aicpu-sd[306] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -5317,7 +5317,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.370.442 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:435] before Call bind device id[0], host pid[94868], mode[0], cp type[0] vf id[0] devpid[437]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.389.514 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:435] Call drvBindHostPidsuccess device id[0], host pid[94868], mode[0], cp type[0] vf id[0] devpid[437]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.389.597 [tsd_common.cpp:1305][ExecuteStart][tid:435] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[94868] vfId[0] fatherPid[4866] subPid[437] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.389.634 [tsd_common.cpp:1318][ExecuteStart][tid:435] [TSDaemon] get pid[437], sub process name[aicpu_sd_437] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.389.634 [tsd_common.cpp:1318][ExecuteStart][tid:435] [TSDaemon] get pid[437], sub process name[aicpu_sd_437]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.414.121 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:437, timestamp[1746688029414119]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.414.150 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[437] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:07:09.414.167 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[62] fmkPid[94868] CheckSubProcPid: subProcPid[437] procType[1], current aicpu-sd[437] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -5446,7 +5446,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.915.756 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:1105] before Call bind device id[0], host pid[97687], mode[0], cp type[0] vf id[0] devpid[1107]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.933.909 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:1105] Call drvBindHostPidsuccess device id[0], host pid[97687], mode[0], cp type[0] vf id[0] devpid[1107]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.933.999 [tsd_common.cpp:1305][ExecuteStart][tid:1105] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[97687] vfId[0] fatherPid[4866] subPid[1107] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.934.035 [tsd_common.cpp:1318][ExecuteStart][tid:1105] [TSDaemon] get pid[1107], sub process name[aicpu_sd_1107] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.934.035 [tsd_common.cpp:1318][ExecuteStart][tid:1105] [TSDaemon] get pid[1107], sub process name[aicpu_sd_1107]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.959.729 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:1107, timestamp[1746688359959727]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.959.759 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[1107] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:12:39.959.776 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[64] fmkPid[97687] CheckSubProcPid: subProcPid[1107] procType[1], current aicpu-sd[1107] hccp[-1], custom-aicpu[-1], qs[-1]
@@ -5573,7 +5573,7 @@
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.598.128 [process_util_server.cpp:281][BindHostPidAndSubProcess][tid:1177] before Call bind device id[0], host pid[98209], mode[0], cp type[0] vf id[0] devpid[1179]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.617.913 [process_util_server.cpp:289][BindHostPidAndSubProcess][tid:1177] Call drvBindHostPidsuccess device id[0], host pid[98209], mode[0], cp type[0] vf id[0] devpid[1179]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.617.999 [tsd_common.cpp:1305][ExecuteStart][tid:1177] [TsdEVENT]#### Start TSD->SubProcess[PROC] Start Msg device index in os[0] Proc[aicpu_scheduler] fmkPid[98209] vfId[0] fatherPid[4866] subPid[1179] #### profilingMode is[0]
-[INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.618.037 [tsd_common.cpp:1318][ExecuteStart][tid:1177] [TSDaemon] get pid[1179], sub process name[aicpu_sd_1179] 
+[INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.618.037 [tsd_common.cpp:1318][ExecuteStart][tid:1177] [TSDaemon] get pid[1179], sub process name[aicpu_sd_1179]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.641.876 [tsd_event_server.cpp:414][ProcessEvent][tid:4919] Begin to process tsd event. sendpid:1179, timestamp[1746688388641873]
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.641.905 [tsdaemon.cpp:678][ProcessEventServerInfo][tid:4919] [ProcessEventServerInfo] deviceId[0] srcPid[1179] type[43] subEventId[43 (0:START_RSP, 1:SHUTDOWN_RSP, 2:NOTIFY_AICPUINFO, 3:NOTIFY_AICPUINFO_RSP, 4:ABNORMAL, 5:SHUTDOWN, 6:LOAD_SO)].
 [INFO] TDT(4866,tsdaemon):2025-05-08-07:13:08.641.923 [tsd_common.cpp:1996][CheckSubProcPid][tid:4919] [TSDaemon] device index in os[0] sessId[66] fmkPid[98209] CheckSubProcPid: subProcPid[1179] procType[1], current aicpu-sd[1179] hccp[-1], custom-aicpu[-1], qs[-1]

@@ -33,7 +33,7 @@
 [INFO] DRV(1592077,python3):2024-09-12-16:39:57.782.870 [ascend][curpid: 1592077, 1592077][drv][devmm][devmm_setup_device 99]DrvMemDeviceOpen. (devid=0)
 [INFO] DRV(1592077,python3):2024-09-12-16:39:57.785.784 [ascend][curpid: 1592077, 1592077][drv][devmm][devmm_ioctl_init_process 394]Init_process details. (hostpid=1592077)
 [INFO] DRV(1592077,python3):2024-09-12-16:39:57.786.041 [ascend][curpid: 1592077, 1592077][drv][devmm][share_log_read_in_single_module 634]Setup device succeeded. (logical_devid=0; devid=0; vfid=0; hostpid=1592077; devpid=32192)
-[INFO] TDT(1592077,python3):2024-09-12-16:39:57.786.323 [stub_process_mode_nowin.cpp:60][ProcessQueueForMdc][tid:1592077] [TsdClient] it is unnecessary of current mode[0] to grant queue auth to aicpusd
+[INFO] TDT(1592077,python3):2024-09-12-16:39:57.786.323 [stub_process_mode_nowin.cpp:60][ProcessQueueForHost][tid:1592077] [TsdClient] it is unnecessary of current mode[0] to grant queue auth to aicpusd
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.786.330 [stub_process_mode_nowin.cpp:98][OpenInHost][tid:1592077] enter into OpenInHost deviceid[0]
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.786.343 [client_manager.cpp:420][IsHostEnvironment][tid:1592077] [TsdClient] logicDeviceId is [0], hostaicpunum[0]
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.786.347 [stub_process_mode_nowin.cpp:102][OpenInHost][tid:1592077] host cpu not support
@@ -43,7 +43,7 @@
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.048 [tsd_client.cpp:178][TsdCapabilityGet][tid:1592077] TsdCapabilityGet Begin.
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.067 [process_mode_manager.cpp:1282][CapabilityGet][tid:1592077] [ProcessModeManager] enter into CapabilityGet process deviceId[0] type[0]
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.074 [version_verify.cpp:114][SpecialFeatureCheck][tid:1592077] VersionVerify: previous type[38], supported
-[INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.090 [process_mode_manager.cpp:1305][CapabilityGet][tid:1592077] [TsdClient][deviceId=0] [sessionId=1] [type=0]send capability success 
+[INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.090 [process_mode_manager.cpp:1305][CapabilityGet][tid:1592077] [TsdClient][deviceId=0] [sessionId=1] [type=0]send capability success
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.856 [process_mode_manager.cpp:764][PidQosMsgProc][tid:1592077] [TsdClient] PidQosMsgProc recvMsg realDeviceId[0] msgType[39] localDevId[0] rspCode[0],pidqos[1]
 [INFO] TDT(1592077,python3):2024-09-12-16:39:57.796.862 [process_mode_manager.cpp:1310][CapabilityGet][tid:1592077] [TsdClient][logicDeviceId_=0][type=0][pidQos=1][ret=0]recv capability respond finish
 [INFO] RUNTIME(1592077,python3):2024-09-12-16:39:57.796.888 [engine.cc:76] 1592077 Engine: Constructor.
@@ -69,7 +69,7 @@
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.642.333 [ge_api.cc:243][EVENT]1592077 GEInitializeImpl:[GEPERFTRACE] The time cost of GEInitialize::InitPreparation is [48431] micro second.
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.642.352 [gelib.cc:91][EVENT]1592077 Initialize:[GEPERFTRACE] GE Init Start
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.820.132 [gelib.cc:157][EVENT]1592077 Initialize:[GEPERFTRACE] The time cost of GELib::InitializePrepare is [177770] micro second.
-[INFO] GE(1592077,python3):2024-09-12-16:39:58.820.300 [gelib.cc:312][EVENT]1592077 SystemInitialize:Infer init GELib success, device id :-1 
+[INFO] GE(1592077,python3):2024-09-12-16:39:58.820.300 [gelib.cc:312][EVENT]1592077 SystemInitialize:Infer init GELib success, device id :-1
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.820.307 [gelib.cc:184][EVENT]1592077 InnerInitialize:[GEPERFTRACE] The time cost of InnerInitialize::SystemInitialize is [8] micro second.
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.823.360 [process_node_engine_manager.cc:63][EVENT]1592077 Initialize:[GEPERFTRACE] The time cost of ProcessNodeEngineManager::Initialize[HOST_CPU] is [5] micro second.
 [INFO] GE(1592077,python3):2024-09-12-16:39:58.823.370 [process_node_engine_manager.cc:63][EVENT]1592077 Initialize:[GEPERFTRACE] The time cost of ProcessNodeEngineManager::Initialize[NPU] is [1] micro second.
