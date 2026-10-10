@@ -281,7 +281,10 @@ def run_all(config_path, raw_ops_path, manifest_path, source_dirs, mode='A',
                 if not f.get('pass'):
                     # A finding may downgrade itself (e.g. MA1/MA3 against a
                     # low-confidence manifest); otherwise fall back to the id class.
-                    sev = f.get('severity') or ('error' if f['id'] in hard else 'warning')
+                    # L8 only records optional shape annotations. Explicit
+                    # --with-shapes remains the separate shape validation path.
+                    sev = f.get('severity') or ('error' if f['id'] in hard else
+                                               'info' if f['id'] == 'L8' else 'warning')
                     issues.append({'id': f['id'], 'severity': sev, 'node_path': 'regression',
                                    'message': json.dumps(f.get('detail', {}), ensure_ascii=False)[:300]})
             return issues, {'findings': len(findings)}

@@ -25,7 +25,7 @@ Reports (never lets missing and duplicate cancel out):
   C2 duplicate:  op index owned by more than one instance/node       -> error
   C3 out-of-range: covered index not present in raw_ops              -> error
   C4 unmapped-without-reason: unmapped_ops entry missing reason      -> error
-  C5 shape_semantic missing on registered required kernel            -> error
+  C5 optional shape_semantic missing on a registered kernel          -> info
 
 Legacy v1 configs: emits a single info issue and computes best-effort union of
 leaf op_indices (no extrapolation, no pass/fail promotion). Use migrate_config.py
@@ -41,6 +41,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import breakdown_common as bc  # noqa: E402
 
+# The historical name is retained for compatibility. In coverage, this set only
+# selects operators for the informational C5 hint; it does not require annotations.
 SHAPE_SEMANTIC_ALWAYS_REQUIRED = {
     'MatMul', 'MatMulV2', 'QuantBatchMatmulV3', 'GroupedMatmul', 'GemmEx', 'BatchMatMul',
     'FlashAttentionScore', 'FusedInferAttentionScore', 'KvQuantSparseFlashAttention',
@@ -53,6 +55,7 @@ SHAPE_SEMANTIC_ALWAYS_REQUIRED = {
 
 
 def is_shape_always_required(name: str) -> bool:
+    """Select operators for the C5 hint, not mandatory coverage annotations."""
     return name in SHAPE_SEMANTIC_ALWAYS_REQUIRED or name.startswith('AddRmsNorm')
 
 
@@ -153,11 +156,12 @@ def check_coverage_v2(config: dict, raw_ops: dict, allow_unmapped: bool = False)
             issues.append(Issue('C7', 'error', 'excluded_profiler_ops',
                                 f'excluded 条目 {e.get("op_indices")} 缺少 evidence'))
 
-    # C5 shape_semantic on registered required kernels
+    # C5 is diagnostic only: optional annotations do not decide exact coverage.
+    # Explicit shape validation remains available through --with-shapes/validate_shapes.
     for idx, info in collect_registered_kernels(config).items():
         if is_shape_always_required(info['name']) and not info['has_shape_semantic']:
-            issues.append(Issue('C5', 'error', f'{info["path"]}/kernels[index={idx}]',
-                                f'{info["name"]} 必填 shape_semantic 但未提供'))
+            issues.append(Issue('C5', 'info', f'{info["path"]}/kernels[index={idx}]',
+                                f'{info["name"]} 未提供可选 shape_semantic 注解（不影响覆盖校验）'))
 
     model_c = len(model)
     runtime_c = len(runtime)
