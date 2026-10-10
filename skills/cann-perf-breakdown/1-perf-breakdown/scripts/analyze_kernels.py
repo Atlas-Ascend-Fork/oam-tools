@@ -31,6 +31,7 @@ import json
 import sys
 import argparse
 import os
+import math
 from collections import defaultdict
 
 REQUIRED_COLUMNS = ['Step Id', 'Name', 'Duration(us)', 'Start Time(us)', 'Stream ID']
@@ -219,24 +220,30 @@ def mark_duplicate_collective_records(kernels: list) -> int:
     marked `duplicate_of` and excluded from duration totals. The communication record is kept
     as the primary because it carries the collective's name; the AIV row is the duplicate.
 
-    Pairing requires an exact timestamp and duration match, not just a shared type: two
-    genuinely concurrent collectives on different streams keep both durations.
+    Pairing requires an exact timestamp and duration match plus exactly one record without
+    a Stream ID and one record on a real stream. Two genuinely concurrent collectives on
+    different streams keep both durations. Larger or otherwise ambiguous groups are kept
+    because a timestamp/duration match alone does not prove they describe the same work.
     """
     by_key = {}
     for op in kernels:
+        valid_times = op.pop('_dedup_times_valid', True)
         if str(op.get('accelerator_core', '')).upper() != 'COMMUNICATION':
+            continue
+        if not valid_times:
             continue
         key = (op.get('start_time_us'), op.get('duration_us'))
         by_key.setdefault(key, []).append(op)
 
     duplicates = 0
     for group in by_key.values():
-        if len(group) < 2:
+        if len(group) != 2:
             continue
-        # Prefer the record carrying the collective's name as primary; it is the one without a
-        # Stream/Task ID. Fall back to first-seen so the choice is always deterministic.
-        primary = next((op for op in group if not str(op.get('stream_id') or '').strip()
-                        or str(op.get('stream_id')).upper() == 'N/A'), group[0])
+        summaries = [op for op in group if str(op.get('stream_id') or '').strip().upper() in ('', 'N/A')]
+        if len(summaries) != 1:
+            continue
+        # Only an unambiguous summary/kernel pair proves duplicate device work.
+        primary = summaries[0]
         for op in group:
             if op is primary:
                 continue
@@ -277,6 +284,14 @@ def parse_float(value):
         return float(value.strip().rstrip('\t'))
     except (ValueError, AttributeError):
         return 0.0
+
+
+def is_finite_csv_number(value):
+    """A missing/invalid CSV time is not evidence of duplicate device work."""
+    try:
+        return math.isfinite(float(value))
+    except (ValueError, TypeError):
+        return False
 
 
 def extract_kernel_type(name):
@@ -440,6 +455,10 @@ def analyze_kernels(csv_file, detail_step_id=None, allow_step_variation=False):
                         'input_shapes': get_safe_value(row, 'Input Shapes').strip('"') if 'Input Shapes' in row else '',
                         'output_shapes': get_safe_value(row, 'Output Shapes').strip('"') if 'Output Shapes' in row else ''
                     }
+                    op_info['_dedup_times_valid'] = all(
+                        is_finite_csv_number(get_safe_value(row, column))
+                        for column in ('Start Time(us)', 'Duration(us)')
+                    )
 
                     detail_info = {'index': op_info['index'], 'org_index': op_info['org_index']}
                     for col in all_columns:
