@@ -65,8 +65,11 @@ def test_calc_shape_size_normal():
     assert shape_utils.calc_shape_size((2, 3, 4)) == 24
 
 
-def test_calc_shape_size_empty_shape_returns_zero():
-    assert shape_utils.calc_shape_size(()) == 0
+def test_calc_shape_size_scalar_missing_and_zero_axis():
+    assert shape_utils.calc_shape_size(()) == 1
+    assert shape_utils.calc_shape_size([]) == 1
+    assert shape_utils.calc_shape_size(None) == 0
+    assert shape_utils.calc_shape_size((0, 3)) == 0
 
 
 def test_calc_shape_size_all_negative_dims_returns_zero():

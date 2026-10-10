@@ -18,6 +18,7 @@
 """
 shape utils module
 """
+
 import numpy as np
 from ms_interface.single_op_test_frame.common import dtype_trans
 
@@ -28,23 +29,27 @@ def calc_shape_size(shape):
     :param shape: shape
     :return: shape's size
     """
-    if not shape:
+    if shape is None:
         return 0
+    if len(shape) == 0:
+        return 1
 
     shape_nums = np.array(shape, dtype=np.int64)
     shape_nums = shape_nums[np.where(shape_nums >= 0)]
     if len(shape_nums) == 0:
         return 0
-    
+
     size = np.prod(shape_nums, dtype=np.int64)
     return int(size)
-  
-  
+
+
 def calc_op_param_size(shape_size, dtype):
     """
     calculate operator parameter size
     """
     if not isinstance(dtype, str) and dtype not in dtype_trans.get_all_str_dtypes():
-        raise TypeError("dtype must be str and in [%s]" % ",".join(dtype_trans.get_all_str_dtypes()))
+        raise TypeError(
+            "dtype must be str and in [%s]" % ",".join(dtype_trans.get_all_str_dtypes())
+        )
     dtype_size = dtype_trans.get_dtype_byte(dtype)
     return shape_size * dtype_size

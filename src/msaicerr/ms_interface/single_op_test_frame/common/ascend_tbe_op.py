@@ -273,13 +273,13 @@ class AscendOpKernelParam:
             self.sync_to_device_ori(ascend_device)
             return
         if self._np_data is not None:
-            real_mem_len = int(math.ceil(len(self._np_data) / 32) * 32 + 32)
+            real_mem_len = int(math.ceil(self._np_data.nbytes / 32) * 32 + 32)
             if self._hbm_pointer.value:
                 self._ascend_device.memcpy(
                     self._hbm_pointer,
                     real_mem_len,
                     self._np_data.tobytes(),
-                    len(self._np_data),
+                    self._np_data.nbytes,
                     "RT_MEMCPY_HOST_TO_DEVICE",
                 )
 

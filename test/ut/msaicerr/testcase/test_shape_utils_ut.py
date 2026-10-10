@@ -26,8 +26,9 @@ from ms_interface.single_op_test_frame.utils import shape_utils
 sys.path.append(MSAICERR_PATH)
 
 
-def test_calc_shape_size_empty():
-    assert shape_utils.calc_shape_size([]) == 0
+def test_calc_shape_size_scalar_and_missing():
+    assert shape_utils.calc_shape_size([]) == 1
+    assert shape_utils.calc_shape_size(()) == 1
     assert shape_utils.calc_shape_size(None) == 0
 
 
