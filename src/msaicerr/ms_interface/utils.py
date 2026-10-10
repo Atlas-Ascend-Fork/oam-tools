@@ -75,9 +75,10 @@ def screen_error(func):
     def wrapper(*args, **kwargs):
         tmp = ExceptionRootCause().cache_error
         ExceptionRootCause().cache_error = False
-        result = func(*args, **kwargs)
-        ExceptionRootCause().cache_error = tmp
-        return result
+        try:
+            return func(*args, **kwargs)
+        finally:
+            ExceptionRootCause().cache_error = tmp
 
     return wrapper
 
