@@ -38,7 +38,8 @@ def _split_cell(cell, width):
 
 def _iter_row_lines(row, column_widths):
     cell_lines = [
-        _split_cell(cell, column_widths[index]) for index, cell in enumerate(row)
+        _split_cell(row[index] if index < len(row) else "", width)
+        for index, width in enumerate(column_widths)
     ]
     if not cell_lines:
         yield []
@@ -110,8 +111,10 @@ def generate_report(table_header, table_data, split_line=False):
         key_list[0] = data_key
         table_row.append(key_list)
         table_row += data_value
+    column_count = max(len(row) for row in table_row)
     column_widths = [
-        max(len(str(row[i])) for row in table_row) for i in range(len(table_row[0]))
+        max(len(str(row[i])) if i < len(row) else 0 for row in table_row)
+        for i in range(column_count)
     ]
     # Create the formatted table string
     table_string = "\n"
