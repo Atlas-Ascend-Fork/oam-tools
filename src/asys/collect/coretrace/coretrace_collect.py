@@ -182,7 +182,7 @@ class ParseCoreTrace:
 
     def run(self, coretrace_path, count=0):
         coretrace_dirs = f.walk_dir(coretrace_path)
-        if not coretrace_dirs or not self.check_tool_exists:
+        if not coretrace_dirs or not self.check_tool_exists():
             return False
         num = 0
         threads = []
