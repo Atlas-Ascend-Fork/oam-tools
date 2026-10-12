@@ -63,7 +63,7 @@ usage() {
     echo "    --cov          Enable code coverage for unit tests"
     echo "    --component <name>"
     echo "                   Specify component to test:"
-    echo "                   asys, msaicerr, msprof, install, upgrade, uninstall, all (default: all)"
+    echo "                   host, asys, msaicerr, msprof, install, upgrade, uninstall, all (default: all)"
     echo "    --ut           Run UT tests only (default when -u is specified)"
     echo "    --st           Run ST tests only"
     echo ""
@@ -421,7 +421,7 @@ build_oam_tools() {
 # build (cmake/make/cpack/.run packaging, msprof wheel, msprobe staging, etc.).
 is_python_only_component() {
     case "$1" in
-        asys|msaicerr) return 0 ;;
+        host|asys|msaicerr) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -443,7 +443,9 @@ main() {
     if [[ "${ENABLE_UT}" == "on" && "${EXEC_TEST}" == "on" ]] && is_python_only_component "${TEST_COMPONENT}"; then
         skip_build="on"
         echo "---------------- skip oam_tools build for python-only component: ${TEST_COMPONENT} ----------------"
-        generate_asys_chip_handler
+        if [[ "${TEST_COMPONENT}" != "host" ]]; then
+            generate_asys_chip_handler
+        fi
     fi
 
     if [[ "${skip_build}" == "off" ]]; then

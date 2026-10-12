@@ -194,7 +194,7 @@ After compilation, users can verify whether the project functions work properly.
 # Run all component tests
 bash build.sh -u
 
-# Test a specific component (options: asys / msaicerr / msprof / install / upgrade / uninstall / all)
+# Test a specific component (options: host / asys / msaicerr / msprof / install / upgrade / uninstall / all)
 bash build.sh -u --component msprof
 ```
 
@@ -202,6 +202,7 @@ The `--component` options map to the test scope and setup documentation as follo
 
 | component | Test scope | Setup reference | Example |
 | --- | --- | --- | --- |
+| `host` | Pure Python Host UT (UT only) | Python and pytest; no CANN, device environment or C++ build required | `bash build.sh -u --component host --ut` |
 | `asys` | asys Python UT + ST | [Environment Preparation](docs/en/quick_install.md#environment-preparation), [Environment Variable Configuration](docs/en/quick_install.md#environment-variable-configuration) | `bash build.sh -u --component asys` |
 | `msaicerr` | msaicerr Python UT + ST | [Environment Preparation](docs/en/quick_install.md#environment-preparation), [Environment Variable Configuration](docs/en/quick_install.md#environment-variable-configuration) | `bash build.sh -u --component msaicerr` |
 | `msprof` | msprof C++ gtest UT | [Source Code Compilation](#running-the-build), [Offline Build Environment Preparation](docs/en/quick_install.md#offline-build-environment-preparation) | `bash build.sh -u --component msprof --ut` |

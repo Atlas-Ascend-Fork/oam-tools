@@ -125,6 +125,40 @@ stages:
         runs-on: ['self-hosted', 'arch=x64', 'spec=large']
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.API_Check }}
+      JOB_UT_TEST_host:
+        name: UT_TEST_host
+        select: selected_by_default
+        needs: []
+        steps:
+          -
+            name: Checkout
+            identifier: process_checkout
+            uses: checkout
+            with:
+              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
+          -
+            name: host_ut
+            run: |
+              export PATH=/opt/buildtools/python-3.10.2/bin:$PATH
+              cd "${{ steps.process_checkout.outputs.path }}"
+              bash scripts/run_tests.sh --component host --ut
+          -
+            name: host_ut_log
+            if: ${{ always() }}
+            uses: obs-upload
+            with:
+              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+              bucket: "ascend-ci"
+              access-key: ${{ secrets.AK }}
+              secret-key: ${{ secrets.SK }}
+              artifact-path: |
+                ${{ steps.process_checkout.outputs.path }}/build/host_ut_output.log
+              object-prefix: ${{ env.obs_path }}/
+        if: "${{ default() }}"
+        runs-on: ['self-hosted', 'arch=x64', 'spec=xlarge']
+        container:
+          image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.UT_Test }}
       JOB_UT_TEST_asys:
         name: UT_TEST_asys
         select: selected_by_default

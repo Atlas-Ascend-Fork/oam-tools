@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,15 +46,26 @@ import breakdown_common as bc  # noqa: E402
 def normalize_boundaries(boundaries):
     instances = []
     inv_counter = {}
+    # Reserve declared indexes even when their records follow automatic calls.
+    reserved_invocations = {}
+    for i, b in enumerate(boundaries):
+        if isinstance(b.get('invocation_index'), int):
+            mli = b.get('model_layer_index', 'unknown')
+            key = mli if isinstance(mli, int) else f'unknown_{i}'
+            reserved_invocations.setdefault(key, set()).add(b['invocation_index'])
     for i, b in enumerate(boundaries):
         mli = b.get('model_layer_index', 'unknown')
+        key = mli if isinstance(mli, int) else f'unknown_{i}'
         # derive invocation_index per model layer if not given
         if 'invocation_index' in b:
             inv = b['invocation_index']
         else:
-            key = mli if isinstance(mli, int) else f'unknown_{i}'
             inv = inv_counter.get(key, 0)
-            inv_counter[key] = inv + 1
+            while inv in reserved_invocations.get(key, ()):
+                inv += 1
+        # Later automatic records must not reuse an already declared invocation.
+        if isinstance(inv, int):
+            inv_counter[key] = max(inv_counter.get(key, 0), inv + 1)
         inst = {
             'instance_id': b.get('instance_id') or _make_id(mli, inv, b.get('layer_group_type')),
             'model_layer_index': mli,
@@ -90,7 +102,11 @@ def derive_execution_counts(instances):
 def from_segments(segments):
     """Convert op_segments.json candidates into unknown-layer boundaries."""
     boundaries = []
-    seglist = segments.get('segments') or segments.get('candidates') or []
+    # segment_layers emits coordinate-bearing ranges; candidates are marker statistics.
+    if isinstance(segments.get('ranges'), list):
+        seglist = segments['ranges']
+    else:
+        seglist = segments.get('segments') or segments.get('candidates') or []
     for i, seg in enumerate(seglist):
         rng = seg.get('op_range') or ([seg['start'], seg['end']] if 'start' in seg else None)
         if not rng:

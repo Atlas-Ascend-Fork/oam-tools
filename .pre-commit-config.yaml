@@ -63,7 +63,7 @@ repos:
             | experiment/
             | scripts/
             | skills/
-            | test/(?!(ut|st)/(asys|msaicerr)/)
+            | test/(?!(host/|(ut|st)/(asys|msaicerr)/))
             | test/(ut|st)/msaicerr/res/
           )
       - id: ruff-format
@@ -76,7 +76,7 @@ repos:
             | experiment/
             | scripts/
             | skills/
-            | test/(?!(ut|st)/(asys|msaicerr)/)
+            | test/(?!(host/|(ut|st)/(asys|msaicerr)/))
             | test/(ut|st)/msaicerr/res/
           )
 
@@ -98,7 +98,7 @@ repos:
             | experiment/
             | scripts/
             | skills/
-            | test/(?!(ut|st)/(asys|msaicerr)/)
+            | test/(?!(host/|(ut|st)/(asys|msaicerr)/))
             | test/(ut|st)/msaicerr/res/
           )
 
@@ -141,7 +141,7 @@ repos:
               msprof
               | third_party
             )/
-            | test/(?!(ut|st)/(asys|msaicerr)/)
+            | test/(?!(host/|(ut|st)/(asys|msaicerr)/))
             | test/(ut|st)/asys/data/
             | test/(ut|st)/msaicerr/res/
           )

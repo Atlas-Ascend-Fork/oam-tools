@@ -191,7 +191,7 @@ rpm 包不支持在 Ubuntu/Debian 上安装，此类系统请使用 deb 或 run 
 # 执行所有组件测试
 bash build.sh -u
 
-# 指定单独组件测试（可选：asys / msaicerr / msprof / install / upgrade / uninstall / all）
+# 指定单独组件测试（可选：host / asys / msaicerr / msprof / install / upgrade / uninstall / all）
 bash build.sh -u --component msprof
 ```
 
@@ -199,6 +199,7 @@ bash build.sh -u --component msprof
 
 | component | 测试范围 | 环境准备索引 | 示例 |
 | --- | --- | --- | --- |
+| `host` | 纯 Python Host UT（仅 UT） | Python 与 pytest；不需要 CANN、设备环境或 C++ 编译 | `bash build.sh -u --component host --ut` |
 | `asys` | asys Python UT + ST | [环境准备](./docs/zh/quick_install.md#环境准备)、[环境变量配置](./docs/zh/quick_install.md#环境变量配置) | `bash build.sh -u --component asys` |
 | `msaicerr` | msaicerr Python UT + ST | [环境准备](./docs/zh/quick_install.md#环境准备)、[环境变量配置](./docs/zh/quick_install.md#环境变量配置) | `bash build.sh -u --component msaicerr` |
 | `msprof` | msprof C++ gtest UT | [源码编译](#执行编译)、[离线编译环境准备](./docs/zh/quick_install.md#离线编译环境准备) | `bash build.sh -u --component msprof --ut` |

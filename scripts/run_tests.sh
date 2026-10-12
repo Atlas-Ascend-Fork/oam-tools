@@ -24,6 +24,7 @@ BUILD_OUTPUT_DIR="${BASEPATH}/build"
 BUILD_OUT_DIR="${BASEPATH}/build_out"
 
 declare -A TEST_CASES=(
+    ["host_ut"]="pytest"
     ["asys_st"]="pytest"
     ["asys_ut"]="pytest"
     ["msaicerr_st"]="pytest"
@@ -34,7 +35,7 @@ declare -A TEST_CASES=(
     ["uninstall_st"]="pytest"
 )
 
-VALID_COMPONENTS=("asys" "msaicerr" "msprof" "install" "upgrade" "uninstall" "all")
+VALID_COMPONENTS=("host" "asys" "msaicerr" "msprof" "install" "upgrade" "uninstall" "all")
 
 # 代码覆盖率基线：低于该值判失败。固定值，不提供命令行开关——门禁阈值可调
 # 等于可被绕过，失去门禁意义。要调整基线请改此处并走评审。
@@ -49,7 +50,7 @@ print_usage() {
     echo ""
     echo "Options:"
     echo "  --component <name>  Specify component to test:"
-    echo "                        asys, msaicerr, msprof, install, upgrade, uninstall, all (default: all)"
+    echo "                        host, asys, msaicerr, msprof, install, upgrade, uninstall, all (default: all)"
     echo "  --ut               Run UT tests only"
     echo "  --st               Run ST tests only"
     echo "  --cov              Enable gcov coverage collection for gtest cases"
@@ -59,6 +60,7 @@ print_usage() {
     echo ""
     echo "Examples:"
     echo "  $0                                    # Run all tests (UT + ST)"
+    echo "  $0 --component host --ut              # Run pure Python host UT"
     echo "  $0 --component asys                  # Run asys UT + ST"
     echo "  $0 --component msaicerr --ut         # Run msaicerr UT only"
     echo "  $0 --st                              # Run all ST tests"
@@ -139,7 +141,7 @@ get_test_cases() {
 
     local components=()
     if [[ "$COMPONENT" == "all" ]]; then
-        components=("asys" "msaicerr" "msprof" "install" "upgrade" "uninstall")
+        components=("host" "asys" "msaicerr" "msprof" "install" "upgrade" "uninstall")
     else
         components=("$COMPONENT")
     fi
@@ -147,6 +149,9 @@ get_test_cases() {
     for comp in "${components[@]}"; do
         if [[ "$RUN_UT" == "true" ]]; then
             case "$comp" in
+                host)
+                    result+=("host_ut")
+                    ;;
                 asys)
                     result+=("asys_ut")
                     ;;
@@ -570,7 +575,8 @@ run_pytest_plain() {
     local case_name="$1"
     local test_dir="$2"
     local output_file="$3"
-    python3 -m pytest "${test_dir}" 2>&1 | tee "${output_file}"
+    shift 3
+    python3 -m pytest "${test_dir}" "$@" 2>&1 | tee "${output_file}"
     local pytest_rc=${PIPESTATUS[0]}
     echo "${pytest_rc}" > "${BUILD_OUTPUT_DIR}/${case_name}.exitcode"
     return "${pytest_rc}"
@@ -687,6 +693,11 @@ run_test_case() {
     cd "${BASEPATH}"
 
     case "$case_name" in
+        host_ut)
+            # Host tests exercise standalone Python tools without device conftests.
+            run_pytest_plain "${case_name}" "./test/host" "${output_file}" \
+                "--confcutdir=${BASEPATH}/test/host"
+            ;;
         asys_st)
             run_pytest_with_coverage "${case_name}" "./src/asys" "./test/st/asys/testcase" "${output_file}"
             ;;
