@@ -118,7 +118,12 @@ class AsysProfiling:
                 log_error(f"The profiling command does not support {_chip_info}.")
                 return False
 
-        self.run_modes = set(self.run_modes.split(","))
+        self.run_modes = {
+            mode.strip() for mode in self.run_modes.split(",") if mode.strip()
+        }
+        if not self.run_modes:
+            log_error("Run mode is empty, run 'asys profiling -h' to get help.")
+            return False
         if not self.run_modes.issubset(support_profiling_list):
             log_error(
                 "Run mode type is unsupported, run 'asys profiling -h' to get help."
