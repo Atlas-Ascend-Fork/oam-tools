@@ -20,6 +20,7 @@ import sys
 from unittest.mock import Mock
 
 import pytest
+import numpy as np
 
 from conftest import MSAICERR_PATH
 from ms_interface import utils
@@ -202,15 +203,19 @@ def test_analyse_full_flow(mocker):
 def test_analyse_aic_exception(mocker):
     mocker.patch("msaicerr.check_device_valid", return_value=True)
     mocker.patch("msaicerr.is_sub_path", return_value=False)
-    mocker.patch("ms_interface.utils.check_path_valid",
-                 side_effect=utils.AicErrException(Constant.MS_AICERR_INVALID_PATH_ERROR))
+    mocker.patch(
+        "ms_interface.utils.check_path_valid",
+        side_effect=utils.AicErrException(Constant.MS_AICERR_INVALID_PATH_ERROR),
+    )
     ret = msaicerr.analyse_report_path(_report_args())
     assert ret == Constant.MS_AICERR_INVALID_PATH_ERROR
 
 
 def test_convert_dump_invalid_path(mocker):
-    mocker.patch("ms_interface.utils.check_path_valid",
-                 side_effect=utils.AicErrException(Constant.MS_AICERR_INVALID_PATH_ERROR))
+    mocker.patch(
+        "ms_interface.utils.check_path_valid",
+        side_effect=utils.AicErrException(Constant.MS_AICERR_INVALID_PATH_ERROR),
+    )
     ret = msaicerr.convert_dump_data(_dump_args(), "/dump/data.bin")
     assert ret == Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR
 
@@ -239,16 +244,20 @@ def test_env_invalid_device(mocker):
 def test_env_success(mocker):
     mocker.patch("msaicerr.check_device_valid", return_value=True)
     mocker.patch("msaicerr.get_soc_version", return_value="Ascend910B")
-    mocker.patch("ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
-                 return_value=True)
+    mocker.patch(
+        "ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
+        return_value=True,
+    )
     assert msaicerr.test_env(0) == Constant.MS_AICERR_NONE_ERROR
 
 
 def test_env_fail(mocker):
     mocker.patch("msaicerr.check_device_valid", return_value=True)
     mocker.patch("msaicerr.get_soc_version", return_value="Ascend910B")
-    mocker.patch("ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
-                 return_value=False)
+    mocker.patch(
+        "ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
+        return_value=False,
+    )
     assert msaicerr.test_env(0) == Constant.MS_AICERR_HARDWARE_ERR
 
 
@@ -262,17 +271,22 @@ def test_env_attribute_error(mocker):
     # get_chip_info() 取芯片信息失败返回 None，get_soc_version() 对其取属性抛
     # AttributeError，须按环境检查失败上报而非直接崩溃。
     mocker.patch("msaicerr.check_device_valid", return_value=True)
-    mocker.patch("msaicerr.get_soc_version",
-                 side_effect=AttributeError("'NoneType' object has no attribute "
-                                            "'get_complete_platform'"))
+    mocker.patch(
+        "msaicerr.get_soc_version",
+        side_effect=AttributeError(
+            "'NoneType' object has no attribute 'get_complete_platform'"
+        ),
+    )
     assert msaicerr.test_env(0) == Constant.MS_AICERR_HARDWARE_ERR
 
 
-def test_formated_arg_falls_back_to_dest(mocker):
+def test_formatted_arg_falls_back_to_dest(mocker):
     # 未经 _register_argument 登记的 dest（有人直接 add_argument）不应抛 KeyError，
     # 而是回退成 --dest，保证参数校验的报错信息仍可读。
     mocker.patch.dict(msaicerr.DEST_OPTIONS_MAP, {}, clear=True)
-    assert msaicerr.RequireOtherArgs.formated_arg("report_path", None) == "--report_path"
+    assert (
+        msaicerr.RequireOtherArgs.formatted_arg("report_path", None) == "--report_path"
+    )
 
 
 def test_env_type_error(mocker):
@@ -280,7 +294,94 @@ def test_env_type_error(mocker):
     # 须按环境检查失败上报而不是崩溃（根因已用 or '' 兜底，这里守边界）。
     mocker.patch("msaicerr.check_device_valid", return_value=True)
     mocker.patch("msaicerr.get_soc_version", return_value="Ascend910B")
-    mocker.patch("ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
-                 side_effect=TypeError("unsupported operand type(s) for +: "
-                                       "'NoneType' and 'str'"))
+    mocker.patch(
+        "ms_interface.aicore_error_parser.AicoreErrorParser.run_test_env",
+        side_effect=TypeError(
+            "unsupported operand type(s) for +: 'NoneType' and 'str'"
+        ),
+    )
     assert msaicerr.test_env(0) == Constant.MS_AICERR_HARDWARE_ERR
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--data", "data.bin", "--dest_dtype", "float32", "--output_path", "out"],
+        ["--data=data.bin", "--dest_dtype=float32", "--output_path=out"],
+        ["-d=data.bin", "-dtype=float32", "-out=out"],
+        ["--dest_dtype=float32", "--output_path=out", "--data=data.bin"],
+        ["-ddata.bin", "--dest_dtype=float32", "--output_path=out"],
+        ["--dest_dtype=float32", "--output_path=out", "-ddata.bin"],
+        ["--da=data.bin", "--dest_dtype=float32", "--output_path=out"],
+        ["--dest_dtype=float32", "--output_path=out", "--da=data.bin"],
+    ],
+)
+def test_main_converts_bin_with_dependent_options(monkeypatch, tmp_path, options):
+    # Run the public CLI through its actual host-side file conversion. The OPP
+    # variable is only a startup prerequisite; this path does not use a device.
+    monkeypatch.chdir(tmp_path)
+    opp_path = tmp_path / "opp"
+    opp_path.mkdir()
+    monkeypatch.setenv("ASCEND_OPP_PATH", str(opp_path))
+    values = np.array([0.5, -1.25, 3.0], dtype=np.float32)
+    values.tofile("data.bin")
+    monkeypatch.setattr(sys, "argv", ["msaicerr.py", *options])
+
+    assert msaicerr.main() == Constant.MS_AICERR_NONE_ERROR
+    converted = np.load(tmp_path / "out" / "data.float32.npy")
+    np.testing.assert_array_equal(converted, values)
+    assert converted.dtype == values.dtype
+
+
+def test_main_still_rejects_missing_dependent_option(monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ASCEND_OPP_PATH", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["msaicerr.py", "--dest_dtype=float32"])
+
+    with pytest.raises(SystemExit) as error:
+        msaicerr.main()
+
+    assert error.value.code == 2
+    assert "--dest_dtype must be used with -d/--data" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--rep=/r", "--output_path=/o"],
+        ["--output_path=/o", "--rep=/r"],
+        ["--env", "--device_id=0"],
+        ["--device_id=0", "--env"],
+    ],
+)
+def test_argparse_recognized_dependencies_preserve_order(
+    monkeypatch, tmp_path, options
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ASCEND_OPP_PATH", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["msaicerr.py", *options])
+    if any(option.startswith("--rep") for option in options):
+        handler = Mock(return_value=Constant.MS_AICERR_NONE_ERROR)
+        monkeypatch.setattr(msaicerr, "analyse_report_path", handler)
+    else:
+        handler = Mock(return_value=Constant.MS_AICERR_NONE_ERROR)
+        monkeypatch.setattr(msaicerr, "test_env", handler)
+    assert msaicerr.main() == Constant.MS_AICERR_NONE_ERROR
+    handler.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--output_path=/o", "--device_id=0"],
+        ["--data=data.bin", "--device_id=0"],
+        ["--report_path=/r", "--dest_dtype=float32"],
+    ],
+)
+def test_unrelated_options_do_not_satisfy_dependency(monkeypatch, tmp_path, options):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ASCEND_OPP_PATH", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["msaicerr.py", *options])
+    with pytest.raises(SystemExit) as error:
+        msaicerr.main()
+    assert error.value.code == 2
