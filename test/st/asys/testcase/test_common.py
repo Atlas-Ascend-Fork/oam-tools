@@ -83,7 +83,7 @@ class TestCommon(AssertTest):
             mocker.patch("os.access", return_value=True)
             mocker.patch("os.path.isdir", return_value=True)
             mocker.patch("shutil.copytree", return_value=True)
-            mocker.patch("os.path.relpath", return_value="..")
+            mocker.patch("os.path.realpath", side_effect=["/source", "/source/child"])
             FileOperate.copy_dir("dir1", "dir2")
             self.assertTrue(check_res in caplog.text)
         if test_fun == "collect_file_to_dir":

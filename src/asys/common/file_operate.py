@@ -191,7 +191,12 @@ class FileOperate:
             or not os.path.isdir(source_dir_path)
         ):
             return False
-        if os.path.relpath(source_dir_path, target_dir_path).endswith(".."):
+        real_source = os.path.realpath(source_dir_path)
+        real_target = os.path.realpath(target_dir_path)
+        if real_target == real_source:
+            log_error("The source and target directories cannot be the same.")
+            return False
+        if real_target.startswith(real_source + os.path.sep):
             log_error("The output directory cannot be in the data directory.")
             return False
         shutil.copytree(source_dir_path, target_dir_path)

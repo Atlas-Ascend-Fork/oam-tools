@@ -152,8 +152,18 @@ class TestFileOperate(AssertTest):
         mocker.patch("os.access", return_value=True)
         mocker.patch("os.path.exists", return_value=True)
         mocker.patch("os.path.isdir", return_value=True)
-        mocker.patch("os.path.relpath", return_value="..")
+        realpath = mocker.patch(
+            "os.path.realpath", side_effect=["/source", "/source/child"]
+        )
         self.assertTrue(not f.copy_dir("./test_src", "./test_dst"))
+        realpath.side_effect = ["/source", "/source"]
+        self.assertTrue(not f.copy_dir("./test_src", "./test_src"))
+        realpath.side_effect = ["/source", "/source/nested/child"]
+        self.assertTrue(not f.copy_dir("./test_src", "./test_dst"))
+        realpath.side_effect = ["/source", "/other"]
+        self.assertTrue(f.copy_dir("./test_src", "./test_dst"))
+        realpath.side_effect = ["/source", "/source.."]
+        self.assertTrue(f.copy_dir("./test_src", "./test_dst"))
 
     def test_move_dir_success(self, mocker):
         mocker.patch("os.path.exists", return_value=True)
