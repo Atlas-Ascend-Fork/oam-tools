@@ -266,8 +266,8 @@ class FileOperate:
         except PermissionError:
             log_error(f"Error: Permission denied for file {CONFIG_TABLE_FILE}.")
             return {}
-        except (csv.Error, IndexError):
-            log_error(f"Error: {CONFIG_TABLE_FILE} format or content is error.")
+        except (csv.Error, IndexError, ValueError) as exc:
+            log_error(f"Error: {CONFIG_TABLE_FILE} format or content is error, {exc}")
             return {}
 
     @staticmethod
@@ -276,8 +276,15 @@ class FileOperate:
         config_table = {}
         with open(CONFIG_TABLE_FILE, newline="", encoding="utf-8") as f:
             data = csv.reader(f)
-            _, cfg_get, cfg_set, cfg_restore = next(data)
-            for row in data:
+            header = next(data, None)
+            if not header or len(header) < 4:
+                raise csv.Error("configuration table header is missing or incomplete")
+            _, cfg_get, cfg_set, cfg_restore = header[:4]
+            for row_number, row in enumerate(data, start=2):
+                if len(row) < 4:
+                    raise csv.Error(
+                        f"configuration table row {row_number} is incomplete"
+                    )
                 config_table[row[0]] = {
                     cfg_get: row[1].split(","),
                     cfg_set: row[2].split(","),

@@ -53,6 +53,8 @@ class TestFileOperate(AssertTest):
         self.fp = open(testfile, encoding="utf-8")
 
     def teardown_method(self):
+        if not self.fp.closed:
+            self.fp.close()
         if os.path.exists(self.test_file_path):
             os.remove(self.test_file_path)
 
@@ -276,6 +278,10 @@ class TestFileOperate(AssertTest):
         self.assertTrue(result == {})
         self.assertTrue("does not exist" in caplog.text)
 
+        open(temp_file, "w", encoding="utf-8").close()
+        self.assertTrue(f().read_config() == {})
+        self.assertTrue("format or content is error" in caplog.text)
+
         with open(temp_file, "w", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(["Key", "cfg_get", "cfg_set", "cfg_restore"])
@@ -290,6 +296,7 @@ class TestFileOperate(AssertTest):
         self.assertTrue(f().read_config() == {})
         self.assertTrue("format or content is error" in caplog.text)
         os.remove(temp_file)
+
         mocker.patch.object(file_operate, "CONFIG_TABLE_FILE", temp_file)
         result = f().read_config()
         self.assertTrue(result == {})
@@ -309,6 +316,27 @@ class TestFileOperate(AssertTest):
         self.assertTrue(f().read_config() == {})
         self.assertTrue("format or content is error" in caplog.text)
         os.remove(temp_file)
+
+    def test_read_config_reports_specific_format_errors(self, mocker, caplog):
+        temp_file = os.path.join(tempfile.gettempdir(), "test_config_table_details.csv")
+        mocker.patch.object(file_operate, "CONFIG_TABLE_FILE", temp_file)
+        try:
+            with open(temp_file, "w", encoding="utf-8", newline="") as csv_file:
+                csv.writer(csv_file).writerow(["Key", "cfg_get", "cfg_set"])
+            caplog.clear()
+            self.assertTrue(f().read_config() == {})
+            self.assertTrue("header is missing or incomplete" in caplog.text)
+
+            with open(temp_file, "w", encoding="utf-8", newline="") as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerow(["Key", "cfg_get", "cfg_set", "cfg_restore"])
+                writer.writerow(["Setting1", "get1", "set1"])
+            caplog.clear()
+            self.assertTrue(f().read_config() == {})
+            self.assertTrue("row 2 is incomplete" in caplog.text)
+        finally:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
     def test_append_write_file_failed(self, mocker, caplog):
         mocker.patch("os.path.exists", return_value=False)
