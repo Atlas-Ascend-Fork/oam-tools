@@ -393,7 +393,7 @@ class AicoreErrorParser:
     def _get_v300_error_code(self: any) -> list:
         plog_path = os.path.join(self.collect_path, "collection", "plog")
         cmd = ["grep", "The extend info: errcode:", "-nr", plog_path]
-        regexp = r"\(([0-9xa-eA-E]+),\s*([0-9xa-eA-E]+),\s*([0-9xa-eA-E]+)\)"
+        regexp = r"\(([0-9xa-fA-F]+),\s*([0-9xa-fA-F]+),\s*([0-9xa-fA-F]+)\)"
         ret = utils.get_inquire_result(cmd, regexp)
         new_code = 0
         if ret:
@@ -402,7 +402,7 @@ class AicoreErrorParser:
             code1_int = utils.get_hexstr_value(code1)
             code1_int = code1_int << 64
             code2_int = utils.get_hexstr_value(code2)
-            code2_int = (((code2_int >> 32) << 17) & (code2_int & 0x1FFFF)) << 128
+            code2_int = (((code2_int >> 32) << 17) | (code2_int & 0x1FFFF)) << 128
             new_code = code0_int | code1_int | code2_int
         return str(hex(new_code))
 

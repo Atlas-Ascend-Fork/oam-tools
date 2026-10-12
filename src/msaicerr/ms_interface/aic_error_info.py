@@ -536,6 +536,9 @@ args after  execution: {self._get_args_str(self.args_after_list)}
             return Constant.NO_ERROR_BIT_INFO
         for i in ret:
             aicerr_info = Constant.AIC_ERROR_INFO_DICT.get(i)
+            if aicerr_info is None:
+                aicerror_info_list.append(f"\nunknown error bit {i}\n\n")
+                continue
             err_type = aicerr_info.split("_")[0].lower()
             if err_type in handled_err_type:
                 continue
@@ -597,6 +600,8 @@ args after  execution: {self._get_args_str(self.args_after_list)}
         }
         for ret_a in ret:
             error_info = Constant.AIC_ERROR_INFO_DICT.get(ret_a)
+            if error_info is None:
+                continue
             err_type = error_info.split("_")[0].lower()
             if err_type == "ccu":
                 return ""
