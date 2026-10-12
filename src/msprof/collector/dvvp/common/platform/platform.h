@@ -136,6 +136,7 @@ public:
     void GetQosProfileInfo(uint32_t deviceId, std::string& qosEventInfo, std::vector<uint8_t>& qosEventId);
     uint16_t GetMaxMonitorNumber() const;
     int32_t GetMaxAiPmuEvent() const;
+    uint32_t GetAccProfileFixedCoreMask() const;
     std::vector<::Dvvp::Collect::Platform::BiuPerfChannelInfo> GetBiuPerfChannelInfos(
         const std::vector<uint32_t>& groupVector, uint32_t groupNum) const;
     uint16_t GetBiuPerfGroupNum() const;

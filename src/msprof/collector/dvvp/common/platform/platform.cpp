@@ -377,6 +377,14 @@ int32_t Platform::GetMaxAiPmuEvent() const
     return platform_->GetMaxAiPmuEvent();
 }
 
+uint32_t Platform::GetAccProfileFixedCoreMask() const
+{
+    if (platform_ == nullptr) {
+        return 0;
+    }
+    return platform_->GetAccProfileFixedCoreMask();
+}
+
 std::vector<BiuPerfChannelInfo> Platform::GetBiuPerfChannelInfos(
     const std::vector<uint32_t>& groupVector, uint32_t groupNum) const
 {

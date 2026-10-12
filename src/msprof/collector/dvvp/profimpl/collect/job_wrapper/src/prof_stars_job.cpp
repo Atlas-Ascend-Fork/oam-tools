@@ -206,6 +206,7 @@ int32_t ProfFftsProfileJob::Process()
     drvPeripheralProfileCfg.cfgMode = cfgMode_;
     drvPeripheralProfileCfg.aicMode = aicMode_;
     drvPeripheralProfileCfg.aivMode = aivMode_;
+    drvPeripheralProfileCfg.fixedCoreMask = Platform::instance()->GetAccProfileFixedCoreMask();
     int32_t ret = PROFILING_SUCCESS;
 
     StarsAccProfileConfigT* configP =

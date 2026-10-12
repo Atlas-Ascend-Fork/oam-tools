@@ -47,6 +47,12 @@ protected:
     virtual void TearDown() { GlobalMockObject::verify(); }
 };
 
+TEST_F(PLATFORM_UTEST, DefaultPlatformInterfaceAccCoreMaskIsEmpty)
+{
+    PlatformInterface platformInterface;
+    EXPECT_EQ(0U, platformInterface.GetAccProfileFixedCoreMask());
+}
+
 TEST_F(PLATFORM_UTEST, DavidLitePlatformKeepsDavidFeaturesAndLimitsDieChannels)
 {
     DavidLitePlatform davidLitePlatform;

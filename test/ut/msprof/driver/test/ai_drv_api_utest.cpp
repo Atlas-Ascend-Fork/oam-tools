@@ -43,6 +43,31 @@ protected:
     virtual void TearDown() {}
 };
 
+namespace {
+constexpr uint32_t ACC_PROFILE_DEFAULT_CORE_MASK = 0xFFFFU;
+constexpr uint32_t ACC_PROFILE_FIXED_CORE_MASK = 0xFFFFFU;
+
+void CheckAccProfileCoreMask(struct prof_start_para* startPara, uint32_t expectedCoreMask)
+{
+    EXPECT_NE(nullptr, startPara);
+    EXPECT_NE(nullptr, startPara->user_data);
+    const auto* config = static_cast<const StarsAccProfileConfigT*>(startPara->user_data);
+    EXPECT_EQ(expectedCoreMask, config->aiEventCfg[FFTS_PROF_MODE_AIC].coreMask);
+    EXPECT_EQ(expectedCoreMask, config->aiEventCfg[FFTS_PROF_MODE_AIV].coreMask);
+}
+
+int ProfDrvStartAccProfileCoreMaskStub(unsigned int deviceId, unsigned int channelId, struct prof_start_para* startPara)
+{
+    EXPECT_EQ(0U, deviceId);
+    EXPECT_EQ(static_cast<unsigned int>(PROF_CHANNEL_FFTS_PROFILE_TASK), channelId);
+    static uint32_t callCount = 0;
+    const uint32_t expectedCoreMask = (callCount++ == 0) ? ACC_PROFILE_DEFAULT_CORE_MASK : ACC_PROFILE_FIXED_CORE_MASK;
+    CheckAccProfileCoreMask(startPara, expectedCoreMask);
+    return PROF_OK;
+}
+
+} // namespace
+
 TEST_F(DRIVER_AI_DRV_API_TEST, DrvGetDeviceStatusTest)
 {
     GlobalMockObject::verify();
@@ -309,6 +334,40 @@ TEST_F(DRIVER_AI_DRV_API_TEST, DrvAccProfileStart)
     void* configVoid2 = static_cast<void*>(configP2);
     Utils::ProfFree(configVoid2);
     EXPECT_EQ(configVoid2, nullptr);
+}
+
+TEST_F(DRIVER_AI_DRV_API_TEST, DrvAccProfileStartCoreMask)
+{
+    GlobalMockObject::verify();
+
+    constexpr int32_t accProfileCoreNum = 16;
+    std::vector<int32_t> profCores;
+    std::vector<std::string> profEvents = {"0x8"};
+    for (int32_t coreId = 0; coreId < accProfileCoreNum; coreId++) {
+        profCores.push_back(coreId);
+    }
+
+    StarsAccProfileConfigT configP;
+    configP.aicScale = 1;
+    analysis::dvvp::driver::DrvPeripheralProfileCfg peripheralCfg;
+    peripheralCfg.profDeviceId = 0;
+    peripheralCfg.profChannel = analysis::dvvp::driver::PROF_CHANNEL_FFTS_PROFILE_TASK;
+    peripheralCfg.profSamplePeriod = 10;
+    peripheralCfg.profSamplePeriodHi = 10;
+    peripheralCfg.cfgMode = 1;
+    peripheralCfg.aicMode = 1;
+    peripheralCfg.aivMode = 1;
+    peripheralCfg.configP = &configP;
+
+    MOCKER(prof_drv_start).stubs().will(invoke(ProfDrvStartAccProfileCoreMaskStub));
+    EXPECT_EQ(
+        PROFILING_SUCCESS,
+        analysis::dvvp::driver::DrvAccProfileStart(peripheralCfg, profCores, profEvents, profCores, profEvents));
+
+    peripheralCfg.fixedCoreMask = ACC_PROFILE_FIXED_CORE_MASK;
+    EXPECT_EQ(
+        PROFILING_SUCCESS,
+        analysis::dvvp::driver::DrvAccProfileStart(peripheralCfg, profCores, profEvents, profCores, profEvents));
 }
 
 TEST_F(DRIVER_AI_DRV_API_TEST, DrvTsFwStart)

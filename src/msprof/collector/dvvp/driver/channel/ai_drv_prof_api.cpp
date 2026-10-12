@@ -788,8 +788,12 @@ void DrvPackPmuParam(
         (mode == static_cast<int32_t>(FFTS_PROF_MODE_AIC)) ? peripheralCfg.profSamplePeriod :
                                                              peripheralCfg.profSamplePeriodHi);
 
-    for (uint32_t i = 0; i < aiCores.size(); i++) {
-        configP.aiEventCfg[mode].coreMask |= (static_cast<uint32_t>(1) << static_cast<uint32_t>(aiCores[i]));
+    if (peripheralCfg.fixedCoreMask != 0) {
+        configP.aiEventCfg[mode].coreMask = peripheralCfg.fixedCoreMask;
+    } else {
+        for (uint32_t i = 0; i < aiCores.size(); i++) {
+            configP.aiEventCfg[mode].coreMask |= (static_cast<uint32_t>(1) << static_cast<uint32_t>(aiCores[i]));
+        }
     }
 
     std::string eventStr;
@@ -861,7 +865,10 @@ int32_t DrvAccProfileStart(
     configP.aicScale = inCfg->aicScale;
     DrvPackPmuParam(static_cast<int32_t>(FFTS_PROF_MODE_AIC), configP, peripheralCfg, aicCores, aicEvents);
     DrvPackPmuParam(static_cast<int32_t>(FFTS_PROF_MODE_AIV), configP, peripheralCfg, aivCores, aivEvents);
-    MSPROF_EVENT("DrvAccProfileStart : cfgMode=%u, tag=%d, scale=%u.", configP.cfgMode, configP.tag, configP.aicScale);
+    MSPROF_EVENT(
+        "DrvAccProfileStart : cfgMode=%u, tag=%d, scale=%u, aicCoreMask=0x%x, aivCoreMask=0x%x.", configP.cfgMode,
+        configP.tag, configP.aicScale, configP.aiEventCfg[FFTS_PROF_MODE_AIC].coreMask,
+        configP.aiEventCfg[FFTS_PROF_MODE_AIV].coreMask);
     struct prof_start_para profStartPara;
     profStartPara.channel_type = PROF_TS_TYPE;
     profStartPara.sample_period = peripheralCfg.profSamplePeriod;
