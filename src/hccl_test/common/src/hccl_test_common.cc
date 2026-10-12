@@ -723,6 +723,11 @@ int HcclTest::get_mpi_proc()
         npus = dev_count;
     }
 
+    if (npus < 1) {
+        printf("Error: npus must be greater than or equal to 1. Check the -p option and device count.\n");
+        return -1;
+    }
+
     rank_id = proc_rank;
     rank_size = proc_size;
 
