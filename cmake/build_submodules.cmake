@@ -90,14 +90,12 @@ function(oam_build_msprof_analysis)
         )
     endif()
 
-    # 2. 架构映射。_local_arch 用于匹配 run 包名（x86_64），_pkg_arch 用于 so 架构
-    #    校验的期望值（x86），两者命名不同故分开取值。
+    # 2. 架构映射。_pkg_arch 用于匹配 run 包名（x86/aarch64），并作为 so 架构
+    #    校验的期望值。
     if(_machine STREQUAL "aarch64" OR _machine STREQUAL "arm64")
         set(_pkg_arch "aarch64")
-        set(_local_arch "aarch64")
     elseif(_machine STREQUAL "x86_64" OR _machine STREQUAL "amd64")
         set(_pkg_arch "x86")
-        set(_local_arch "x86_64")
     else()
         message(FATAL_ERROR "unsupported host arch: ${_machine}")
     endif()
@@ -116,7 +114,7 @@ function(oam_build_msprof_analysis)
         # 匹配到多个无法判定用哪个，直接报错而非随意取一。
         set(_local_pkg_dir "${OAM_TOOLS_DIR}/../../build/platform/mindstudio")
         file(GLOB _local_run_pkgs
-            "${_local_pkg_dir}/mindstudio-profiler_*_${_local_arch}.run")
+            "${_local_pkg_dir}/mindstudio-profiler_*_${_pkg_arch}.run")
         list(LENGTH _local_run_pkgs _local_run_count)
         if(_local_run_count GREATER 1)
             message(FATAL_ERROR
@@ -129,7 +127,7 @@ function(oam_build_msprof_analysis)
         # 继续往下走会在解压/找 whl 处以 FATAL_ERROR 中止，那就不是"跳过"了。
         if(_local_run_count EQUAL 0)
             message(WARNING
-                "msprof analysis: no mindstudio-profiler_*_${_local_arch}.run found in "
+                "msprof analysis: no mindstudio-profiler_*_${_pkg_arch}.run found in "
                 "${_local_pkg_dir}, skip msprof analysis whl preparation")
             return()
         endif()
