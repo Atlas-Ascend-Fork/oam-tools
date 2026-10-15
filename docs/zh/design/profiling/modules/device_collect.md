@@ -19,6 +19,7 @@
 订阅模式与普通模式在Device channel启动和读取上的主流程基本一致，差异主要体现在配置中携带modelId、cacheFlag和订阅开关。Device模块仍复用job创建、驱动启动、channel读取和停止flush链路。
 
 ## 3. 模块间接口
+
 Device采集模块接口只保留模块间对接点，不展开内部实现细节。
 
 ### 3.1 采集任务管理接口
@@ -211,6 +212,7 @@ flowchart TD
 | channel管理子模块 | `src/dfx/msprof/collector/dvvp/profimpl/collect/job_wrapper/include/prof_channel_manager.h`、`src/dfx/msprof/collector/dvvp/profimpl/collect/job_wrapper/src/prof_channel_manager.cpp` | 管理`ChannelPoll`生命周期和全局flush。 |
 | channel读取子模块 | `src/dfx/msprof/collector/dvvp/transport/prof_channel.h`、`src/dfx/msprof/collector/dvvp/transport/prof_channel.cpp` | 轮询和读取驱动channel数据。 |
 | 数据上传子模块 | `src/dfx/msprof/collector/dvvp/transport/uploader_mgr.h`、`src/dfx/msprof/collector/dvvp/transport/uploader_mgr.cpp` | 将Device数据按文件块上传到Host侧处理。 |
+
 ## 9. 核心数据结构
 
 | 数据结构 | 说明 | 位置 |

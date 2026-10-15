@@ -4,7 +4,7 @@
 
 English | [简体中文](./README.md)
 
-**Huawei CANN Operations, Administration, and Maintenance Toolkit**
+**CANN Operations, Administration, and Maintenance Toolkit**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![CANN](https://img.shields.io/badge/CANN-%E2%89%A58.5.0-green.svg)](./docs/en/quick_install.md)
@@ -15,7 +15,8 @@ English | [简体中文](./README.md)
 
 OAM-Tools (Operations, Administration, and Maintenance) is an open-source operations and maintenance toolkit for Huawei CANN, providing developers on Ascend AI processors with two core capabilities: **fault diagnosis** and **performance tuning**. The toolkit covers the complete O&M pipeline — from fault information collection and AI Core Error analysis to AI task performance profiling and analysis — helping developers quickly identify software/hardware issues and optimize AI task performance.
 
-**Use cases**:
+**Use cases**
+
 - One-click fault information collection and AI Core Error root cause analysis when AI training/inference tasks encounter anomalies
 - AI task performance tuning: collect key performance indicators across runtime stages to identify bottlenecks
 - Testing collective communication (HCCL) functionality and performance in distributed training scenarios
@@ -26,10 +27,10 @@ OAM-Tools includes four core components that collaboratively cover the full O&M 
 
 | Component | Purpose | Key Capabilities | Documentation | Examples |
 | --- | --- | --- | --- | --- |
-| **asys** (Fault Information Collection) | One-click fault information collection and diagnosis | Fault information collection, business rerun with info collection, software/hardware & Device status display, health check, comprehensive detection, component detection, trace/coredump/stackcore/coretrace/UB file parsing, real-time stack export, AI Core Error fault info parsing, performance data collection | [User Guide](./docs/zh/asys/README.md) | [Examples](./examples/README_en.md#asys-fault-information-collection-and-diagnosis) |
-| **msaicerr** (AI Core Error Analysis) | AI Core Error problem localization | AI Core Error problem analysis, Dump file parsing and data type conversion, runtime environment check | [User Guide](./docs/zh/msaicerr/README.md) | [Examples](./examples/README_en.md#msaicerr-ai-core-error-analysis) |
-| **msprof** (Performance Tuning) | AI task performance collection and analysis | Collect AI task runtime performance data, AI processor system data, Host-side system data, msproftx data; support dynamic/delayed collection; provide ACL/Ascend Graph/acl.json/environment variable collection methods | [User Guide](./docs/zh/profiling/README.md) | [Examples](./examples/README_en.md#msprof-performance-tuning) |
-| **hccl_test** (HCCL Performance Test) | Collective communication functionality and performance testing | Test collective communication functionality and performance based on HCCL single-operator API in distributed training/inference scenarios | [User Guide](./docs/zh/hccl_test/README.md) | — |
+| **asys** (Fault Information Collection) | One-click fault information collection and diagnosis | Fault information collection, business rerun with info collection, software/hardware & Device status display, health check, comprehensive detection, component detection, trace/coredump/stackcore/coretrace/UB file parsing, real-time stack export, AI Core Error fault info parsing, performance data collection | [User Guide](./docs/zh/user_guide/asys/README.md) | [Examples](./examples/README_en.md#asys-fault-information-collection-and-diagnosis) |
+| **msaicerr** (AI Core Error Analysis) | AI Core Error problem localization | AI Core Error problem analysis, Dump file parsing and data type conversion, runtime environment check | [User Guide](./docs/zh/user_guide/msaicerr/README.md) | [Examples](./examples/README_en.md#msaicerr-ai-core-error-analysis) |
+| **msprof** (Performance Tuning) | AI task performance collection and analysis | Collect AI task runtime performance data, AI processor system data, Host-side system data, msproftx data; support dynamic/delayed collection; provide ACL/Ascend Graph/acl.json/environment variable collection methods | [User Guide](./docs/zh/user_guide/profiling/README.md) | [Examples](./examples/README_en.md#msprof-performance-tuning) |
+| **hccl_test** (HCCL Performance Test) | Collective communication functionality and performance testing | Test collective communication functionality and performance based on HCCL single-operator API in distributed training/inference scenarios | [User Guide](./docs/zh/user_guide/hccl_test/README.md) | — |
 
 > Component user guides are currently available in Chinese only (`docs/zh/`); English translations are in progress.
 

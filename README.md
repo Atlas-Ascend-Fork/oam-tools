@@ -13,9 +13,10 @@
 
 ## 📖 项目简介
 
-OAM-Tools（Operations, Administration, and Maintenance）是华为 CANN 的开源运维工具集，为昇腾 AI 处理器开发者提供**故障定位**与**性能调优**两大核心能力。工具集覆盖从故障信息采集、AI Core Error 分析到 AI 任务性能采集与分析的完整运维链路，帮助开发者快速定位软硬件问题、优化 AI 任务性能。
+OAM-Tools（Operations, Administration, and Maintenance）是CANN 的开源运维工具集，为昇腾 AI 处理器开发者提供**故障定位**与**性能调优**两大核心能力。工具集覆盖从故障信息采集、AI Core Error 分析到 AI 任务性能采集与分析的完整运维链路，帮助开发者快速定位软硬件问题、优化 AI 任务性能。
 
-**适用场景**：
+**适用场景**
+
 - AI 训练/推理任务运行异常时，一键采集故障信息、分析 AI Core Error 根因
 - AI 任务性能调优，采集各运行阶段关键性能指标，定位性能瓶颈
 - 分布式训练场景下，测试集合通信（HCCL）的功能与性能
@@ -26,10 +27,10 @@ OAM-Tools 包含四大核心组件，协同覆盖昇腾 AI 处理器的运维全
 
 | 组件 | 功能定位 | 核心能力 | 文档 | 运行示例 |
 | --- | --- | --- | --- | --- |
-| **asys**（故障信息收集） | 一键式故障信息采集与诊断 | 故障信息收集、业务复跑+信息收集、软硬件/Device 状态展示、健康检查、综合检测、组件检测、trace/coredump/stackcore/coretrace/UB 文件解析、实时堆栈导出、AI Core Error 故障信息解析、性能数据采集 | [用户指南](./docs/zh/asys/README.md) | [示例](./examples/README.md#asys故障信息收集与诊断) |
-| **msaicerr**（AI Core Error 分析） | AI Core Error 问题定位 | AI Core Error 问题分析、Dump 文件解析与数据类型转换、运行环境检查 | [用户指南](./docs/zh/msaicerr/README.md) | [示例](./examples/README.md#msaicerrai-core-error-分析) |
-| **msprof**（性能调优） | AI 任务性能采集与分析 | 采集 AI 任务运行性能数据、AI 处理器系统数据、Host 侧系统数据、msproftx 数据；支持动态/延迟采集；提供 ACL/Ascend Graph/acl.json/环境变量多种采集方式 | [用户指南](./docs/zh/profiling/README.md) | [示例](./examples/README.md#msprof性能调优) |
-| **hccl_test**（HCCL 性能测试） | 集合通信功能与性能测试 | 分布式训练/推理场景下，基于 HCCL 单算子 API 测试集合通信的功能正确性与性能 | [用户指南](./docs/zh/hccl_test/README.md) | — |
+| **asys**（故障信息收集） | 一键式故障信息采集与诊断 | 故障信息收集、业务复跑+信息收集、软硬件/Device 状态展示、健康检查、综合检测、组件检测、trace/coredump/stackcore/coretrace/UB 文件解析、实时堆栈导出、AI Core Error 故障信息解析、性能数据采集 | [用户指南](./docs/zh/user_guide/asys/README.md) | [示例](./examples/README.md#asys故障信息收集与诊断) |
+| **msaicerr**（AI Core Error 分析） | AI Core Error 问题定位 | AI Core Error 问题分析、Dump 文件解析与数据类型转换、运行环境检查 | [用户指南](./docs/zh/user_guide/msaicerr/README.md) | [示例](./examples/README.md#msaicerrai-core-error-分析) |
+| **msprof**（性能调优） | AI 任务性能采集与分析 | 采集 AI 任务运行性能数据、AI 处理器系统数据、Host 侧系统数据、msproftx 数据；支持动态/延迟采集；提供 ACL/Ascend Graph/acl.json/环境变量多种采集方式 | [用户指南](./docs/zh/user_guide/profiling/README.md) | [示例](./examples/README.md#msprof性能调优) |
+| **hccl_test**（HCCL 性能测试） | 集合通信功能与性能测试 | 分布式训练/推理场景下，基于 HCCL 单算子 API 测试集合通信的功能正确性与性能 | [用户指南](./docs/zh/user_guide/hccl_test/README.md) | — |
 
 ## 🏗️ 项目架构
 

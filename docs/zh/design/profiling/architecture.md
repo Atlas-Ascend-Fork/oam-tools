@@ -7,6 +7,7 @@
 ### 架构图
 
 ![](figures/prof_sw_arch.svg)
+
 ## 核心模块介绍
 
 ### ① msprof命令行
@@ -27,13 +28,13 @@
 **核心流程**：组件注册回调函数→通知组件上报性能数据→组件组装并上报性能数据 → 性能数据保存到无锁的缓冲buffer → 后台线程从缓冲buffer取数据。
 **设计考量**：通过无锁队列实现上报接口低开销；上报与落盘解耦。
 
-###  ④ AICPU 数据采集
+### ④ AICPU 数据采集
 
 **组件职责**：采集 Device的AICPU进程（Host主进程setdevice后，会在Device拉起一个执行aicpu算子的进程和一个执行集合通信算子的进程）上报的性能数据以及AICPU/Ctrl CPU占用率等指标。
 **核心流程**：组件注册回调函数→通知组件上报性能数据→组件组装并上报性能数据 → 性能数据保存到无锁的缓冲buffer → 后台线程从缓冲buffer取数据并上报给profiling driver->host通过profiling drv获取数据。
 **设计考量**：接口封装与Host数据采集保持一致；上报接口低开销。
 
-###  ⑤ Device 驱动数据采集
+### ⑤ Device 驱动数据采集
 
 **组件职责**：通过驱动通道采集NPU硬件性能数据，包括算子执行性能、AICore PMU等。
 **核心流程**：Runtime通知setdevice→调 用`prof_drv_start` 打开驱动通道 →  后台线程`ChannelPoll` 轮询数据 。
@@ -52,16 +53,17 @@
 **设计考量**：虚接口 + `PLATFORM_REGISTER` 反射注册，新增芯片符合开闭原则。
 
 ### 部署图
+
 ![](figures/prof_deploy_view.svg)
 
 **msprofiler.so**：提供acl prof接口能力。
 **profapi.so**：profiling数据采集的接口层，Host和Device部署的profapi.so是归一的。profapi.so通过dlopen的方式加载profimpl.so，在对动态库大小敏感的场景下，如果生产态下不需要做profiling数据采集，用户可以不部署profimpl.so，仅部署profapi.so，保证上层业务组件的so可以正常加载。
 **profimpl.so**：profiling数据采集的实现层，Host和Device部署的profimpl.so是归一的。
 
-
 ## 特性功能介绍
 
 ### 用例图
+
 ![](figures/prof_user_case.svg)
 
 ### 动态 Profiling
@@ -103,7 +105,3 @@
 ### 互联带宽
 
 **功能说明**：采集互联通道（nic、hccs、ub等）的收发带宽。
-
-
-
-

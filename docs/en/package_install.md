@@ -83,7 +83,7 @@ sudo rpm -ivh --nodeps cann-oam-tools_<cann_version>_linux-<arch>.rpm
 Failure mode of Scenario 2 (verified): on a host whose rpm database has no record of the CANN dependencies, running `sudo rpm -ivh` directly (without `--nodeps`) fails with a "Failed dependencies" error (17 entries observed in actual testing: the 16 CANN dependencies plus `/bin/sh`), and no files are unpacked.
 
 > **Note**: The Scenario 1 installation (CANN dependencies registered in the local rpm database, no `--nodeps` required) has not yet been verified on real rpm-based systems; Scenario 2 has been verified in an actual test environment.
-
+>
 > **Note**: `dpkg -i` / `rpm -ivh` only verify the local package database and never automatically resolve or download missing dependencies from software repositories; to have the dependencies resolved and installed from repositories instead, use `apt install ./<deb>` (deb-based) or `dnf|yum|zypper install ./<rpm>` (choose by distribution), which requires the corresponding CANN dependency packages to be already available in the repositories.
 
 ### Installation Path

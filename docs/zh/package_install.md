@@ -83,7 +83,7 @@ sudo rpm -ivh --nodeps cann-oam-tools_<cann_version>_linux-<arch>.rpm
 场景二的失败形态（实测）：在 rpm 数据库无 CANN 依赖记录的主机上直接执行 `sudo rpm -ivh`（不带 `--nodeps`），会以 "Failed dependencies" 报错失败（实测 17 条：16 项 CANN 依赖与 `/bin/sh`），且不会解包任何文件。
 
 > **注意**：场景一（CANN 依赖已登记本机 rpm 数据库、无需 `--nodeps`）的安装场景待实装验证；场景二已在实测环境验证。
-
+>
 > **说明**：`dpkg -i` / `rpm -ivh` 仅校验本机包数据库、不会从软件源自动补齐缺失依赖；若希望由软件源解析并安装依赖，可改用 `apt install ./<deb>`（deb 系）或 `dnf|yum|zypper install ./<rpm>`（按发行版选择），该方式要求软件源中已提供对应 CANN 依赖包。
 
 ### 安装路径

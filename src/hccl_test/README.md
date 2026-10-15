@@ -4,7 +4,7 @@ HCCL Test是基于昇腾AI处理器的集合通信性能与正确性测试工具
 
 ## 目录结构
 
-```
+```sh
 hccl_test/
 ├── CMakeLists.txt                          # CMake构建配置（项目安装集成）
 ├── Makefile                                # Make构建配置（独立编译各算子测试二进制）
@@ -39,7 +39,7 @@ hccl_test/
 
 HCCL Test采用三层类继承体系实现代码复用与算子扩展：
 
-```
+```sh
 ┌──────────────────────────────────────────────────────────────────┐
 │ 第一层：HcclTest（基础设施层）                                    │
 │ ─────────────────────────────────────────────────────────────── │
@@ -366,4 +366,5 @@ mpirun -n 8 ./bin/all_gather_test -b 8K -e 64M -f 2 -p 8 -z 1
 # 单节点 8 NPU — 开启仅设备计时的 AllReduce 测试
 mpirun -n 8 ./bin/all_reduce_test -b 8K -e 64M -f 2 -p 8 -t 1 -n 20 -w 10
 ```
-详细使用指导参见[HCCL性能测试工具用户指南](https://gitcode.com/cann/oam-tools/tree/master/docs/zh/hccl_test)。
+
+详细使用指导参见[HCCL性能测试工具用户指南](../../docs/zh/user_guide/hccl_test)。

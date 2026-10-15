@@ -74,7 +74,7 @@ asys health
 asys collect --output <output_dir>
 ```
 
-更多用法详见 [asys 工具用户指南](../docs/zh/asys/README.md)。
+更多用法详见 [asys 工具用户指南](../docs/zh/user_guide/asys/README.md)。
 
 ## msaicerr（AI Core Error 分析）
 
@@ -94,7 +94,7 @@ python3 ${ASCEND_HOME_PATH}/tools/msaicerr/msaicerr.py -e -dev 0
 python3 ${ASCEND_HOME_PATH}/tools/msaicerr/msaicerr.py -h
 ```
 
-更多用法详见 [msaicerr 工具用户指南](../docs/zh/msaicerr/README.md)。
+更多用法详见 [msaicerr 工具用户指南](../docs/zh/user_guide/msaicerr/README.md)。
 
 ## msprof（性能调优）
 
@@ -108,4 +108,4 @@ python3 ${ASCEND_HOME_PATH}/tools/profiler/profiler_tool/analysis/msprof/msprof.
 
 C++ 侧 collector 一般作为 CANN profiler 流水线的内置组件被调用，开发者无需直接执行；回归通过 `bash build.sh -u --component msprof` 运行 gtest 用例（产物 `build/test/ut/msprof/msprofbin/msprof_bin_utest`）。
 
-更多用法详见[性能调优工具用户指南](../docs/zh/profiling/README.md)。
+更多用法详见[性能调优工具用户指南](../docs/zh/user_guide/profiling/README.md)。

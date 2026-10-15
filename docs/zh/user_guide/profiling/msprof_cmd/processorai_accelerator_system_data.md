@@ -22,16 +22,18 @@ msprof [options] <app>
 - app参数说明请参见[app参数说明](general_collect_commands.md#app参数说明)，options参数说明请参见[参数说明](#参数说明)。
 - Ascend EP场景下，使用msprof命令行方式采集整网推理Profiling数据时，如果通过配置`--llc-profiling`、`--sys-cpu-profiling`、`--sys-profiling`和`--sys-pid-profiling`采集项采集相应数据，采集完成后，除`--sys-cpu-profiling`采集项仅生成TS CPU数据外，其余采集项均不会生成数据；但在不传入用户程序时，配置上述几个采集项均会有数据生成。
 <!-- end id1 -->
+
 <!-- npu="950,A3" id2 -->
 - 对于以下型号，--sys-profiling、--sys-pid-profiling、--sys-cpu-profiling参数不支持同时采集共用OS的两个Device。例如：该Device为\[0,7\]，但0和1、2和3、4和5、6和7分别共用OS，那么此时--sys-devices则不能同时配置0和1、2和3、4和5、6和7，可以配置0、2、4、6或1、3、5、7。
 
-   <!-- npu="A3" id56 -->
+  <!-- npu="A3" id56 -->
   - Atlas A3系列产品
-   <!-- end id56 -->
-   <!-- npu="950" id3 -->
-  - Ascend 950PR&950DT系列产品
-   <!-- end id3 -->
+  <!-- end id56 -->
 
+  <!-- npu="950" id3 -->
+  - Ascend 950PR&950DT系列产品
+  <!-- end id3 -->
+<!-- end id2 -->
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00001 -->
 
 ## 参数说明
@@ -111,7 +113,7 @@ aic-metrics=<aic-metrics-value\>：可选，AI Core性能指标采集项。该�
 <!-- npu="310b" id15 -->
 - Atlas 200I/500 A2推理产品：PipelineExecuteUtilization
 <!-- end id15 -->
-<!-- npu="310b" id16 -->
+<!-- npu="310p" id16 -->
 - Atlas推理系列产品：PipeUtilization
 <!-- end id16 -->
 <!-- npu="910" id17 -->
@@ -157,7 +159,7 @@ Ascend 950PR&950DT系列产品，QoS和SoC支持的采集频率最大支持配�
 <!-- npu="910b" id24 -->
 - Atlas A2系列产品
 <!-- end id24 -->
-<!-- npu="950,A3,910b,910,310p,310b" id25 -->
+<!-- npu="A3" id25 -->
 - Atlas A3系列产品
 <!-- end id25 -->
 <!-- end id60 -->

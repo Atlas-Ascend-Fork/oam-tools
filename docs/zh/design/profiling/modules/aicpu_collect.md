@@ -65,8 +65,8 @@ graph TB
 
 ### 2.2.3 核心模块交互图
 
-
 - **场景一（Host-Move Mode）**
+
 ```mermaid
 sequenceDiagram
     participant R as runtime
@@ -141,6 +141,7 @@ sequenceDiagram
 ```
 
 - **场景二（Device-Move Mode）**
+
 ```mermaid
 sequenceDiagram
     participant R as runtime
@@ -204,7 +205,6 @@ sequenceDiagram
 | `MsprofReportAdditionalInfo` | `collector/dvvp/msprof/devprof/src/devprof_msprof_api.cpp` | 上报单批次 AICPU 附加信息 |
 | `MsprofReportBatchAdditionalInfo` | `collector/dvvp/msprof/devprof/src/devprof_msprof_api.cpp` | 批量上报 AICPU 附加信息 |
 | `MsprofGetBatchReportMaxSize` | `collector/dvvp/msprof/devprof/src/devprof_msprof_api.cpp` | 查询批量上报最大字节数 |
-
 
 ## 3. 详细设计
 

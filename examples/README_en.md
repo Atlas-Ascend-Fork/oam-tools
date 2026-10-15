@@ -74,7 +74,7 @@ asys health
 asys collect --output <output_dir>
 ```
 
-For more usage, see the [asys Tool User Guide](../docs/zh/asys/README.md).
+For more usage, see the [asys Tool User Guide](../docs/zh/user_guide/asys/README.md).
 
 ## msaicerr (AI Core Error Analysis)
 
@@ -94,7 +94,7 @@ python3 ${ASCEND_HOME_PATH}/tools/msaicerr/msaicerr.py -e -dev 0
 python3 ${ASCEND_HOME_PATH}/tools/msaicerr/msaicerr.py -h
 ```
 
-For more usage, see the [msaicerr Tool User Guide](../docs/zh/msaicerr/README.md).
+For more usage, see the [msaicerr Tool User Guide](../docs/zh/user_guide/msaicerr/README.md).
 
 ## msprof (Performance Tuning)
 
@@ -108,4 +108,4 @@ python3 ${ASCEND_HOME_PATH}/tools/profiler/profiler_tool/analysis/msprof/msprof.
 
 The C++ collectors are normally invoked as built-in components of the CANN profiler pipeline and developers do not need to run them directly; regression is covered by `bash build.sh -u --component msprof`, which runs the gtest cases (artifact `build/test/ut/msprof/msprofbin/msprof_bin_utest`).
 
-For more usage, see the [Performance Tuning Tool User Guide](../docs/zh/profiling/README.md).
+For more usage, see the [Performance Tuning Tool User Guide](../docs/zh/user_guide/profiling/README.md).

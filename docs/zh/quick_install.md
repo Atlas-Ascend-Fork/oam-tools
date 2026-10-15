@@ -13,27 +13,26 @@
 
 |  安装方式  |  使用说明  |  使用场景  |
 | ----- | ------ | ------ |
-|  WebIDE  | 一站式开发平台，提供在线直接运行的昇腾环境，无需手动安装。<br>当前可提供单机算力，**默认安装最新商发版CANN包**。 | 适用于没有昇腾设备的开发者。|
+|  WebIDE  | CANNLab是为CANN社区开发者提供的开箱即用的云端开发环境，内置CANN 软件、NPU算力和WebIDE等全套开发工具提供浏览器和本地IDE客户端双接入方式，支撑社区开发者算子开发、模型训&调优和 AI 应用开发三大领域的开发活动。 | 适用于没有昇腾设备的开发者。|
 |  Docker  | Docker镜像是一种高效部署方式，已预集成CANN包和必备依赖。<br>当前仅适用于Atlas A2系列产品，OS仅支持Ubuntu操作系统。**默认安装最新商发版CANN包**。 | 需要快速搭建环境的开发者，有无昇腾设备均可|
 |  手动安装  | 按照本文中[方式3：手动安装](#section_manual_install)进行环境准备 |适用有昇腾设备，想体验手动安装CANN包或体验最新master分支能力的开发者。|
 
 ### 方式1：WebIDE环境
 
-对于无昇腾设备的开发者，可直接使用WebIDE开发平台，即“**一站式开发平台**”，该平台为您提供在线可直接运行的昇腾环境，环境中已安装必备的驱动固件、软件包和依赖，无需手动安装。更多关于开发平台的介绍请参考[LINK](https://gitcode.com/org/cann/discussions/54)。
+对于无昇腾设备的开发者，可直接使用CANNLab云开发环境，即“**CANN一站式开发平台**”，该平台为您提供在线可直接运行的昇腾环境，环境中已安装必备的驱动固件、软件包和依赖，无需手动安装。
 
-1. 进入开源项目，单击“`CANNLab`”按钮，使用已认证过的华为云账号登录。若未注册或认证，请根据页面提示进行注册和认证。
+> **说明**：环境默认安装最新商发版CANN包，源码下载时注意与软件配套。更多关于开发平台的介绍请参考[CANNLab指导](https://gitcode.com/org/cann/cannlab/docs)。
 
-   <img src="../figures/cloudIDE.png" alt="CANNLab"  width="750px" height="90px">
+1. 进入开源项目，单击“`CANNLab`”按钮，若未注册或认证，请根据页面提示进行注册和认证。
 
-2. 根据页面提示创建并启动云开发环境，单击“`连接 > WebIDE `”进入一站式开发平台，开源项目的源码资源默认在`/mnt/workspace`目录下。
-
-   <img src="../figures/webIDE.png" alt="云平台"  width="1000px" height="150px">
+2. 根据页面提示创建环境并配置规格，启动云开发环境后，单击“连接”进入一站式开发平台。
 
 环境部署完成后，请继续以下步骤：
 
 1. **安装 Python 依赖**
 
    WebIDE 环境已预装核心依赖，如运行 UT 时缺少其他库，可执行以下命令补充：
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -41,7 +40,6 @@
 2. **验证环境**
 
    请参考[环境验证](#环境验证)章节，确认环境和驱动正常。
-
 
 ### 方式2：Docker部署
 
@@ -128,7 +126,6 @@ curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
 
 <a id="section_manual_install"></a>
 
-
 ### 方式3：手动安装
 
 对于有昇腾设备的开发者，若您想手动搭建昇腾环境，请参考下述步骤。
@@ -157,7 +154,8 @@ curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
 
     Python 运行时依赖（asys / msaicerr 等工具运行所需，由 `pip install -r requirements.txt` 安装）的版本要求见仓库根目录的 `requirements.txt`。其中 `protobuf>=6.33.4` 指 Python 包 `protobuf`（PyPI 上独立发版，与上文 C++ 编译用的 protobuf 25.1 是不同的版本号体系），二者不冲突。
 
-	其中：
+ 其中：
+
     - \$\{chip\_type\}：表示昇腾AI处理器型号（与下文`${soc_name}`等价），用于拼接CANN ops包名。可通过`npu-smi info`命令查看`Name`列得到本机芯片型号，再按下表选择对应的ops包。
     - \$\{cann\_version\}：表示CANN包版本号，需要与Toolkit包版本号相同。
     - \$\{arch\}：表示CPU架构，如aarch64、x86_64。
@@ -171,6 +169,7 @@ curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
 | `950` | Atlas 950 系列产品 | `950` | `Ascend-cann-950-ops_${cann_version}_linux-${arch}.run` |
 
 > **说明**
+>
 > - 上表 Name 列为本工具识别的型号关键字；`npu-smi info`实际可能显示带子型号的字符串（如`910B`类会显示为`910B1` / `910B2` / `910B3` / `910B4`），按"Name 列包含上述关键字"的规则匹配即可。
 > - "910C"是商用别称，对应包名中的`A3`（CANN 8.5.0 起统一使用 `Ascend-cann-A3-ops_*`），请勿手动拼写为`910c`、`910_c`、`910_93`等形式。
 > - ops 包的实际文件名与可用版本以 [CANN 官方下载页](https://www.hiascend.com/cann/download) 为准，本工具仅识别上表三类芯片，其它芯片暂不支持，欢迎提交 issue 反馈。
@@ -221,6 +220,7 @@ curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
 1. **安装 Python 依赖**
 
    手动安装环境需要自行配置 Python 依赖，请执行以下命令安装 UT 所需的核心包：
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -240,7 +240,8 @@ git clone -b ${branch} https://gitcode.com/cann/oam-tools.git
 
 对于WebIDE或Docker环境，已默认提供最新商发版本的项目源码，如需获取其他版本的源码，也需通过上述命令下载源码。
 
-> 注意
+> **注意**
+>
 > - gitcode平台在使用HTTPS协议的时候要配置并使用个人访问令牌代替登录密码进行克隆，推送等操作。
 > - 若您的编译环境无法访问网络，无法通过git指令下载代码，请先在联网环境中下载源码，再手动上传至目标环境。
 
@@ -269,6 +270,7 @@ python cmake/download_libs.py --bundle_branch=9.1.0
 ### 上传依赖包
 
 在编译环境中新建一个`third_party_path`目录来存放第三方开源软件和闭源软件
+
 ```bash
 mkdir -p ${third_party_path}
 ```
@@ -278,6 +280,7 @@ mkdir -p ${third_party_path}
 ### 依赖包清单
 
 第三方库、闭源二进制包和子仓包括：
+
 | 开源软件 | 版本 | 下载地址 |
 |---|---|---|
 |protobuf|v25.1|[protobuf-25.1.tar.gz](https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz)|
@@ -297,15 +300,15 @@ mkdir -p ${third_party_path}
 
 | 子仓 | 版本 | 下载地址 |
 |---|---|---|
-|msprobe|master|https://gitcode.com/Ascend/msprobe|
-|msprof|master|https://gitcode.com/Ascend/msprof|
+|msprobe|master|<https://gitcode.com/Ascend/msprobe>|
+|msprof|master|<https://gitcode.com/Ascend/msprof>|
 |cann-cmake|master-053|[cmake-master-053.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-053.tar.gz) |
 
 ## 环境验证
 
 安装完CANN包后，需验证环境和驱动是否正常。
 
--   **检查NPU设备**
+- **检查NPU设备**
 
     ```bash
     # 运行npu-smi，若能正常显示设备信息，则驱动正常
@@ -313,7 +316,7 @@ mkdir -p ${third_party_path}
     ```
 
     请记录输出中的`Name`列，并对照[前置依赖](#前置依赖)章节中的"芯片型号与CANN ops包对应关系"表，确认本机芯片型号与已安装的CANN ops包匹配；若`Name`列不在表内，说明本工具尚未适配，请在 issue 中反馈。
--   **检查CANN安装**
+- **检查CANN安装**
 
     ```bash
     # 查看CANN toolkit包版本信息（默认路径安装），WebIDE场景下将/usr/local替换为/home/developer
@@ -322,7 +325,7 @@ mkdir -p ${third_party_path}
     cat /usr/local/Ascend/cann/${arch}-linux/ascend_ops_install.info
     ```
 
--   **检查 Python 依赖**
+- **检查 Python 依赖**
 
     ```bash
     # 检查 pytest 版本
@@ -336,6 +339,7 @@ mkdir -p ${third_party_path}
 ## 环境变量配置
 
 按需选择合适的命令使环境变量生效。
+
 ```bash
 # 默认路径安装，以root用户为例（非root用户，将/usr/local替换为${HOME}）
 source /usr/local/Ascend/cann/set_env.sh

@@ -4,7 +4,7 @@ HCCL Test is a collective communication performance and correctness testing tool
 
 ## Directory Structure
 
-```
+```sh
 hccl_test/
 ├── CMakeLists.txt                          # CMake build configuration (project installation integration)
 ├── Makefile                                # Make build configuration (standalone compilation of each operator test binary)
@@ -39,7 +39,7 @@ hccl_test/
 
 HCCL Test adopts a three-layer class inheritance hierarchy to achieve code reuse and operator extension:
 
-```
+```sh
 ┌──────────────────────────────────────────────────────────────────┐
 │ Layer 1: HcclTest (Infrastructure Layer)                         │
 │ ─────────────────────────────────────────────────────────────── │
@@ -366,4 +366,5 @@ mpirun -n 8 ./bin/all_gather_test -b 8K -e 64M -f 2 -p 8 -z 1
 # Single node 8 NPUs — AllReduce test with device-only timing enabled
 mpirun -n 8 ./bin/all_reduce_test -b 8K -e 64M -f 2 -p 8 -t 1 -n 20 -w 10
 ```
-For detailed usage guidance, refer to the [HCCL Performance Test Tool User Guide](https://gitcode.com/cann/oam-tools/tree/master/docs/zh/hccl_test).
+
+For detailed usage guidance, refer to the [HCCL Performance Test Tool User Guide](../../docs/zh/user_guide/hccl_test).

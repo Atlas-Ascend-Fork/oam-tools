@@ -13,27 +13,26 @@ This project provides multiple ways to set up the Ascend environment. Choose acc
 
 | Installation Method | Usage Instructions | Usage Scenario |
 | ----- | ------ | ------ |
-| WebIDE | One-stop development platform that provides an online directly runnable Ascend environment without manual installation. Currently provides single machine computing power and **installs the latest commercial release CANN package by default**. | Suitable for developers without Ascend devices.|
+| WebIDE | CANNLab is an out-of-the-box cloud development environment for CANN community developers. It comes pre-installed with the full suite of development tools including CANN software, NPU computing power and WebIDE. It supports access via both web browser and local IDE client, facilitating community developers in three major development areas: operator development, model training and tuning, as well as AI application development.| Suitable for developers without Ascend devices.|
 | Docker | Docker image is an efficient deployment method that pre-integrates CANN packages and necessary dependencies. Currently only applicable to Atlas A2 series products, OS only supports Ubuntu operating system. **Installs the latest commercial release CANN package by default**. |Suitable for developers who need to quickly set up the environment, with or without Ascend devices.|
 | Manual Installation | Follow [Method 3: Manual Installation](#section_manual_install) in this document for environment preparation |Suitable for developers with Ascend devices who want to experience manual CANN package installation or experience the latest master branch capabilities.|
 
 ### Method 1: WebIDE Environment
 
-For developers without Ascend devices, you can directly use the WebIDE development platform, that is, the "One-stop Development Platform". This platform provides an online directly runnable Ascend environment. The environment has pre-installed necessary driver firmware, software packages, and dependencies without manual installation. For more information about the development platform, refer to [LINK](https://gitcode.com/org/cann/discussions/54).
+For developers without Ascend devices, you can directly use the CANNLab cloud development environment, namely the **CANN One-Stop Development Platform**. This platform provides an online Ascend environment ready for immediate use. The required driver firmware, software packages and dependencies are pre-installed in the environment with no manual installation needed.
 
-1. Enter the open source project and click the "`Cloud Development`" button. Log in with a certified Huawei Cloud account. If not registered or certified, follow the page prompts to register and certify.
+> **Note**:The environment comes with the latest commercial release of the CANN package by default. Please ensure version compatibility with the software when downloading source code. For more information about the development platform, refer to [CANNLab Guide](https://gitcode.com/org/cann/cannlab/docs).
 
-   <img src="../figures/cloudIDE.png" alt="Cloud Platform"  width="750px" height="90px">
+1. Go to the open-source project and click the `CANNLab` button. If you have not registered or authenticated, complete registration and authentication following the on-screen prompts.
 
-2. Follow the page prompts to create and start the cloud development environment. Click "`Connect > WebIDE`" to enter the one-stop development platform. The open source project source code resources are in the `/mnt/workspace` directory by default.
-
-   <img src="../figures/webIDE.png" alt="Cloud Platform"  width="1000px" height="150px">
+2. Create the environment and configure specifications according to the on-screen instructions. After starting the cloud development environment, click **Connect** to access the one-stop development platform.
 
 After environment deployment completes, continue with the following steps:
 
 1. **Install Python Dependencies**
 
    The WebIDE environment has pre-installed core dependencies. If other libraries are missing when running UT, execute the following command to supplement:
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -41,7 +40,6 @@ After environment deployment completes, continue with the following steps:
 2. **Verify Environment**
 
    Refer to the [Environment Verification](#environment-verification) section to confirm that the environment and driver are normal.
-
 
 ### Method 2: Docker Deployment
 
@@ -105,6 +103,7 @@ If you only need to compile and build the code without accessing NPU devices, us
 ```bash
 docker run --name oam-tools -it swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.5.0-910b-ubuntu22.04-py3.10 bash
 ```
+
 | Parameter | Description | Notes |
 | :--- | :--- | :--- |
 | `--name oam-tools` | Specify a name for the container for easy management. | Can be customized. |
@@ -126,6 +125,7 @@ curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
    Refer to the [Environment Verification](#environment-verification) section to confirm that the environment and driver are normal.
 
 <a id="section_manual_install"></a>
+
 ### Method 3: Manual Installation
 
 For developers with Ascend devices, if you want to manually set up an Ascend environment, refer to the following steps.
@@ -154,7 +154,7 @@ For developers with Ascend devices, if you want to manually set up an Ascend env
 
     Python runtime dependencies (required by tools such as asys / msaicerr at runtime, installed via `pip install -r requirements.txt`) are listed in `requirements.txt` at the repository root. Note that `protobuf>=6.33.4` there refers to the Python package `protobuf` on PyPI, which uses a versioning scheme independent from the C++ protobuf 25.1 above; the two version numbers do not conflict.
 
-	Where:
+    Where:
     - $\{chip\_type\}: Indicates the Ascend AI processor model (equivalent to `${soc_name}` below), used to compose the CANN ops package name. Run `npu-smi info` and read the `Name` column to identify the chip on this machine, then pick the matching ops package from the table below.
     - $\{cann\_version\}: Indicates the CANN package version number. Must match the Toolkit package version number.
     - $\{arch\}: Indicates the CPU architecture, such as aarch64, x86_64.
@@ -168,6 +168,7 @@ Currently supported chip models and their CANN ops packages:
 | `950` | Atlas 950 series products | `950` | `Ascend-cann-950-ops_${cann_version}_linux-${arch}.run` |
 
 > **Notes**
+>
 > - The Name column values above are the keywords this tool recognizes. `npu-smi info` may print a string with sub-model suffixes (e.g. `910B1` / `910B2` / `910B3` / `910B4` for the `910B` family); matching is by "Name column contains the keyword".
 > - "910C" is a commercial alias. Since CANN 8.5.0, the ops package is uniformly named `Ascend-cann-A3-ops_*`. Do not use `910c`, `910_c`, or `910_93` in the package name.
 > - The actual ops package filename and available versions follow the [CANN download page](https://www.hiascend.com/cann/download). Only the three chip families above are supported; please open an issue for any other chip you'd like added.
@@ -218,6 +219,7 @@ After environment deployment completes, continue with the following steps:
 1. **Install Python Dependencies**
 
    The manual installation environment requires you to configure Python dependencies yourself. Execute the following command to install the core packages required for UT:
+
    ```bash
    pip3 install -r requirements.txt
    ```
@@ -238,10 +240,12 @@ git clone -b ${branch} https://gitcode.com/cann/oam-tools.git
 For WebIDE or Docker environments, the latest commercial release version project source code is provided by default. If you need to obtain source code for other versions, you also need to download the source code through the above command.
 
 > Note
+>
 > - When using the HTTPS protocol on the gitcode platform, configure and use a personal access token instead of the login password for clone, push, and other operations.
 > - If your build environment cannot access the network and cannot download code through git commands, first download the source code in a networked environment, then manually upload it to the target environment.
 
 <a id="offline-build-environment-preparation"></a>
+
 ## Offline Build Environment Preparation
 
 If your build environment cannot access the network, you need to manually download third-party libraries, closed-source binary packages, and subrepositories in a networked environment, then manually upload them to your build environment.
@@ -268,6 +272,7 @@ python cmake/download_libs.py --bundle_branch=9.1.0
 ### Upload Dependency Packages
 
 Create a new `third_party_path` directory in the build environment to store third-party open source software and closed-source software
+
 ```bash
 mkdir -p ${third_party_path}
 ```
@@ -277,6 +282,7 @@ After creating the directory, upload the downloaded third-party libraries, close
 ### Dependency Package List
 
 Third-party libraries, closed-source binary packages, and subrepositories include:
+
 | Open Source Software | Version | Download Address |
 |---|---|---|
 |protobuf|v25.1|[protobuf-25.1.tar.gz](https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz)|
@@ -301,6 +307,7 @@ Closed-source binary packages are fetched per branch. The table below uses the d
 |cann-cmake|master-053|[cmake-master-053.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-053.tar.gz) |
 
 <a id="environment-verification"></a>
+
 ## Environment Verification
 
 After installing CANN packages, verify whether the environment and driver are normal.
@@ -336,6 +343,7 @@ After installing CANN packages, verify whether the environment and driver are no
 ## Environment Variable Configuration
 
 Choose the appropriate command according to your needs to make environment variables effective.
+
 ```bash
 # Default path installation, using root user as example (for non-root user, replace /usr/local with ${HOME})
 source /usr/local/Ascend/cann/set_env.sh
