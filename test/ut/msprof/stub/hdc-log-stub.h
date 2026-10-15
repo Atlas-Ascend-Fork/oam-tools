@@ -18,4 +18,9 @@
 
 #include "slog.h"
 
+void ResetDlogRecordCount();
+int32_t GetDlogRecordCount();
+const char* GetLastDlogRecordMsg();
+void ResetLastDlogRecordMsg();
+
 #endif

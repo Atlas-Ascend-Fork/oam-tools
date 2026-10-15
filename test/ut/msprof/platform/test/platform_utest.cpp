@@ -115,6 +115,17 @@ TEST_F(PLATFORM_UTEST, DavidV121_FeatureIsSupport)
     EXPECT_FALSE(platform->FeatureIsSupport(PLATFORM_TASK_FWK));
 }
 
+TEST_F(PLATFORM_UTEST, TaskPmuResourceNotResetOnlySupportedOnDavidV121)
+{
+    DavidPlatform davidPlatform;
+    DavidLitePlatform davidLitePlatform;
+    DavidV121Platform davidV121Platform;
+
+    EXPECT_FALSE(davidPlatform.FeatureIsSupport(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET));
+    EXPECT_FALSE(davidLitePlatform.FeatureIsSupport(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET));
+    EXPECT_TRUE(davidV121Platform.FeatureIsSupport(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET));
+}
+
 TEST_F(PLATFORM_UTEST, DavidV121_GetMaxMonitorNumber)
 {
     auto platform = std::make_shared<DavidV121Platform>();

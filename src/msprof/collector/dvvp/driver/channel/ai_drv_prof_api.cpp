@@ -33,7 +33,9 @@ constexpr uint32_t AI_CORE_SAMPLE_FULL_THRESHOLD = static_cast<uint32_t>(32 * 10
 constexpr int32_t DRV_NOT_ENOUGH_SUB_CHANNEL_RESOURCE = -10; // PROF_NOT_ENOUGH_SUB_CHANNEL_RESOURCE
 constexpr int32_t DRV_VF_SUB_RESOURCE_FULL = -11;            // PROF_VF_SUB_RESOURCE_FULL
 constexpr int32_t DRV_TS_NOT_BIND_CP_PROCESS = 115;          // 0x73
-constexpr int32_t DRV_PROF_DATA_LOSS = 0x916;                // status code reported by driver on profiling data loss
+constexpr int32_t DRV_SAMPLE_AND_TASK_PMU_MUTEX = 0x917;
+constexpr int32_t DRV_TASK_PMU_RESOURCE_NOT_RESET = 0x918;
+constexpr int32_t DRV_PROF_DATA_LOSS = 0x916; // status code reported by driver on profiling data loss
 constexpr int32_t STRING_TO_LONG_WEIGHT = 16;
 const std::string SOC_PMU_HA = "HA:";
 const std::string SOC_PMU_MATA = "MATA:";
@@ -1039,6 +1041,21 @@ int32_t DrvStart(uint32_t profDeviceId, AI_DRV_CHANNEL profChannel, prof_start_p
             "Prof channel[%u] of device[%u] start failed, which may cause by cp process not bind."
             "Please set device and retry.",
             static_cast<uint32_t>(profChannel), profDeviceId);
+    }
+    if ((profChannel == PROF_CHANNEL_FFTS_PROFILE_TASK) && (ret == DRV_TASK_PMU_RESOURCE_NOT_RESET) &&
+        Platform::instance()->CheckIfSupport(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET)) {
+        MSPROF_LOGE(
+            "Prof channel[%u] of device[%u] start failed with ret=0x%x because PMU resources were not reset after "
+            "sample-based profiling. Exit all processes before starting task-based PMU collection.",
+            static_cast<uint32_t>(profChannel), profDeviceId, ret);
+    }
+    if (((profChannel == PROF_CHANNEL_FFTS_PROFILE_TASK) || (profChannel == PROF_CHANNEL_FFTS_PROFILE_SAMPLE)) &&
+        (ret == DRV_SAMPLE_AND_TASK_PMU_MUTEX) &&
+        Platform::instance()->CheckIfSupport(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET)) {
+        MSPROF_LOGE(
+            "Prof channel[%u] of device[%u] start failed with ret=0x%x because sample-based and task-based profiling "
+            "are mutually exclusive. Exit all processes before restarting profiling.",
+            static_cast<uint32_t>(profChannel), profDeviceId, ret);
     }
     return ret;
 }

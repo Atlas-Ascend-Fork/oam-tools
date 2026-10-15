@@ -20,6 +20,7 @@
 #include <syslog.h>
 #include <map>
 #include <string>
+#include <atomic>
 #include "securec.h"
 
 #ifndef DLOG_EVENT
@@ -29,8 +30,10 @@
 const std::map<int, std::string> LOG_LEVEL_INFO = {
     {DLOG_DEBUG, "DEBUG"}, {DLOG_INFO, "INFO"}, {DLOG_WARN, "WARNING"}, {DLOG_ERROR, "ERROR"}, {DLOG_EVENT, "EVENT"}};
 
-namespace {
+static std::atomic<int32_t> g_dlogRecordCount{0};
+
 constexpr size_t LOG_BUFFER_SIZE = 4096;
+char g_lastDlogRecordMsg[LOG_BUFFER_SIZE] = {0};
 
 bool FormatLog(char* buffer, size_t bufferSize, const char* format, va_list args)
 {
@@ -39,7 +42,14 @@ bool FormatLog(char* buffer, size_t bufferSize, const char* format, va_list args
     }
     return vsnprintf_s(buffer, bufferSize, bufferSize - 1, format, args) >= 0;
 }
-} // namespace
+
+void ResetDlogRecordCount() { g_dlogRecordCount.store(0); }
+
+int32_t GetDlogRecordCount() { return g_dlogRecordCount.load(); }
+
+void ResetLastDlogRecordMsg() { g_lastDlogRecordMsg[0] = '\0'; }
+
+const char* GetLastDlogRecordMsg() { return g_lastDlogRecordMsg; }
 
 void DlogErrorInner(int moduleId, const char* format, ...)
 {
@@ -123,6 +133,7 @@ void DlogDebugInner(int moduleId, const char* format, ...)
 
 void DlogRecord(int module_id, int level, const char* fmt, ...)
 {
+    g_dlogRecordCount.fetch_add(1, std::memory_order_relaxed);
     auto iter = LOG_LEVEL_INFO.find(level);
     std::string levelStr;
     if (iter != LOG_LEVEL_INFO.end()) {
@@ -137,6 +148,10 @@ void DlogRecord(int module_id, int level, const char* fmt, ...)
     if (!formatRet) {
         printf("[ERROR]Failed to execute vsnprintf_s for DlogRecord.");
         return;
+    }
+    if (snprintf_s(g_lastDlogRecordMsg, sizeof(g_lastDlogRecordMsg), sizeof(g_lastDlogRecordMsg) - 1U, "%s", buffer) <
+        0) {
+        g_lastDlogRecordMsg[0] = '\0';
     }
     printf("[%s][pid:%d]%s", levelStr.c_str(), getpid(), buffer);
 }

@@ -175,6 +175,7 @@ enum PlatformFeature {
     PLATFORM_SYS_DEVICE_SIO_PA,          // sys-interconnection covers SIO and PA
     PLATFORM_SYS_DEVICE_INTERCONNECTION, // sys-interconnection acquisition group is offered
     PLATFORM_STARS_F_DIE,
+    PLATFORM_TASK_PMU_RESOURCE_NOT_RESET, // task based PMU resource not reset error code
     // MAX
     PLATFORM_COLLECTOR_TYPES_MAX
 };

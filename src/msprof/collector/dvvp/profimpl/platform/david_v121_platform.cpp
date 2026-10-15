@@ -84,6 +84,7 @@ DavidV121Platform::DavidV121Platform()
     supportedFeature_.insert(PLATFORM_TASK_BLOCK_ON);
     supportedFeature_.insert(PLATFORM_AICORE_EVENT_FROM_ZERO);
     supportedFeature_.insert(PLATFORM_ADPROF);
+    supportedFeature_.insert(PLATFORM_TASK_PMU_RESOURCE_NOT_RESET);
 }
 
 void DavidV121Platform::InsertSysFeature()
