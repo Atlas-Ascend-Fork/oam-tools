@@ -10,15 +10,9 @@ For details about how to obtain the coretrace file, see  Exporting System Logs a
 
 - The coretrace parsing function uses addr2line, a built-in tool of the Linux system, to parse stack function names and line numbers. Ensure that the addr2line tool has been installed, and that the user has the permission to execute the script.
 - You need to run the coretrace file parsing command in the environment where the coretrace file is obtained. Otherwise, the parsing result may be inaccurate.
-<!-- npu="950" id1 -->
-- Only  Ascend 950PR/Ascend 950DT  supports the coretrace file parsing function.
-<!-- end id1 -->
-<!-- npu="A3,910b" id2 -->
-- For  Atlas A3 training products/Atlas A3 inference products  and  Atlas A2 training products/Atlas A2 inference products, the coretrace file parsing function is not supported.
-<!-- end id2 -->
-<!-- npu="910,310p,310b" id3 -->
+<!-- npu="910,310p,310b" id1 -->
 - For  Atlas 200I/500 A2 inference products,  Atlas inference products, and  Atlas training products, the coretrace file parsing function is not supported.
-<!-- end id3 -->
+<!-- end id1 -->
 
 ## Command Format
 

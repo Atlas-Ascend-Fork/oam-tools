@@ -10,15 +10,9 @@
 
 - coretrace解析功能依赖addr2line进行堆栈函数名和行号的解析，这是Linux系统自带工具，请确保addr2line已安装且执行该脚本的用户有权限执行。
 - 需在获取coretrace文件的环境中执行coretrace文件解析命令，否则可能导致解析结果不准确。
-<!-- npu="950" id1 -->
-- 仅Ascend 950PR&950DT系列产品支持使用coretrace文件解析功能。
-<!-- end id1 -->
-<!-- npu="A3,910b" id2 -->
-- 对于Atlas A3系列产品、Atlas A2系列产品，不支持使用coretrace文件解析功能。
-<!-- end id2 -->
-<!-- npu="910,310p,310b" id3 -->
+<!-- npu="910,310p,310b" id1 -->
 - 对于Atlas 200I/500 A2推理产品、Atlas推理系列产品、Atlas训练系列产品，不支持使用coretrace文件解析功能。
-<!-- end id3 -->
+<!-- end id1 -->
 
 ## 命令格式
 
