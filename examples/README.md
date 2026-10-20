@@ -28,6 +28,8 @@ source /usr/local/Ascend/cann/set_env.sh
 > - 非 root 用户默认：`${HOME}/Ascend/cann`
 > - 指定路径安装：`${install_path}/cann`
 
+此外，运行样例前还需在 examples 目录执行 `pip3 install -r ../requirements.txt`，安装仓库根目录 [requirements.txt](../requirements.txt) 声明的 Python 依赖（其中包含 msaicerr 样例 golden_op 算子编译所需的 sympy、scipy 等 7 个三方库）。
+
 ## 一键运行脚本
 
 本目录下为各场景预置了可直接执行的脚本，加载环境变量后即可运行：

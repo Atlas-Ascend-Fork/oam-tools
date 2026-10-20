@@ -28,6 +28,8 @@ source /usr/local/Ascend/cann/set_env.sh
 > - Non-root user default: `${HOME}/Ascend/cann`
 > - Custom install path: `${install_path}/cann`
 
+In addition, run `pip3 install -r ../requirements.txt` in the examples directory before running the examples. This installs the Python dependencies declared in [requirements.txt](../requirements.txt) at the repository root, including the seven third-party libraries such as sympy and scipy required for compiling the golden_op operator of the msaicerr example.
+
 ## One-Click Scripts
 
 This directory ships ready-to-execute scripts for each scenario. Run them once the environment variables are loaded:
