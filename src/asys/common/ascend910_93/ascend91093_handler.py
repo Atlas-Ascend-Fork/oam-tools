@@ -47,15 +47,34 @@ class Ascend91093Handler(DeviceInfo):
         else:
             return interface.run_diagnose(device_obj, diagnose_devices, run_mode)
 
+        # detected_by maps a logic id to the logic id whose detection result is
+        # reported for it. Devices sharing one master id are detected only once
+        # and share that result.
+        detected_by = {}
+
         for device_id in diagnose_devices:
-            if logic_master_info[device_id] not in master_ids:
+            master_id = logic_master_info[device_id]
+            if master_id == interface.ERROR_DEVICE_ID:
+                # The master id of this device could not be resolved, so it
+                # cannot be grouped with any other device. Detect it on its
+                # own and report its own result, instead of silently reusing
+                # the result of an unrelated device.
+                t = Thread(
+                    target=_target_func, args=(device_id, device_obj, ret), daemon=True
+                )
+                t.start()
+                threads.append(t)
+                detected_by[device_id] = device_id
+                continue
+            if master_id not in master_ids:
                 # new thread
                 t = Thread(
                     target=_target_func, args=(device_id, device_obj, ret), daemon=True
                 )
                 t.start()
                 threads.append(t)
-                master_ids[logic_master_info[device_id]] = device_id
+                master_ids[master_id] = device_id
+            detected_by[device_id] = master_ids[master_id]
 
         # wait for all threads to end.
         for t in threads:
@@ -63,6 +82,6 @@ class Ascend91093Handler(DeviceInfo):
 
         ret_logic_id = {}
         for device_id in diagnose_devices:
-            ret_logic_id[device_id] = ret[master_ids[logic_master_info[device_id]]]
+            ret_logic_id[device_id] = ret[detected_by[device_id]]
 
         return ret_logic_id
