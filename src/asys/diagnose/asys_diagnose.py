@@ -225,11 +225,13 @@ class AsysDiagnose:
         if not diagnose_devices or chip_info == UNKNOWN:
             return False
 
-        # aicore_stl_detect is only supported on Ascend950.
+        # aicore_stl_detect is supported on Ascend950 and Ascend960DT only.
         if run_mode == AICORE_STL_MODE:
             diagnose_devices = self.__filter_aicore_stl_devices(diagnose_devices)
             if not diagnose_devices:
-                log_error("The aicore_stl_detect mode is only supported on Ascend950.")
+                log_error(
+                    "The aicore_stl_detect mode is only supported on Ascend950 and Ascend960DT."
+                )
                 return False
 
         if not self._check_support(run_mode):
@@ -336,15 +338,17 @@ class AsysDiagnose:
             continue
 
     def __filter_aicore_stl_devices(self, diagnose_devices):
-        """aicore_stl_detect 仅支持 Ascend950:过滤掉非 950 的 device 并告警。"""
+        """aicore_stl_detect 仅支持 Ascend950 与 Ascend960DT:过滤不支持的 device 并告警。"""
         stl_devices = []
         for dev in diagnose_devices:
             chip_info = self.device_obj.get_chip_info(dev)
-            if chip_info != UNKNOWN and re.search("950", chip_info):
+            # 960 家族仅 960DT 接入 STL:裸 "960" 会把 960PR 一并放行(两者为不同型号,
+            # diag 侧形态表也只注册了 Ascend960DT),故 960 必须带 DT 后缀匹配。
+            if chip_info != UNKNOWN and re.search("950|960DT", chip_info):
                 stl_devices.append(dev)
             else:
                 log_warning(
                     f"device_{dev} ({chip_info}) does not support aicore_stl_detect "
-                    "(Ascend950 only), skipped."
+                    "(Ascend950/Ascend960DT only), skipped."
                 )
         return stl_devices

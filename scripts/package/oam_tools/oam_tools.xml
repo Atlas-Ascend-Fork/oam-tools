@@ -72,6 +72,22 @@
         <file value="mix_nd2nz_covery.o" optional="true"/>
         <file value="mx.bin" optional="true"/>
     </file_info>
+    <file_info value="aicore_stl_ascend960dt" copy_type="delivery" src_path="" dst_path="tools/aml/lib64/aicore_stl/ascend960dt_aicore_stl" install_path="tools/aml/lib64/aicore_stl/ascend960dt_aicore_stl" install_mod="440">
+        <file value="libaml_stl_ascend960dt.so" file_type="shared"  optional="true"/>
+        <file value="libaml_stl_kernel_ascend960dt.so" file_type="shared"  optional="true"/>
+        <file value="aic_cube_covery.o" optional="true"/>
+        <file value="aic_cube_mxfp4_covery.o" optional="true"/>
+        <file value="aic_cube_mxfp8_covery.o" optional="true"/>
+        <file value="aiv_nddma_covery.o" optional="true"/>
+        <file value="aiv_simt_atomG_covery.o" optional="true"/>
+        <file value="aiv_simt_atomS_covery.o" optional="true"/>
+        <file value="aiv_simt_instr_overload.o" optional="true"/>
+        <file value="aiv_ub_covery.o" optional="true"/>
+        <file value="mix_all_method_sync.o" optional="true"/>
+        <file value="mix_load3d_covery.o" optional="true"/>
+        <file value="mix_nd2nz_covery.o" optional="true"/>
+        <file value="mx.bin" optional="true"/>
+    </file_info>
     <file_info value="profiler_lib" copy_type="delivery" src_path="" dst_path="tools/profiler/lib64" install_path="tools/profiler/lib64" install_mod="440">
         <file value="libascend_profinj.so" file_type="shared" optional="true"/>
     </file_info>
@@ -97,6 +113,7 @@
         <path value="tools/aml/lib64/plugin_v2"/>
         <path value="tools/aml/lib64/aicore_stl"/>
         <path value="tools/aml/lib64/aicore_stl/ascend950_aicore_stl"/>
+        <path value="tools/aml/lib64/aicore_stl/ascend960dt_aicore_stl"/>
         <path value="tools/msaicerr"/>
         <path value="tools/hccl_test"/>
         <path value="tools/operator_cmp"/>

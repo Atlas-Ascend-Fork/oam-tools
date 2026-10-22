@@ -253,8 +253,8 @@ options:
                         mode. It can be set to 'stress_detect' (AI Core stress
                         test), 'hbm_detect' (HBM detection), 'cpu_detect' (CPU
                         detection), 'component' (Operator detection) or
-                        'aicore_stl_detect' (AICore STL self-diagnose,
-                        support Ascend950 only).
+                        'aicore_stl_detect' (AICore STL self-diagnose, support
+                        Ascend950 and Ascend960DT only).
   -d                    <Optional> Specifies the ID of the device for
                         command execution.
   --timeout             <Optional> Specifies the detection duration,

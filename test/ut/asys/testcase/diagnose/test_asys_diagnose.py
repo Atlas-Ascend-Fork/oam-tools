@@ -858,7 +858,7 @@ class TestAsysDiagnose(AssertTest):
         self.assertTrue(AsysDiagnose().run() is True)
 
     def test_diagnose_aicore_stl_not_950(self, mocker, caplog):
-        """aicore_stl_detect is intercepted on non-Ascend950 chips."""
+        """aicore_stl_detect is intercepted on unsupported chips (e.g. 910B)."""
         self.assertTrue(True)
 
         class Args:
@@ -880,7 +880,61 @@ class TestAsysDiagnose(AssertTest):
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
         self.assertTrue(
-            "The aicore_stl_detect mode is only supported on Ascend950." in caplog.text
+            "The aicore_stl_detect mode is only supported on Ascend950 and "
+            "Ascend960DT." in caplog.text
+        )
+
+    def test_diagnose_aicore_stl_960dt_pass(self, mocker, capsys):
+        """aicore_stl_detect on Ascend960DT with a passing device."""
+        self.assertTrue(True)
+
+        class Args:
+            d = 0
+            r = "aicore_stl_detect"
+            subparser_name = "diagnose"
+            output = None
+            timeout = None
+
+        mocker.patch(
+            "drv.LoadSoType.get_aml_aicore_stl", return_value=AsysStlDiagnose0()
+        )
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 960DT V1")
+        mocker.patch("os.path.isfile", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(Args())
+        self.assertTrue(AsysDiagnose().run() is True)
+        except_msg = "AICore STL Detect"
+        captured = capsys.readouterr()
+        self.assertTrue(except_msg in captured.out)
+
+    def test_diagnose_aicore_stl_960pr_intercepted(self, mocker, caplog):
+        """aicore_stl_detect is intercepted on Ascend960PR (960 family, DT only)."""
+        self.assertTrue(True)
+
+        class Args:
+            d = 0
+            r = "aicore_stl_detect"
+            subparser_name = "diagnose"
+            output = None
+            timeout = None
+
+        mocker.patch(
+            "drv.LoadSoType.get_aml_aicore_stl", return_value=AsysStlDiagnose0()
+        )
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 960PR V1")
+        mocker.patch("os.path.isfile", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(Args())
+        self.assertTrue(AsysDiagnose().run() is False)
+        self.assertTrue(
+            "The aicore_stl_detect mode is only supported on Ascend950 and "
+            "Ascend960DT." in caplog.text
         )
 
     def test_diagnose_aicore_stl_no_so(self, mocker):
