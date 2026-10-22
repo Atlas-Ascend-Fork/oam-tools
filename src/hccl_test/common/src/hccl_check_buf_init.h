@@ -76,30 +76,25 @@ static inline uint16_t fp16_ieee_from_fp32_value(float f)
 
 static inline uint16_t fp32tobf16(float x)
 {
-    float y = x;
-    int* p = (int*)&y;
-    unsigned int exp, man;
-    exp = *p & 0x7F800000u;
-    man = *p & 0x007FFFFFu;
-    if (exp == 0 && man == 0) {
+    uint32_t bits = fp32_to_bits(x);
+    uint32_t sign = bits & 0x80000000u;
+    uint32_t exp = bits & 0x7F800000u;
+    if ((bits & 0x7FFFFFFFu) == 0) {
         // zero
-        return x;
+        return (uint16_t)(sign >> 16);
     }
+
+    // sign    exp        man
+    // 0/1     11111111   don't care
     if (exp == 0x7F800000u) {
         // infinity or Nans
-        return x;
+        return (uint16_t)(bits >> 16);
     }
     // Normalized number
     // round to nearest
-    float r = x;
-    int* pr = (int*)&r;
-    *pr &= 0xff800000; // r has the same exp as x
-    r = r / 256;
-    y = x + r;
-
-    *p &= 0xffff0000;
-
-    return y;
+    // r 与 x 同符号、同指数，r/256 即半个 bf16 ULP
+    float r = fp32_from_bits(sign | exp) / 256;
+    return (uint16_t)(fp32_to_bits(x + r) >> 16);
 }
 
 constexpr u8 HIF8_SIGN_MASK = 0x80;
