@@ -286,12 +286,16 @@ Third-party libraries, closed-source binary packages, and subrepositories includ
 | Open Source Software | Version | Download Address |
 |---|---|---|
 |protobuf|v25.1|[protobuf-25.1.tar.gz](https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz)|
-|makeself|2.5.0|[makeself-release-2.5.0-patch1.tar.gz](https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz)|
+|makeself|2.5.0|[makeself-release-2.5.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz)|
+|makeself-patch|2.5.0|[makeself-2.5.0.patch](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2.5.0.patch)|
 |abseil-cpp|20230802.1|[abseil-cpp-20230802.1.tar.gz](https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1/abseil-cpp-20230802.1.tar.gz)|
+|abseil-cpp-patch|20230802.1-h0|[backport-CVE-2025-0838.patch](https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1-h0/backport-CVE-2025-0838.patch)|
 |boost|v1.87.0|[boost_1_87_0.tar.gz](https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz)|
 |gtest|1.14.0|[googletest-1.14.0.tar.gz](https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz)|
-|mockcpp-patch|2.7-h2|[mockcpp-2.7_py3.patch](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7_py3.patch)|
+|mockcpp-patch|2.7-h5|[mockcpp-2.7-h5.patch](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h5/mockcpp-2.7-h5.patch)|
 |mockcpp|2.7-h2|[mockcpp-2.7.tar.gz](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz)|
+
+> Note: The addresses above are consistent with the third-party packages actually fetched by cann-cmake at build time (the protobuf / abseil-cpp / boost / googletest / mockcpp source packages on gitcode are identical to the OBS packages verified by cann-cmake). When downloading manually, the three patch files makeself-2.5.0.patch, backport-CVE-2025-0838.patch, and mockcpp-2.7-h5.patch must be placed in the patch/ subdirectory of the dependency directory, while the other files are placed directly in the root of the dependency directory; the cmake/download_libs.py script saves files in this layout automatically.
 
 Closed-source binary packages are fetched per branch. The table below uses the default `master` branch as an example; to prestage another branch, replace `master` in the address with the corresponding branch name (for example `9.1.0`), or run `python cmake/download_libs.py --bundle_branch=<branch>` to download the package for that branch automatically.
 
@@ -304,7 +308,7 @@ Closed-source binary packages are fetched per branch. The table below uses the d
 |---|---|---|
 |msprobe|master|https://gitcode.com/Ascend/msprobe|
 |msprof|master|https://gitcode.com/Ascend/msprof|
-|cann-cmake|master-053|[cmake-master-053.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-053.tar.gz) |
+|cann-cmake|master-059|[cmake-master-059.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-059.tar.gz)|
 
 <a id="environment-verification"></a>
 

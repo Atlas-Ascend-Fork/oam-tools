@@ -64,10 +64,14 @@ def detect_bundle_branch():
         return None
     listed = subprocess.run(
         [git_path, "for-each-ref", "--format=%(refname:short)", "refs/remotes"],
-        capture_output=True, text=True, check=False
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if listed.returncode != 0:
-        logging.warning("git for-each-ref refs/remotes failed: %s", listed.stderr.strip())
+        logging.warning(
+            "git for-each-ref refs/remotes failed: %s", listed.stderr.strip()
+        )
         return None
     best_branch = None
     best_ahead = None
@@ -78,10 +82,14 @@ def detect_bundle_branch():
             continue
         count = subprocess.run(
             [git_path, "rev-list", "--count", f"{ref}..HEAD"],
-            capture_output=True, text=True, check=False
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if count.returncode != 0:
-            logging.warning("git rev-list --count %s..HEAD failed: %s", ref, count.stderr.strip())
+            logging.warning(
+                "git rev-list --count %s..HEAD failed: %s", ref, count.stderr.strip()
+            )
             continue
         ahead = int(count.stdout.strip() or "0")
         if best_ahead is None or ahead < best_ahead:
@@ -148,12 +156,12 @@ def download_single_file(url, current_dir):
         repo_path = os.path.join(current_dir, custom_name if custom_name else repo_name)
         logging.info("Start git clone %s", actual_url)
 
-        git_path = shutil.which('git')
+        git_path = shutil.which("git")
         result = subprocess.run(
             [git_path, "clone", actual_url, repo_path],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
         if result.returncode != 0:
             raise RuntimeError(f"git clone failed: {result.stderr}")
@@ -169,6 +177,11 @@ def download_single_file(url, current_dir):
         raise ValueError(f"only https url is allowed, got: {actual_url}")
 
     file_path = os.path.join(current_dir, file_name)
+    # custom_name 可带相对子目录（如 patch/xxx.patch，对齐 cann-cmake 的补丁缓存查找路径）；
+    # wget -O 不会自建目录，须先确保父目录存在。
+    parent_dir = os.path.dirname(file_path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
     logging.info("Start download %s", actual_url)
 
     wget_path = shutil.which("wget")
@@ -178,7 +191,7 @@ def download_single_file(url, current_dir):
         [wget_path, "--no-check-certificate", "-O", file_path, actual_url],
         capture_output=True,
         text=True,
-        check=False
+        check=False,
     )
     if result.returncode != 0:
         # wget -O 会先建目标文件，失败时残留半截内容；留着会被后续误当作可用预置包。
@@ -207,30 +220,54 @@ def download_files_native(url_list):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="离线预置 oam-tools 编译依赖（第三方库 + 闭源 bundle 包 + 子仓）")
+        description="离线预置 oam-tools 编译依赖（第三方库 + 闭源 bundle 包 + 子仓）"
+    )
     parser.add_argument(
-        "--bundle_branch", default=None,
+        "--bundle_branch",
+        default=None,
         help="预置哪个分支的闭源 bundle 包（可选 master / 9.1.0）。"
-             "不指定则按当前 git 提交自动探测所属发布分支，探测不出时回退 master。"
-             "须与联编时 build.sh --bundle_branch / install_bundle.cmake 的解析结果一致。")
+        "不指定则按当前 git 提交自动探测所属发布分支，探测不出时回退 master。"
+        "须与联编时 build.sh --bundle_branch / install_bundle.cmake 的解析结果一致。",
+    )
     args = parser.parse_args()
 
     # bundle 分支解析与 install_bundle.cmake 同规则：显式 > git 探测 > master 兜底 + 白名单校验。
     bundle_branch = resolve_bundle_branch(args.bundle_branch)
     logging.info("prefetch bundle for branch: %s", bundle_branch)
 
+    # 三方件下载清单，须与本地构建引用（cann-cmake 各 tag 的 third_party/*.cmake）保持一致：
+    # - 源码包优先 gitcode 镜像，其内容须与 cann-cmake 按 sha256 校验的 OBS 包一致；
+    # - makeself 的源码包与补丁 cann-cmake 直接引用 OBS 地址，gitcode 无对应镜像；
+    # - 补丁落盘位置须与 cann-cmake 的本地缓存查找路径一致：makeself-2.5.0.patch 与
+    #   backport-CVE-2025-0838.patch 与 mockcpp-2.7-h5.patch 在 patch/ 子目录；
+    # - 升级 cmake/fetch_cann_cmake.cmake 的 CANN_CMAKE_TAG 时，须同步核对 cann-cmake
+    #   third_party/ 下各三方件的版本、地址与补丁路径。
     my_urls = [
         (
             "https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1"
             "/protobuf-25.1.tar.gz",
         ),
         (
-            "https://gitcode.com/cann-src-third-party/makeself/releases/download"
-            "/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz",
+            "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself"
+            "/makeself-release-2.5.0.tar.gz",
+        ),
+        (
+            "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix"
+            "/makeself-2.5.0.patch",
+            "patch/makeself-2.5.0.patch",
         ),
         (
             "https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download"
             "/20230802.1/abseil-cpp-20230802.1.tar.gz",
+        ),
+        (
+            "https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download"
+            "/20230802.1-h0/backport-CVE-2025-0838.patch",
+            "patch/backport-CVE-2025-0838.patch",
+        ),
+        (
+            "https://gitcode.com/cann-src-third-party/boost/releases/download"
+            "/v1.87.0/boost_1_87_0.tar.gz",
         ),
         (
             "https://gitcode.com/cann-src-third-party/googletest/releases/download"
@@ -238,38 +275,44 @@ if __name__ == "__main__":
         ),
         (
             "https://gitcode.com/cann-src-third-party/mockcpp/releases/download"
-            "/v2.7-h2/mockcpp-2.7_py3.patch",
+            "/v2.7-h5/mockcpp-2.7-h5.patch",
+            "patch/mockcpp-2.7-h5.patch",
         ),
         (
             "https://gitcode.com/cann-src-third-party/mockcpp/releases/download"
             "/v2.7-h2/mockcpp-2.7.tar.gz",
         ),
+        # cann-cmake 工程仓 tar 包：版本须与 cmake/fetch_cann_cmake.cmake 的
+        # CANN_CMAKE_TAG 保持一致，离线联编时供其 FetchContent 本地缓存分支使用。
+        (
+            "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake"
+            "/cmake-master-059.tar.gz",
+        ),
     ]
     # 闭源 bundle 包按解析出的分支拼地址（各架构一份），不再硬编码 master。
     bundle_url_list = bundle_urls(bundle_branch)
     my_urls.extend(bundle_url_list)
-    my_urls.extend([
-        (
-            "https://gitcode.com/Ascend/msprobe.git",
-        ),
-        (
-            "https://gitcode.com/Ascend/msprof.git",
-        ),
-    ])
+    my_urls.extend(
+        [
+            ("https://gitcode.com/Ascend/msprobe.git",),
+            ("https://gitcode.com/Ascend/msprof.git",),
+        ]
+    )
 
     downloaded = download_files_native(my_urls)
     # 预置包名不含分支，旁写元数据供联编时校验，避免混用其它分支的闭源包。
     # 只给本轮确实下载成功的 bundle tar 写：否则目录里的旧分支包会被误标成本轮分支，
     # 联编时反而错误通过校验。
     bundle_tars = [
-        os.path.join(os.getcwd(), url[0].split("/")[-1])
-        for url in bundle_url_list
+        os.path.join(os.getcwd(), url[0].split("/")[-1]) for url in bundle_url_list
     ]
     fetched_bundle_tars = [tar for tar in bundle_tars if tar in downloaded]
     if not fetched_bundle_tars:
         logging.error(
             "no bundle tarball downloaded for branch %s; "
-            "offline build cannot use prestaged bundle", bundle_branch)
+            "offline build cannot use prestaged bundle",
+            bundle_branch,
+        )
         sys.exit(1)
     write_bundle_branch_metadata(bundle_branch, fetched_bundle_tars)
     # 本轮没取到的包若还留着上一轮的元数据，会被联编时当成"已核对"而错误放行；

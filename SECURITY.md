@@ -24,15 +24,15 @@
 
 |      类型      |                                           开源代码地址                                           |                            文件名                             |             公网IP地址/公网URL地址/域名/邮箱地址/压缩文件地址             |                   用途说明                    |
 | :------------: |:------------------------------------------------------------------------------------------:|:----------------------------------------------------------| :---------------------------------------------------------- |:-----------------------------------------|
-|  依赖  | 不涉及  | cmake/third_party/makeself-fetch.cmake | https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz | 从gitcode下载makeself源码，作用编译依赖 |
+|  依赖  | 不涉及  | cann-cmake (makeself-fetch) | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz | 从OBS下载makeself源码，作用编译依赖 |
+|  依赖  | 不涉及  | cann-cmake (makeself-fetch) | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2.5.0.patch | 从OBS下载makeself补丁，作用编译依赖 |
 |  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz | 从gitcode下载protobuf源码，作用编译依赖 |
 |  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1/abseil-cpp-20230802.1.tar.gz | 从gitcode下载abseil源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/boost.cmake | https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz | 从gitcode下载boost源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/eigen.cmake | https://gitcode.com/cann-src-third-party/eigen/releases/download/3.4.0/eigen-3.4.0.tar.gz | 从gitcode下载eigen源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/gtest_shared.cmake | https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz | 从gitcode下载googletest源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/mockcpp.cmake | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7_py3.patch | 从gitcode下载mockcpp package包 |
-|  依赖  | 不涉及  | cmake/third_party/mockcpp.cmake | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz | 从gitcode下载mockcpp源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/nlohmann_json.cmake | https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip | 从gitcode下载json源码，作用编译依赖 |
+|  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1-h0/backport-CVE-2025-0838.patch | 从gitcode下载abseil安全补丁（CVE-2025-0838 修复回合） |
+|  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz | 从gitcode下载boost源码，作用编译依赖 |
+|  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz | 从gitcode下载googletest源码，作用编译依赖 |
+|  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h5/mockcpp-2.7-h5.patch | 从gitcode下载mockcpp补丁 |
+|  依赖  | 不涉及  | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz | 从gitcode下载mockcpp源码，作用编译依赖 |
 ---
 
 ## 漏洞机制说明

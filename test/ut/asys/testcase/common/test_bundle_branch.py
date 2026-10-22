@@ -414,3 +414,30 @@ def test_download_libs_whitelist_matches_cmake():
     assert py_branches == cmake_branches, (
         f"白名单不同步: py={py_branches} cmake={cmake_branches}"
     )
+
+
+def test_cann_cmake_059_syncs_fetch_script_and_docs():
+    fetch = (REPO_ROOT / "cmake" / "fetch_cann_cmake.cmake").read_text(encoding="utf-8")
+    downloader = (REPO_ROOT / "cmake" / "download_libs.py").read_text(encoding="utf-8")
+    zh = (REPO_ROOT / "docs" / "zh" / "quick_install.md").read_text(encoding="utf-8")
+    en = (REPO_ROOT / "docs" / "en" / "quick_install.md").read_text(encoding="utf-8")
+
+    assert 'set(CANN_CMAKE_TAG "master-059")' in fetch
+    assert (
+        "SHA256=9e59939b5c97c9498293969df22ab2dd40e450700c51f84f117d065880f40d25"
+        in fetch
+    )
+    assert "/cmake-master-059.tar.gz" in downloader
+    assert "master-059" in zh and "cmake-master-059.tar.gz" in zh
+    assert "master-059" in en and "cmake-master-059.tar.gz" in en
+    downloader_url_text = downloader.replace('"\n            "', "")
+
+    # master-059 changes the local patch cache from pkg/ to patch/.
+    assert "makeself/fix/makeself-2.5.0.patch" in downloader_url_text
+    assert "makeself/makeself-2.5.0.patch" not in downloader_url_text
+    assert "patch/makeself-2.5.0.patch" in downloader
+    assert "patch/backport-CVE-2025-0838.patch" in downloader
+    assert "patch/mockcpp-2.7-h5.patch" in downloader
+    assert "pkg/makeself-2.5.0.patch" not in downloader
+    assert "pkg/backport-CVE-2025-0838.patch" not in downloader
+    assert "both patches" not in zh

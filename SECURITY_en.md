@@ -24,15 +24,15 @@ The public network addresses included in this project code are as follows:
 
 | Type | Open Source Code Address | File Name | Public Network IP Address/URL/Domain/Email/Compressed File Address | Usage Description |
 | :------------: |:------------------------------------------------------------------------------------------:|:----------------------------------------------------------| :---------------------------------------------------------- |:-----------------------------------------|
-| Dependency | Not applicable | cmake/third_party/makeself-fetch.cmake | https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz | Download makeself source code from gitcode, used as build dependency |
+| Dependency | Not applicable | cann-cmake (makeself-fetch) | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz | Download makeself source code from OBS, used as build dependency |
+| Dependency | Not applicable | cann-cmake (makeself-fetch) | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2.5.0.patch | Download makeself patch from OBS, used as build dependency |
 | Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz | Download protobuf source code from gitcode, used as build dependency |
 | Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1/abseil-cpp-20230802.1.tar.gz | Download abseil source code from gitcode, used as build dependency |
-| Dependency | Not applicable | cmake/third_party/boost.cmake | https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz | Download boost source code from gitcode, used as build dependency |
-| Dependency | Not applicable | cmake/third_party/eigen.cmake | https://gitcode.com/cann-src-third-party/eigen/releases/download/3.4.0/eigen-3.4.0.tar.gz | Download eigen source code from gitcode, used as build dependency |
-| Dependency | Not applicable | cmake/third_party/gtest_shared.cmake | https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz | Download googletest source code from gitcode, used as build dependency |
-| Dependency | Not applicable | cmake/third_party/mockcpp.cmake | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7_py3.patch | Download mockcpp package from gitcode |
-| Dependency | Not applicable | cmake/third_party/mockcpp.cmake | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz | Download mockcpp source code from gitcode, used as build dependency |
-| Dependency | Not applicable | cmake/third_party/nlohmann_json.cmake | https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip | Download json source code from gitcode, used as build dependency |
+| Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1-h0/backport-CVE-2025-0838.patch | Download abseil security patch from gitcode (CVE-2025-0838 backport) |
+| Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz | Download boost source code from gitcode, used as build dependency |
+| Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz | Download googletest source code from gitcode, used as build dependency |
+| Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h5/mockcpp-2.7-h5.patch | Download mockcpp patch from gitcode |
+| Dependency | Not applicable | cann-cmake (add_cann_third_party) | https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz | Download mockcpp source code from gitcode, used as build dependency |
 ---
 
 ## Vulnerability Mechanism

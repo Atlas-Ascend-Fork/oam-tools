@@ -284,12 +284,16 @@ mkdir -p ${third_party_path}
 | 开源软件 | 版本 | 下载地址 |
 |---|---|---|
 |protobuf|v25.1|[protobuf-25.1.tar.gz](https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz)|
-|makeself|2.5.0|[makeself-release-2.5.0-patch1.tar.gz](https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz)|
+|makeself|2.5.0|[makeself-release-2.5.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz)|
+|makeself-patch|2.5.0|[makeself-2.5.0.patch](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2.5.0.patch)|
 |abseil-cpp|20230802.1|[abseil-cpp-20230802.1.tar.gz](https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1/abseil-cpp-20230802.1.tar.gz)|
+|abseil-cpp-patch|20230802.1-h0|[backport-CVE-2025-0838.patch](https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1-h0/backport-CVE-2025-0838.patch)|
 |boost|v1.87.0|[boost_1_87_0.tar.gz](https://gitcode.com/cann-src-third-party/boost/releases/download/v1.87.0/boost_1_87_0.tar.gz)|
 |gtest|1.14.0|[googletest-1.14.0.tar.gz](https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz)|
-|mockcpp-patch|2.7-h2|[mockcpp-2.7_py3.patch](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7_py3.patch)|
+|mockcpp-patch|2.7-h5|[mockcpp-2.7-h5.patch](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h5/mockcpp-2.7-h5.patch)|
 |mockcpp|2.7-h2|[mockcpp-2.7.tar.gz](https://gitcode.com/cann-src-third-party/mockcpp/releases/download/v2.7-h2/mockcpp-2.7.tar.gz)|
+
+> 注意：上表地址与联编时 cann-cmake 实际拉取的三方件一致（gitcode 上的 protobuf / abseil-cpp / boost / googletest / mockcpp 源码包与 cann-cmake 校验的 OBS 包内容一致）。手工下载时，makeself-2.5.0.patch、backport-CVE-2025-0838.patch 与 mockcpp-2.7-h5.patch 三个补丁文件需存放于依赖目录的 patch/ 子目录下，其余文件直接存放于依赖目录根目录；使用 cmake/download_libs.py 脚本下载时会自动按此布局保存。
 
 闭源二进制包按分支拉取，下表以默认的 `master` 分支为例；预置其它分支时把地址中的 `master` 替换为对应分支名（如 `9.1.0`），或直接用 `python cmake/download_libs.py --bundle_branch=<分支>` 自动下载对应分支的包。
 
@@ -302,7 +306,7 @@ mkdir -p ${third_party_path}
 |---|---|---|
 |msprobe|master|<https://gitcode.com/Ascend/msprobe>|
 |msprof|master|<https://gitcode.com/Ascend/msprof>|
-|cann-cmake|master-053|[cmake-master-053.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-053.tar.gz) |
+|cann-cmake|master-059|[cmake-master-059.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-059.tar.gz)|
 
 ## 环境验证
 
