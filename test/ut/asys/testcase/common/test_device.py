@@ -159,6 +159,56 @@ class TestDevice(AssertTest):
         deviceinfo.get_device_errorcode(0)
         self.assertTrue(True)
 
+    def test_get_device_errorcode_buffer_size(self, mocker):
+        class RecordDsmiHandle:
+            def __init__(self, error_count):
+                self.error_count = error_count
+                self.errorinfo_lens = []
+                self.max_sizes = []
+
+            def dsmi_get_device_errorcode(self, device_id, p_error_count, perrorcode):
+                p_error_count.contents.value = self.error_count
+                return 0
+
+            def dsmi_query_errorstring(
+                self, device_id, error_code, errorinfo, max_size
+            ):
+                self.errorinfo_lens.append(len(errorinfo))
+                self.max_sizes.append(max_size)
+                return 0
+
+        mocker.patch("drv.LoadSoType.get_env_type", return_value="EP")
+        deviceinfo = DeviceInfo()
+        deviceinfo.dsmi_handle = RecordDsmiHandle(1)
+        deviceinfo.get_device_errorcode(0)
+        self.assertTrue(deviceinfo.dsmi_handle.errorinfo_lens == [256])
+        self.assertTrue(deviceinfo.dsmi_handle.max_sizes == [256])
+
+    def test_get_device_errorcode_count_clamped(self, mocker, caplog):
+        class CountDsmiHandle:
+            def __init__(self, error_count):
+                self.error_count = error_count
+                self.query_count = 0
+
+            def dsmi_get_device_errorcode(self, device_id, p_error_count, perrorcode):
+                p_error_count.contents.value = self.error_count
+                return 0
+
+            def dsmi_query_errorstring(
+                self, device_id, error_code, errorinfo, max_size
+            ):
+                self.query_count += 1
+                return 0
+
+        mocker.patch("drv.LoadSoType.get_env_type", return_value="EP")
+        deviceinfo = DeviceInfo()
+        deviceinfo.dsmi_handle = CountDsmiHandle(129)
+        error_list = deviceinfo.get_device_errorcode(0)
+        self.assertTrue(deviceinfo.dsmi_handle.query_count == 128)
+        self.assertTrue(len(error_list) == 128)
+        self.assertTrue("reported 129 error codes" in caplog.text)
+        self.assertTrue("only the first 128 are queried" in caplog.text)
+
     def test_get_ccpu_count(self, mocker):
         self.assertTrue(True)
 

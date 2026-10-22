@@ -18,7 +18,7 @@
 
 import ctypes
 from common import RetCode
-from common import log_debug, log_error
+from common import log_debug, log_error, log_warning
 from common.const import AI_CORE_FREQUENCY, NOT_SUPPORT, UNKNOWN
 import common.interface as interface
 from drv import LoadSoType
@@ -47,6 +47,9 @@ MODULE_TYPE_SYSTEM = 0
 INFO_TYPE_MASTERID = 2
 
 MEMORY_CONVERT_RATIO = 1024
+
+DSMI_ERROR_INFO_LEN = 256
+DSMI_MAX_ERROR_CODE_NUM = 128
 
 DSMI_ERROR_CORE = {
     1: "the device does not exist.",
@@ -357,8 +360,8 @@ class DeviceInfo:
         """Obtaining the device error code"""
         error_list = list()
         pyarray = [0]
-        perrorcode = (ctypes.c_uint * 128)(*pyarray)
-        perrorinfo = (ctypes.c_char * 255)(*pyarray)
+        perrorcode = (ctypes.c_uint * DSMI_MAX_ERROR_CODE_NUM)(*pyarray)
+        perrorinfo = (ctypes.c_char * DSMI_ERROR_INFO_LEN)(*pyarray)
         p_error_count = ctypes.pointer(ctypes.c_int())
         try:
             ret = self.dsmi_handle.dsmi_get_device_errorcode(
@@ -369,9 +372,15 @@ class DeviceInfo:
         if not self.check_status(ret, "Get error code failed"):
             return error_list
         error_code = p_error_count.contents.value
-        for i in range(error_code):
+        if error_code > DSMI_MAX_ERROR_CODE_NUM:
+            log_warning(
+                f"Device {device_id} reported {error_code} error codes, "
+                f"exceeding capacity {DSMI_MAX_ERROR_CODE_NUM}. Truncated, "
+                f"only the first {DSMI_MAX_ERROR_CODE_NUM} are queried."
+            )
+        for i in range(min(error_code, DSMI_MAX_ERROR_CODE_NUM)):
             ret = self.dsmi_handle.dsmi_query_errorstring(
-                device_id, perrorcode[i], perrorinfo, 256
+                device_id, perrorcode[i], perrorinfo, DSMI_ERROR_INFO_LEN
             )
             error_info = ""
             for info in perrorinfo:
