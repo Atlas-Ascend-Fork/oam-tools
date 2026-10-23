@@ -30,5 +30,5 @@ export PROFILING_OPTIONS='{"output":"/tmp/profiling","training_trace":"on","task
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id1 -->
 ## 采集结果说明
 
-配置PROFILING\_OPTIONS参数后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的性能数据文件，保存在PROF\_XXX/mindstudio\_profiler\_output目录下。
+配置PROFILING\_OPTIONS参数后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的性能数据文件，保存在PROF\_XXX/mindstudio\_profiler\_output目录下。
 <!-- end id1 -->

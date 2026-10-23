@@ -17,9 +17,9 @@ OAM-Tools (Operations, Administration, and Maintenance) is an open-source operat
 
 **Use cases**
 
-- One-click fault information collection and AI Core Error root cause analysis when AI training/inference tasks encounter anomalies
-- AI task performance tuning: collect key performance indicators across runtime stages to identify bottlenecks
-- Testing collective communication (HCCL) functionality and performance in distributed training scenarios
+- One-click fault information collection and AI Core Error root cause analysis when AI training/inference tasks encounter anomalies.
+- AI task performance tuning: collect key performance indicators across runtime stages to identify bottlenecks.
+- Testing collective communication (HCCL) functionality and performance in distributed training scenarios.
 
 ## ✨ Core Features
 

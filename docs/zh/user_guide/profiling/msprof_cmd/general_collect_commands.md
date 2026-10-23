@@ -111,7 +111,7 @@ msprof命令行工具提供了**AI任务运行性能数据**、**AI处理器系�
 msprof --output=/home/projects/output /home/projects/MyApp/out/main
 ```
 
-msprof命令执行完成后，会自动解析并导出性能数据结果文件，详细内容请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
+msprof命令执行完成后，会自动解析并导出性能数据结果文件，详细内容请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/profile_data_file_references.md)。
 <!-- end id3 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/general_collect_commands_res.md#id00002 -->

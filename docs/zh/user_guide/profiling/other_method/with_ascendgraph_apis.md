@@ -100,6 +100,6 @@ std::map<AscendString, AscendString> config = {{"ge.exec.deviceId", "0"},
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id7 -->
 ## 采集数据说明
 
-配置Ascend Graph API方式采集后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的timeline和summary文件。
+配置Ascend Graph API方式采集后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的timeline和summary文件。
 
 <!-- end id7 -->

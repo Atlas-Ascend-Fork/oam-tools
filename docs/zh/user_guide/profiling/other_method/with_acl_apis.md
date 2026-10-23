@@ -13,7 +13,7 @@
 |方式三：订阅算子信息|将采集到的性能数据解析后写入管道，由用户读入内存，再由用户调用API获取性能数据。|
 
 <!-- npu="950,A3,910b,910,310p,310b" id22 -->
-注：接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md)》。
+注：接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.1/docs/zh/api_ref/README.md)》。
 <!-- end id22 -->
 
 > [!NOTE]说明
@@ -23,7 +23,7 @@
 
 ## 采集并落盘性能数据
 
-通过调用API方式开启性能数据采集功能，从而自动采集性能原始数据。采集性能原始数据成功后，可将采集的原始数据拷贝到装有工具的开发环境上进行原始性能[数据解析](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)，可视化展示原始性能数据解析结果。
+通过调用API方式开启性能数据采集功能，从而自动采集性能原始数据。采集性能原始数据成功后，可将采集的原始数据拷贝到装有工具的开发环境上进行原始性能[数据解析](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)，可视化展示原始性能数据解析结果。
 
 **API简介**
 
@@ -42,7 +42,7 @@
 > [!NOTE]说明
 >aclprofInit接口传入的性能采集数据的落盘路径，需要确保用户进程具有读写权限。
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id23 -->
->接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md)》。
+>接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.1/docs/zh/api_ref/README.md)》。
 <!-- end id23 -->
 
 **API调用示例**
@@ -114,7 +114,7 @@ aclprofFinalize();
 > [!NOTE]说明
 >当只开启msproftx功能时，aclprofCreateConfig接口的deviceIdList参数值需设为空，deviceNums参数值设为0。
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id24 -->
->接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md)》。
+>接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.1/docs/zh/api_ref/README.md)》。
 <!-- end id24 -->
 
 **API调用示例**
@@ -315,13 +315,13 @@ aclprofFinalize();
 |aclprofDestroySubscribeConfig|销毁通过aclprofCreateSubscribeConfig接口创建的aclprofSubscribeConfig类型的数据。同步接口。|
 
 > [!NOTE]说明
->接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md)》。
+>接口详细说明，请参见《[Runtime运行时API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.1/docs/zh/api_ref/README.md)》。
 
 ## 采集数据说明
 
 采集性能数据后请将原始数据文件解析并导出为可视化的性能数据文件，保存在PROF\_XXX/mindstudio\_profiler\_output目录下。
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-解析详细操作请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)。
+解析详细操作请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)。
 <!-- end id1 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id21 -->
@@ -389,7 +389,7 @@ aclprofFinalize();
 <!-- end id19 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id20 -->
-详细的性能数据信息如请参考[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
+详细的性能数据信息如请参考[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/profile_data_file_references.md)。
 <!-- end id20 -->
 
 <!-- end id21 -->
