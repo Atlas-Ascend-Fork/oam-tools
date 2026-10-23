@@ -149,6 +149,7 @@ To build rpm/deb format packages, specify the package format via the `--pkg-type
 ### Build Parameters and Dependencies
 
 Parameters:
+
 - `--cann_3rd_lib_path`: The directory for storing third-party libraries. The default value is `./third_party`. If third-party libraries do not exist locally, the build script automatically downloads the source code of each third-party library from the gitcode open source repository.
 - The build process automatically downloads closed-source binary packages that contain the libraries and header files required for normal operation. Only release versions are provided. **Even if the build option specifies debug, only the release version tar package is downloaded**.
 - Closed-source binary packages are fetched per branch. When not specified, the build script detects the release branch the current git commit belongs to (branches cut from `master` fetch the master package; branches on the 9.1.0 line fetch the 9.1.0 package), falling back to `master` when detection fails. You can also specify the branch explicitly with `--bundle_branch=<NAME>`, which is recommended when detection is inaccurate for personal branches. Branches with packages currently published on OBS are `master` and `9.1.0`; specifying any other branch fails at the configuration stage.

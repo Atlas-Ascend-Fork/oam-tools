@@ -193,7 +193,7 @@ result_<算子或模型名>_<YYYYMMDD_HHMMSS>_rank<N>.json
 | `documented_codes` | array | 已在文档中找到定义的错误码列表 | — |
 | `undocumented_codes` | array | 未在文档中找到的错误码（可能是新错误或内部码） | 应为空或仅含 E\*9\*\*\* |
 | `internal_error_count` | int | 内部错误码（序号 9000~9999 段）数量 | — |
-| `internal_error_rate` | float | 内部错误码占所有错误码的比例（内部码需联系华为） | 越低越好 |
+| `internal_error_rate` | float | 内部错误码占所有错误码的比例（内部码需提交ISSUE） | 越低越好 |
 | `description_match` | bool | 屏幕打印的错误描述是否与文档定义一致 | true |
 
 #### format_compliance（格式规范度）

@@ -13,7 +13,7 @@
 
 - **第 1 位**：级别 — `E`（Error 错误）、`W`（Warning 告警）、`I`（Info 提示）
 - **第 2 位**：模块字母（见下表）
-- **后 4 位**：错误序号，`0000~8999` 为用户类错误，`9000~9999` 为内部错误（需联系华为技术支持）
+- **后 4 位**：错误序号，`0000~8999` 为用户类错误，`9000~9999` 为内部错误（请提交ISSUE）
 
 > **说明**：`E*9***` 格式表示系统内部错误码，出现时须收集日志后联系技术支持。
 > 异步任务场景下（连续下发多个算子），日志中可能含有多个算子报错，需**从首报错算子开始**排查。
@@ -79,7 +79,7 @@
 | `E14001` | Invalid_Argument_Operator_Compilation_Parameter | 算子编译参数非法 | 检查 ATC 转换时的算子参数 |
 | `E14002` | Invalid_Argument_Tensor_Attribute | Tensor 属性非法 | 检查 Tensor dtype/format/shape 组合 |
 | `E16001~E16005` | Invalid_Argument_ONNX_Model_Data | ONNX 模型数据非法 | 检查 ONNX 模型文件与 opset 版本 |
-| `E19999` | Inner_Error | GE 内部错误 | 收集完整日志后联系华为技术支持 |
+| `E19999` | Inner_Error | GE 内部错误 | 收集完整日志后请提交ISSUE |
 | `W11001` | Performance_Not_Optimal_Operator | 算子性能非最优 | 可忽略或优化算子 shape/格式 |
 | `W11002` | Config_Error_Weight_Configuration | 权重配置告警 | 检查权重量化配置 |
 | `W11003` | Config_Error_Operator_Missing_Implementation | 算子缺少实现 | 提供自定义算子实现 |
@@ -336,7 +336,7 @@ EI0018依据 [HCOMM 9.0.0-beta.2 独立目录](https://gitcode.com/cann/hcomm/bl
 | `EL0010` | Insufficient_Notify_Resources | Notify 资源不足 | 减少 Notify 创建数量 |
 | `EL0011` | Insufficient_Model_Resources | Model 资源不足 | 减少同时加载的模型数量 |
 | `EL0012` | Full_Service_Queue | 服务队列已满 | 等待队列消费完成；减少并发任务量 |
-| `EL0013` | Insufficient_CDQM_Resources | CDQM 资源不足 | 联系华为技术支持 |
+| `EL0013` | Insufficient_CDQM_Resources | CDQM 资源不足 | 请提交ISSUE |
 | `EL0014` | Operation_Unsupported | 操作不支持 | 确认驱动版本支持该操作 |
 | `EL0015` | Invalid_Device_Access | 设备访问非法 | 核对设备的容器绑定、设备访问权限及残留容器进程，按实际配置修正；不由此码推定内存越界 |
 
@@ -348,7 +348,7 @@ EL0015的上述检查对象来自 Runtime [8.5.0](https://gitcode.com/cann/runti
 
 | 错误码 | 错误类型 | 说明 | 排查方向 |
 |--------|---------|------|---------|
-| `EM9001` | Inner_Error_Group_Attach_Failed | Group 附加失败 | 内部错误，收集日志联系华为技术支持 |
+| `EM9001` | Inner_Error_Group_Attach_Failed | Group 附加失败 | 内部错误，收集日志，请提交ISSUE |
 | `EM9002` | Inner_Error_Queue_Scheduler_Init_Failed | Queue 调度器初始化失败 | 内部错误，检查 Device 状态 |
 
 ---
@@ -382,7 +382,7 @@ EL0015的上述检查对象来自 Runtime [8.5.0](https://gitcode.com/cann/runti
 | `EO0002` | Invalid_Argument | 参数非法 | 检查 AMCT 工具参数 |
 | `EO0003` | Invalid_Argument_Model / Invalid_Model | 模型非法 | 检查输入模型格式与版本 |
 | `EO0004` | Invalid_Argument_Command / Config_Error | 命令/配置错误 | 检查 AMCT 命令行参数 |
-| `EO9999` | Inner_Error | 内部错误 | 收集日志联系华为技术支持 |
+| `EO9999` | Inner_Error | 内部错误 | 收集日志，提交ISSUE |
 
 ---
 

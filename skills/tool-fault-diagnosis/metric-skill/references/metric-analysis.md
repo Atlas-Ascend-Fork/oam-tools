@@ -198,7 +198,7 @@ errMsg 综合质量分（0~100）= 各维度得分加权求和，各维度权重
 |---------|------|---------|
 | `documented_rate` < 80% | 错误码较新（9.0 新增）或文档版本落后 | 对照最新社区版文档更新 err-messages.md |
 | 存在 `undocumented_codes`（非内部码） | 自定义算子或第三方库错误码未入库 | 在 err-messages.md 中补充自定义算子错误码 |
-| 大量 `E*9***` 内部码 | 问题需要华为介入 | 收集完整 plog + msnpureport 数据联系技术支持 |
+| 大量 `E*9***` 内部码 | 问题需要华为介入 | 收集完整 plog + msnpureport 数据，提交ISSUE |
 | `description_match` = false | 屏幕打印内容与文档描述不一致（可能是版本差异） | 检查 CANN 版本对应的完整文档 |
 
 #### 格式规范度不足
