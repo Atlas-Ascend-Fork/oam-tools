@@ -1508,7 +1508,8 @@ class TestAnalyze(AssertTest):
         """
         sys.argv = [CONF_SRC_PATH, "analyze", "-r=ub"]
         ParamDict().set_env_type("EP")
-        self.assertTrue(asys.main())
+        # 缺少 --path 属于失败分支，asys.main() 应返回 False
+        self.assertTrue(not asys.main())
         self.assertTrue(
             "Please enter the path to the UB data collection file." in caplog.text
         )

@@ -549,7 +549,7 @@ class AsysAnalyze:
             self.path = os.path.abspath(self.path)
         else:
             log_error("Please enter the path to the UB data collection file.")
-            return True
+            return False
         for ub_file_name in ub_file_names:
             func_name = "_convert_ub_" + ub_file_name
             bin_file_name = ub_file_name + ".bin"

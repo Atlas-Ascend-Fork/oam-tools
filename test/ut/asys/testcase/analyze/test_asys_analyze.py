@@ -631,6 +631,39 @@ class TestAsysAnalyze(AssertTest):
         ParamDict().set_env_type("EP")
         self.assertTrue(not analyze.run())
 
+    def test_asys_analyze_ub_not_path(self, mocker):
+        """
+        The ub mode needs the path to the UB data collection file. Without
+        it the command must fail instead of reporting success.
+        """
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch.object(
+            ParamDict, "asys_output_timestamp_dir", return_value=test_trace_tmp
+        )
+        analyze = AsysAnalyze()
+        analyze.output = test_trace_tmp
+        analyze.path = None
+        analyze.run_mode = "ub"
+        self.assertTrue(not analyze.run())
+
+    def test_asys_analyze_ub_have_path(self, mocker):
+        """
+        With the path given, the ub mode converts the UB files and
+        reports success.
+        """
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch.object(
+            ParamDict, "asys_output_timestamp_dir", return_value=test_trace_tmp
+        )
+        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_statistic")
+        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_ssu_schedule")
+        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_config_item")
+        analyze = AsysAnalyze()
+        analyze.output = test_trace_tmp
+        analyze.path = os.path.join(ut_root_path, "data")
+        analyze.run_mode = "ub"
+        self.assertTrue(analyze.run())
+
     def test_asys_analyze_aicore_error_not_have_msaicerr(self, mocker, caplog, capsys):
         fake_ret = subprocess.Popen(
             "ls",
