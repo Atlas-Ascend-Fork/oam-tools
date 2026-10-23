@@ -1,6 +1,6 @@
 # 进程卡住与关联通信超时处理流
 
-> **执行入口**：入口场景 `hang`；`comm_timeout` 复用本流的通信分支并保留原场景 ID。仅分析已有日志、堆栈、配置、采样与验证记录，不执行 `asys stack`、进程附加、信号注入、连通性探测或新 profiling。超时类型分流转为在已有日志中按首报错归类超时类型。先读 [公共约定](common-flow.md)，特别是 §0 找首节点。
+> **执行入口**：入口场景 `hang`；`comm_timeout` 复用本流的通信分支并保留原场景 ID。仅分析已有日志、堆栈、配置、采样与验证记录，不执行 `asys stack`、进程附加、信号注入、连通性探测或新 profiling。超时类型分流转为在已有日志中按首报错归类超时类型。需要清洗或流水线产物时查 [公共约定](common-flow.md)。
 
 ## 问题现象
 
@@ -15,7 +15,7 @@ no progress for 300s
 deadlock detected
 ```
 
-进程存在但无进展，CPU 使用率接近 0%，plog 最后一条日志时间戳在很久以前。超时类问题分为 Host 侧超时与 Device 侧超时两大类。
+进程仍存在、低 CPU 或长期无新日志是等待线索；须结合观察窗口和进展记录判断是否卡住。超时类问题分为 Host 侧超时与 Device 侧超时两大类。
 
 ## 排查流程
 
@@ -25,10 +25,10 @@ deadlock detected
 flowchart TD
     A[找到首报错] --> B{首报错是哪种超时}
     B -->|框架层超时/HCCL拓扑探测超时| C[Host 侧超时子流程]
-    B -->|EI0006 socket 建链超时| D[建链超时子流程]
+    B -->|明确 socket 建链超时| D[建链超时子流程]
     B -->|EE1002 流同步超时| E[流同步超时子流程]
-    B -->|EI0002 Notify Wait 超时| F[Notify Wait 超时子流程]
-    B -->|EE9999 Event Wait 超时| G[Event Wait 超时子流程]
+    B -->|明确 Notify Wait 超时| F[Notify Wait 超时子流程]
+    B -->|明确 Event Wait 超时| G[Event Wait 超时子流程]
     C --> C1{框架超时 or HCCL拓扑超时}
     C1 -->|框架超时| C2[核对 Master/Scheduler/TcpStore 连接记录]
     C1 -->|HCCL拓扑超时| C3[核对 rank_table/防火墙/端口/网卡配置]
@@ -39,16 +39,16 @@ flowchart TD
     E --> E1{排查网络问题}
     E1 -->|是| E2[转网络排查流]
     E1 -->|否| E3{是否全量超时}
-    E3 -->|全量| E4[计算首尾时间差 vs 超时配置]
+    E3 -->|全量| E4[核对同次操作的进入/进展/超时与生效预算]
     E3 -->|非全量| E5[核对不报超时的卡是否少下发通信算子]
     F --> F1{排查网络问题}
     F1 -->|是| F2[转网络排查流]
     F1 -->|否| F3{是否全量超时}
-    F3 -->|全量| F4[计算首尾时间差 vs HCCL_EXEC_TIMEOUT]
+    F3 -->|全量| F4[核对同次操作的依赖/进展与生效预算]
     F3 -->|非全量| F5[核对不报超时的卡是否少下发通信算子]
     G --> G1{是否全量超时}
-    G1 -->|全量| G2[核对 Event Wait 超时配置是否小于 Notify wait]
-    G1 -->|非全量| G3[分析其他卡: 未报错→排查业务日志 / 都报错→继续分析首错卡]
+    G1 -->|全量| G2[关联 Record/Notify 依赖及各阶段预算]
+    G1 -->|非全量| G3[核对其他 rank 的进展/退出/错误, 保留首错候选]
 ```
 
 | 顺序 | 证据 | 判断条件 | 下一步 | 中间过程记录 |
@@ -56,12 +56,12 @@ flowchart TD
 | 1 | plog/应用日志首报错 | 超时类型归类 | 进入对应子流程 | 记录首报错原文、错误码、超时类型、rank/device |
 | 2 | 框架日志/Master/Scheduler 连接记录 | Host 侧：框架超时 or HCCL 拓扑超时 | 框架→核对连接；HCCL→核对配置 | 记录连接超时原文、rank_table 配置、防火墙/端口状态 |
 | 3 | 网络诊断记录 | 建链/流同步/Notify：排查网络是否有异常 | 有→转网络流；无→继续 | 记录网络诊断结论、是否有端口闪断/告警 |
-| 4 | 是否所有卡都报超时 | 全量 or 非全量 | 全量→计算时间差；非全量→核对少下发 | 记录报超时的卡列表、不报的卡列表、覆盖率 |
-| 5 | 首尾报错时间差 vs 超时配置 | 时间差大于 or 小于超时配置 | 大于→增大超时；小于→排查不一致 | 记录首报错时间、尾报错时间、时间差、超时配置值 |
-| 6 | 不报超时的卡通信算子下发记录 | 是否少下发通信算子 | 少下发→分析 atrace；非少下发→卡间不同步 | 记录各卡通信算子数量对比、atrace 分析结果 |
-| 7 | Event Wait 超时配置 vs Notify wait 配置 | Event Wait 配置是否小于 Notify wait | 是→调大 Event Wait 超时；否→收集日志排查 | 记录两个超时配置值、配置关系 |
+| 4 | 同一通信域和操作的参与集合 | 参与实体的超时/完成/退出/未知状态 | 全量或非全量均继续依赖分析；缺覆盖则未知 | 记录去重 rank/device、参与集合、材料覆盖和状态 |
+| 5 | 进入、进展、完成与超时事件及生效预算 | 是否同次操作、时钟可比、生产端仍有进展且延迟可恢复 | 有依据才考虑调整对应阶段预算；退出/错配/不可满足依赖按根因处理 | 记录操作身份、等待区间、配置单位和生效范围；报错差只作线索 |
+| 6 | 各参与者同次通信的下发与进展记录 | 是否有覆盖充分的下发差异 | 已证实差异→追踪缺席/错配原因；未证实则继续比较延迟、退出、依赖和缺日志 | 记录操作身份、覆盖、差异和 atrace 依据，不用累计数量替代同次操作 |
+| 7 | Event Wait、对应 Record 及其 Notify 依赖 | 外层预算是否先于可恢复的内层工作到期 | 按实际依赖和版本核对预算；配置大小关系本身不证明根因 | 记录任务/事件身份、生产端状态、各阶段预算和单位 |
 
-每步的中间过程记录写入 `diagnosis.md` 的 `result.steps`，包含 step_id、检查内容、发现结果和下一步，便于追溯走到哪一步定位到问题。
+采用流水线产物模式时，每步过程写入 `diagnosis.md.result.steps`；默认诊断答复在正文说明关键核对过程及证据，不要求生成该文件。
 
 ### 超时类型分类
 
@@ -69,10 +69,10 @@ flowchart TD
 | --- | --- | --- | --- |
 | Host 侧超时 | 训推框架超时 | 框架层超时报错（PyTorch TcpStore/连接 Master 超时、MindSpore 连接 Scheduler 超时） | §1.1 |
 | Host 侧超时 | HCCL Host 侧建链超时 | HCCL 拓扑探测超时、通信域 rankSize 不符、防火墙/IP 端口被占用 | §1.1 |
-| Device 侧超时 | 建链超时（EI0006） | socket 建链超时、`EI0006` | §1.2 |
+| Device 侧超时 | 建链超时 | `wait socket establish timeout` 等具体建链超时原文；`EI0006` 单独只表示 Socket 获取失败 | §1.2 |
 | Device 侧超时 | 流同步超时（EE1002） | `EE1002`、Stream 同步超时 | §1.3 |
-| Device 侧超时 | Notify Wait 超时（EI0002） | `EI0002`、Notify wait timeout | §1.4 |
-| Device 侧超时 | Event Wait 超时（EE9999） | `EE9999`、Event Wait 超时 | §1.5 |
+| Device 侧超时 | Notify Wait 超时 | 具体 Notify Wait timeout 和任务信息；`EI0002` 单独只表示通信超时 | §1.4 |
+| Device 侧超时 | Event Wait 超时 | 具体 Event Wait timeout 或匹配版本的 waitType/事件信息；`EE9999` 单独是通用内部错误 | §1.5 |
 
 ### 1.1 Host 侧超时子流程
 
@@ -94,12 +94,12 @@ flowchart TD
 | 判断设备型号 | A3→排查 1520 是否有超时代答或其他问题；通用→排查链路网络是否有异常 | A3 场景须核对 1520 日志 |
 | 排查链路/网络是否有异常 | 已有网络诊断记录、链路状态 | 是→解决网络链路问题（转 [网络排查](network-flow.md)）；否→继续找本端对端 |
 | 找到报错异常链路的本端和对端 | 报错链路的两端 rank/device/IP | 定位到具体链路 |
-| 排查卡间不一致 | 建链时间不够（首尾建链超时时间超过阈值）/ 通信算子数量下发不一致 / 对端业务卡住（数据集处理/程序bug/其他）/ 对端业务提前退出（host OOM/segment fault/其他） | 各子项须有时间或证据关联 |
+| 排查卡间不一致 | 核对各端进入/建链进展及生效预算、同次操作下发差异、对端业务卡住或提前退出 | 首尾报错差不等于建链耗时；各候选须有同次操作关联 |
 | 排查软件问题 | 通信算子类型下发不一致 / 其他问题 | 通信算子类型不一致→转 HCCL 研发分析 |
 
 **重要**：检查建链之间的机器是否有版本混跑的情况，不允许混跑。
 
-判断是否全量建链超时的统计方法见 [子检查](#子检查)：统计报 `wait socket establish timeout` 的卡数，若等于节点数 × 每节点卡数则为全量超时。
+判断是否全量建链超时见 [子检查](#子检查)：按同一通信域/操作的有效参与集合核对去重实体，不能用文件数或物理卡总数代替。
 
 ### 1.3 流同步超时子流程（EE1002）
 
@@ -112,15 +112,16 @@ flowchart TD
 
 #### 1.3.1 全量超时
 
-计算首尾报错时间差：
-- **大于流同步超时时间** → 可设置更大的超时时间 `ACL_DEVICE_SYNC_TIMEOUT`或解决不一致
-- **小于流同步超时时间** → 是否有卡的 traceback 不一致 → 否→结合全量 device 日志继续分析 / 是→取异常节点 device 日志继续分析
+对齐同一操作的进入、最后进展、完成及超时记录，比较实际等待区间与生效预算。
+首尾报错时间差只描述各报错的离散程度，不能由其大于/小于 timeout 决定根因。
+继续比较各 rank 的 traceback、生产端进展、退出及下发一致性；只有工作仍可推进且
+延迟可恢复时，才将调整适用版本的 `ACL_DEVICE_SYNC_TIMEOUT` 列为待验证缓解。
 
 #### 1.3.2 非全量超时
 
 关注不报超时的卡是否少下发通信算子：
 - **少下发** → 分析 atrace 日志找到少下发算子 / host 慢卡在 host 侧 / 其他情况找 HCCL 分析
-- **非少下发（卡间不同步）** → 迭代前（编译快慢有区别 / 数据权重加载差异 / 通信算子下发异常）/ 迭代中（PP 设置过大 / 个别卡有额外操作或不一致的行为）→ 可设置更大超时或解决不一致 / 联系研发定位
+- **未证实少下发** → 核对编译、权重加载、阶段调度和额外操作，保持原因未定；有持续进展和可恢复延迟证据才考虑增加对应预算，下发错配或退出须针对原因处理。
 
 ### 1.4 Notify Wait 超时子流程（EI0002）
 
@@ -137,38 +138,40 @@ Notify wait 超时流程：**找到首报错 → 首报错 notify wait timeout �
 
 关注不报超时的卡是否少下发通信算子：
 - **少下发** → 分析 atrace 日志找到少下发算子 / host 慢卡在 host 侧 / 其他情况找 HCCL 分析
-- **非少下发（卡间不同步）** → 迭代前（编译快慢 / 加载 ckpt 快慢 / 数据集下载快慢）/ 迭代中（个别卡有额外操作或不一致）→ 设置更大的 `HCCL_EXEC_TIMEOUT` 或解决不一致 / 联系研发定位
+- **未证实少下发** → 核对编译、ckpt/数据加载和迭代内额外操作；缺少下发差异不证明只是慢卡。生产端持续进展、依赖有效且延迟可恢复时，才考虑调整适用的执行预算。
 
 #### 1.4.2 全量超时
 
-获取首尾报错时间，比较上步时间差与 `HCCL_EXEC_TIMEOUT`：
-- **大于 timeout** → 增加 `HCCL_EXEC_TIMEOUT` 超过卡间最大时间差
-- **小于 timeout** → 排查所有卡，从首报错开始：
-  - 通信算子下发不一致
-  - 两卡互等超时
-  - 建链 timeout 比执行 timeout 长
+按同一 communicator/操作对齐进入、Record/Wait、最后进展、退出和超时记录，并核对
+`HCCL_EXEC_TIMEOUT` 的单位、作用阶段和实际生效值。首尾报错差大于或小于预算都
+不能单独区分慢卡、错配、互等或提前退出。继续检查下发一致性、依赖和建链/执行
+阶段；只在工作持续推进且延迟可恢复时，提出增加对应预算的未验证缓解。
 
-**顺藤摸瓜排查等待关系**（小于 timeout 时重点排查）：从首报错的维测日志中提取 `localRank` 与 `remoteRank`，按 `NOTIFY WAIT, localRank:` 关键词过滤，将 localRank 与 remoteRank 串联得到等待链（如 `146->147->148->...->760->1528->760`）。在等待链中找到 `A->B->A` 的环路关系即定位互等的两张卡。多卡成环时可通过脚本检测：将关系链中的卡号记录到列表，把 remoteRank 在列表中检索，若已存在则说明成环。
+**核对等待关系**：按 `NOTIFY WAIT, localRank:` 检索时，保留 group、操作轮次、
+stream/task/notify ID、等待生效区间及对应 Record。rank 箭头组成 `A->B->A` 只是
+互等候选；不同轮次或先后完成的正常双向同步也会形成这种投影。只有同一未完成
+依赖形成闭环，且对应生产端无法继续提交/完成 Record 时，才能确认死锁。脚本找环
+只能定位需要核对的边，不能补齐缺失的身份和进展证据。
 
-### 1.5 Event Wait 超时子流程（EE9999）
+### 1.5 Event Wait 超时子流程
 
 Event Wait 超时流程：**首报错为 Event Wait 超时 → 是否全量超时 → 全量/非全量分支**。
 
 | 核对节点 | 离线核对内容 | 结论边界 |
 | --- | --- | --- |
-| 是否全量超时 | 是否所有卡都报 Event Wait 超时 | 全量→核对 Event Wait 超时配置是否小于 Notify wait：是→Event wait 超时时间配置大于 Notify wait（问题不复现→解决 / 能复现→收集日志继续）；否→收集 device 和 atrace 日志→排查历史案例 |
-| 非全量超时 | 分析其他卡 | 其他卡存在未报错的→排查业务日志（业务报错比 Event Wait 更早→业务侧分析 / 没有业务报错→同全量分支）；其他卡都有报错→其他不是首错不需要关注，继续分析首错卡 |
+| 是否全量超时 | 按有效参与集合核对 Event Wait timeout、事件和任务身份 | 关联对应 Record 和其依赖；内外层预算关系仅为线索，有可恢复进展才考虑调整预算 |
+| 非全量超时 | 对照其他 rank 的进展、退出和业务错误 | 未报错不等于正常；其他报错也可能提供源头证据，不能因较晚打印而忽略 |
 | 排查历史案例 | 已有案例匹配 | 已知问题→按历史案例解决方案处理；非已知问题→研发分析 |
 
 ### 子检查
 
 | 子检查 | 离线核对内容 |
 | --- | --- |
-| 如何判断是否全量 notify wait 超时 | 统计报 `notify wait timeout` 的卡数，若统计个数 = 节点数 × 每节点卡数则为全量超时。节点较多时按各节点文件夹分别统计报错文件数；卡数较少时可逐个列出报错行（关键词 `notify wait timeout occurred during task execution`）。A2 维测日志中若无 `notify wait timeout` 文字，改为统计 `stuck notify num`。记录报错卡数、节点数、每节点卡数、是否等于总数 |
-| 如何判断是否全量建链超时 | 统计报 `wait socket establish timeout` 的卡数，若统计个数 = 节点数 × 每节点卡数则为全量超时。方法同 notify wait 全量判断。记录报错卡数、节点数、每节点卡数、是否等于总数 |
-| notify wait timeout 如何顺藤摸瓜排查等待关系 | 从首报错维测日志中提取 `localRank`/`remoteRank`（关键词 `NOTIFY WAIT, localRank:`），将 localRank 与 remoteRank 串联成等待链。在等待链中找 `A->B->A` 环路定位互等卡；多卡成环时用脚本检测：将关系链卡号记入列表，把 remoteRank 在列表中检索，已存在则成环。记录等待链、环路卡号对 |
+| 如何判断是否全量 notify wait 超时 | 检索具体 timeout，A2 的 `stuck notify num` 只作待核线索；按同次作业、通信域、操作和时间窗去重 host/PID/rank/device，与有效参与集合逐项比较。轮转文件、副本及重复报错不增加实体数，文件数和行数不能代替 rank 数。缺失参与者标 unknown，材料不全不确认全量 |
+| 如何判断是否全量建链超时 | 检索 `wait socket establish timeout`，按同次建链操作去重端点实体，与该通信域的有效参与集合比较；缺失实体保留 unknown，不以节点数乘物理卡数默认当前参与集合 |
+| notify wait timeout 如何核对等待关系 | 保存 group/操作轮次、stream/task/notify、有效等待区间及对应 Record；找环后逐边核对是否仍未完成、生产端是否可推进。只有不可推进的同一依赖闭环才确认互等；单纯 rank 重现只作为候选 |
 | 大模型训推 host 慢/卡住 | host 慢需业务分析：权重加载慢、dataloader 慢。host 卡住候选原因：模型权重加载卡住、训练数据加载卡住。程序不打印日志看似卡住时，核对已有堆栈快照：Python 程序核对 py-spy dump 结果，C++ 程序核对 gdb attach 后 bt 结果。记录卡住进程 PID、堆栈快照中等待位置（如权重加载/数据加载/IO 等待） |
-| 如何排查通信算子下发不一致 | 在 plog 中找 HCCL `TaskExceptionHandler` 三行维测日志（关键词 `run failed, base info`）：第 1 行含通信域名 `tag[...]` 与算法名；第 2 行含 `rankSize`/`rankId`；第 3 行含 `timeStamp`/`deviceId`/`count`/`reduceType`/`dataType`。按通信域分组比较各卡的 `tag`（通信算子类型）、`count`、`dataType` 是否一致：若某卡下发 AllGather 而其他卡下发 AllReduce 则为下发不一致。记录各卡通信算子类型分布、不一致卡号、参考卡号、差异字段 |
+| 如何排查通信算子下发不一致 | 在 plog 找 HCCL `TaskExceptionHandler` 的 `run failed, base info` 及邻近多行，提取 tag/算法、group/rankSize/rankId、任务/操作序号、count/reduceType/dataType 和时间。先对齐同一通信域、迭代/操作及参与集合，再比较类型、参数和调用次序；不同轮次的正常 AllGather/AllReduce 不能拼成冲突。记录匹配身份、覆盖、不一致实体和差异字段，缺序号关联则保留候选 |
 
 ## 证据盘点与保真要求
 
@@ -194,13 +197,13 @@ Event Wait 超时流程：**首报错为 Event Wait 超时 → 是否全量超�
 | 数据加载/IO 等待 | 任务阶段、队列/worker/IO 栈和生产消费进展记录 | 主线程停在 DataLoader，不足以证明 worker 死锁 |
 | 算子/流依赖等待 | dispatch/done、Event Record/Wait、任务/流依赖与上下游异常 | 缺 done 或同步函数超时，不直接证明死循环 |
 | 正常长任务/日志中断 | 已有活动或后续完成、性能基线、文件截止/轮转/级别信息 | 无后续日志不能排除此分支 |
-| 超时配置不当 | Event Wait 超时配置 < Notify wait、首尾时间差 > 超时配置 | 仅"超时"不证明配置不当 |
+| 超时预算不适合当前负载 | 同次操作的实际等待和生效预算、有效依赖、持续进展及可恢复延迟证据 | 首尾报错差、内外层配置大小关系或单独 timeout 均不证明预算不当 |
 
 锁循环/死锁的结论需要等待关系形成闭环或已有验证证据；否则表述为"在 <位置> 等待，原因未定"。Event/Notify Wait 应核对对应 Record 端，不能只凭等待端闭合因果链。
 
 ### `comm_timeout` 专用判断
 
-当入口场景为 `comm_timeout` 时，保留 `scenario_id=comm_timeout`，并按以下顺序完成通信分支：
+当入口场景为 `comm_timeout` 时，保留 `scenario_id=comm_timeout`，先识别通信库、实际 API、协议和阶段。HIXL/LLM-DataDist 点对点场景按[HIXL 参考](../hixl-reference.md)核对 endpoint、控制请求/响应和底层通道，不要求不存在的 collective/group 字段，也不从客户端等待直接排除 Device/驱动资源。下列步骤中的 collective 一致性用于 HCCL 等集合通信；点对点场景对应比较同次两端操作及状态：
 
 1. **定位超时操作**：从原始日志提取 collective 类型（AllReduce、Broadcast 等）、group、迭代/序号、参与 rank、进入和超时时间，确认超时属于同一次通信操作。
 2. **建立 rank 对照表**：为每个可见 rank 标记 `entered`、`completed`、`exited` 或 `unknown`。缺失 rank 日志使用 `unknown`，不推断其状态。
@@ -213,11 +216,11 @@ Event Wait 超时流程：**首报错为 Event Wait 超时 → 是否全量超�
 
 ## 子步骤产物
 
-每步更新同一个 `diagnosis.md.result.steps`，并保留公共状态、输入/证据引用、缺口和 next_step。
+流水线模式每步更新同一个 `diagnosis.md.result.steps`，并保留公共状态、输入/证据引用、缺口和 next_step。
 
 | step_id | 执行动作 | findings 必含字段 |
 | --- | --- | --- |
-| H1 | 案例/分类与观察区间核对，归类超时类型 | signals、case_comparison、event_identity、observation_window、expected_progress、hang_confirmed、timeout_type（notify/event/host_link/stream_sync/framework/host_topo）、is_all_timeout（全量/非全量）、classification_conflicts |
+| H1 | 案例/分类与观察区间核对，归类超时类型 | signals、case_comparison、event_identity、observation_window、expected_progress、hang_confirmed、timeout_type（notify/event/host_link/stream_sync/framework/host_topo）、is_all_timeout（全量/非全量/未知）、classification_conflicts |
 | H2 | 盘点多 rank、堆栈、配置和正常进展 | material_inventory、versions、rank_map、rank_coverage、clock_alignment、last_progress_by_rank、stack_snapshots、atrace_logs、effective_config、timeout_config（HCCL_EXEC_TIMEOUT/ACL_DEVICE_SYNC_TIMEOUT） |
 | H3 | 按对应子流程核对，对齐通信/任务依赖、首错和竞争假设 | first_error_candidate、timeout_subflow、first_last_time_diff、time_diff_vs_timeout、collective_alignment、task_dependencies、rank_exit_chain、branch_decisions、alternative_decisions、unresolved_links |
 | H4 | 输出等待位置、因果边界和检查依据 | confirmed_facts、wait_location、root_cause_status、limitations、recommendations、check_evidence |

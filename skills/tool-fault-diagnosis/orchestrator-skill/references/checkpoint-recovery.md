@@ -31,7 +31,9 @@
 ## 一次 Agent 交接
 
 运行停止后打开 `artifacts/diagnosis.md`：保留外壳中的 run_id、stage、attempt、inputs；
-根据路由文档填写 result 与人读正文，逐项审核 17 个 checks，设 status=success、finished_at 为完成时间。
+根据路由文档填写 result 与人读正文，逐项审核 17 个 checks，将 result.analysis_status 从 draft 改为 reviewed，
+设 status=success、finished_at 为完成时间。只有用户明确要求证据摘要时才使用 analysis_status=evidence_only；
+该状态不表示已经完成根因诊断。
 随后 `--resume` 执行真实评分；report 交接采用相同方法。证据不足也应如实完成结论边界，不能伪造证据凑字段。
 
 ## 锁与状态

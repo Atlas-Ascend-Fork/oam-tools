@@ -1,169 +1,79 @@
 # 常见问题案例库
 
-> 本文档收录 Ascend NPU / CANN 8.5.0 历史典型问题及其解决方案，用于日志分析时的快速案例匹配。
->
-> **新增案例须经可信度评估**：只有可信度 HIGH（≥85）、关键项全部满足且修复已验证的诊断报告
-> 才能写入本文档；可信度 70~84 或待补证的先进 [候选案例库](cases-pending.md)。
-> 评分规范见 [confidence-assessment.md](confidence-assessment.md)，
-> 入库门槛和格式见 [case-contribution.md](case-contribution.md)，
-> 用 `scripts/promote_case.py` 自动生成规范案例块。
+## 来源与使用边界
+
+下列 CASE-001～006 沿用旧版检索ID。旧记录没有附原始日志、环境、复现或修复验证来源，现明确作为**机制示例**，不能作为已验证历史案例或本次根因的独立证据。示例中的数值和日志形式均非通用规格。
+
+新增正式案例须遵循[可信度规范](confidence-assessment.md)与[案例沉淀规范](case-contribution.md)，关键因果证据和修复验证齐备后再入库；待补证材料进入[候选区](cases-pending.md)。综合分数不能替代实际验证记录。
 
 ---
 
 ## CASE-001：训练过程中 loss 突变为 NaN
 
-**问题描述**
-使用 FP16 混合精度训练大模型，训练数百步后 loss 突然变为 NaN，此后无法恢复。
+**机制示例，未验证。** FP16训练出现NaN，可由前向溢出、输入非有限值、非法数值运算、梯度异常等引起。LayerNorm输出含NaN只定位到观测点；不能单凭它确认LayerNorm内部溢出。算子耗时短也不证明短路。
 
-**关键日志特征**
-```
-[WARNING][GE] Op LayerNorm output contains inf/nan, step=342
-[INFO][PROF] aicore_time=0.01ms, expected>=1ms  # 几乎为 0，表明算子短路
-```
+**区分证据与条件修复**
 
-**根因分析**
-FP16 动态范围有限（最大 65504），LayerNorm 层的中间激活值溢出后产生 inf，传播到后续算子导致 NaN。
-
-**解决方案**
-1. 开启损失缩放（Loss Scaling）：
-   ```python
-   # torch_npu + apex
-   from apex import amp
-   model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
-   ```
-2. 对 LayerNorm 使用 FP32：
-   ```python
-   nn.LayerNorm(...).to(torch.float32)
-   ```
-3. 减小初始学习率，避免梯度爆炸。
+- 比较首个异常算子的输入、中间值和输出，核对实际计算及累加类型；以匹配的高精度参考检查数值范围。
+- 已证实前向FP16范围不足时，评估敏感路径的FP32计算或受支持的BF16路径，并复验精度与性能。BF16指数范围更大，但尾数位更少，不能保证误差更小。
+- Loss Scaling主要缓解低精度反向梯度下溢；动态缩放可检测非有限梯度并调整缩放，不修复已发生的前向溢出。梯度或学习率调整须有相应证据。
 
 ---
 
 ## CASE-002：HCCL AllReduce 超时导致训练挂死
 
-**问题描述**
-8 卡训练，某步骤后所有进程卡住，120 秒后全部超时退出。
+**机制示例，未验证。** 某rank等待其他rank超时，说明对应通信阶段未在预算内完成。内存使用率95%不能证明对端已被OOM Killer杀死；报超时rank可能是等待方。
 
-**关键日志特征**
-```
-[ERROR][HCCL] AllReduce timeout, rank=3, wait_time=120000ms
-[ERROR][HCCL] Rank 5 not ready, hccl_error=timeout
-[WARNING][HOST] rank 5 process memory: 95% used
-```
+**区分证据与条件修复**
 
-**根因分析**
-Rank 5 宿主机内存（CPU RAM）严重不足，数据预处理进程被 OOM Killer 杀死，导致该 rank 的梯度同步等待超时，阻塞了所有其他 rank。
-
-**解决方案**
-1. 增大宿主机内存或减少 `num_workers` 数量
-2. 减小数据预取缓存大小
-3. 启用 HCCL 超时诊断日志：
-   ```bash
-   export HCCL_EXEC_TIMEOUT=300  # 适当延长超时，便于诊断
-   ```
+- 对齐通信域、rank、操作序列与时间范围，回查对端的退出码、应用异常、内核OOM记录和cgroup内存事件。
+- 只有杀进程记录与该任务关联后，才按Host内存耗尽处置；核对预处理worker、预取缓存等实际贡献，再调整资源或负载。
+- 建链、执行和网络故障分别分析。延长对应超时仅在确认进展及合理预算后使用，不能替代修复进程退出、死锁或序列不一致。
 
 ---
 
 ## CASE-003：算子编译失败（UB 内存溢出）
 
-**问题描述**
-使用自定义算子时，TBE 编译阶段报错，任务无法启动。
+**机制示例，未验证。** 若匹配编译目标的错误明确给出所需UB超过可用UB，可确认当前规划不满足该目标容量；不能将示例256KB用作所有芯片上限。
 
-**关键日志特征**
-```
-[ERROR][TBE] Compile op CustomConv failed: UB memory overflow
-[ERROR][TBE] Required UB: 512KB, Available: 256KB, op=CustomConv, tiling_key=1024x1024
-```
+**区分证据与条件修复**
 
-**根因分析**
-自定义卷积算子的 tiling 分块为 1024×1024，超出 NPU 单核 UB 上限（256KB）。
-
-**解决方案**
-1. 减小 tiling 分块大小：
-   ```python
-   # tiling 配置，将 tile_size 从 1024 改为 256
-   tiling_config = {"tile_h": 256, "tile_w": 256}
-   ```
-2. 使用 CANN 提供的 tiling 工具自动计算最优分块
-3. 参考 TBE 开发文档中的 UB 约束说明
+- 按实际shape、dtype、对齐、padding、队列/双缓冲、同时存活的中间tensor及保留空间核算峰值，而非只比较tile边长。
+- 在工具链与算子约束允许时调整分块、缓冲复用或流水深度，重新编译并检查尾块与边界输入。
+- tile从1024改256只是可能的实验点，没有完整容量推导不能称为确定修复或最优配置。
 
 ---
 
 ## CASE-004：图加载失败（HBM OOM）
 
-**问题描述**
-大模型推理时，图加载阶段失败，无法完成初始化。
+**机制示例，未验证。** HBM申请失败需要保留请求、资源类型、设备、配额与时刻。总量、已用、空闲、框架保留和最大连续可分配块不是同一指标，不能由一条申请失败日志断定参数、激活和KV cache各占多少。
 
-**关键日志特征**
-```
-[ERROR][GE] Load graph to device failed: memory not enough
-[ERROR][ACL] HBM memory allocation failed, requested=32GB, available=28GB
-[INFO][MEM] Current HBM usage: 28576MB / 32768MB
-```
+**区分证据与条件修复**
 
-**根因分析**
-模型参数 + 激活内存 + KV cache 共计 > 32GB HBM 容量。
-
-**解决方案**
-1. 开启模型并行（张量并行 / 流水线并行）分散到多卡
-2. 使用量化推理（INT8/INT4）减少模型内存占用：
-   ```python
-   # 使用 CANN 量化工具
-   from ascendquant import quantize
-   quantize(model, quant_config={"mode": "int8"})
-   ```
-3. 减小 KV cache 大小（缩短 max_seq_len）
-4. 开启重计算（recompute）减少激活内存（训练场景）
+- 先量化故障阶段的实际占用和生命周期，区分容量不足、框架预算、碎片、泄漏及其他进程占用。
+- 参数或KV占用已证实时，再评估模型分片、受支持的量化或KV预算调整；检查精度、通信和延迟影响。
+- 重计算适用于可重计算的训练激活，不能作为推理图加载或任意OOM的通用解法。具体配置使用现场框架/工具版本已支持的接口。
 
 ---
 
-## CASE-005：算子精度不达标（FP16 与 FP32 结果差异过大）
+## CASE-005：算子精度不达标（FP16 与参考结果差异过大）
 
-**问题描述**
-使用 FP16 计算的矩阵乘法结果与 FP32 参考值相差超过 1%，不满足精度要求。
+**机制示例，未验证。** 单个max_diff数值不证明累加误差，也没有跨算子通用的1%合格线；需明确误差定义、参考实现、输入范围、计算/累加类型和业务容限。
 
-**关键日志特征**
-```
-[WARNING][PROF] Op MatMulV2 output max_diff=0.023, threshold=0.01
-```
+**区分证据与条件修复**
 
-**根因分析**
-矩阵规模较大时，FP16 累加误差会放大（mantissa 仅 10 bit）。
-
-**解决方案**
-1. 对精度敏感的矩阵乘法使用 FP32 累加：
-   ```python
-   # torch_npu 中开启高精度模式
-   torch.npu.set_float32_matmul_precision("high")
-   ```
-2. 使用 BF16 替代 FP16（动态范围更大，精度损失更小）
-3. 在精度测试时使用 `atol=1e-2, rtol=1e-2` 的合理误差范围
+- 检查首次偏差、绝对/相对误差、近零点与非有限值，并核对参考值本身及算法等价性。
+- 已证实低精度累加主导误差时，测试当前后端支持的高精度累加/计算路径；不要假设同名PyTorch设置控制所有NPU算子。
+- BF16范围更大不等于尾数精度更高。比较实际误差后选择类型，不能为了通过测试放宽既定atol/rtol。
 
 ---
 
-## CASE-006：plog 日志轮转导致日志丢失
+## CASE-006：plog 日志轮转导致早期材料缺失
 
-**问题描述**
-任务运行 4 小时后收集日志，发现早期的报错信息已被轮转覆盖。
+**机制示例，未验证。** 现有文件只覆盖近期，可能由轮转、采集路径/用户错误、过滤或日志未开启造成；需核对配置和文件覆盖后才能归因。
 
-**关键日志特征**
-日志文件只有最近 10 × 100MB = 1GB 的内容，早期 ERROR 信息不存在。
+**区分证据与条件修复**
 
-**根因分析**
-plog 默认保留 10 个文件，每个 100MB，长时间任务超出轮转上限。
-
-**解决方案**
-1. 任务启动后立即后台持续采集日志：
-   ```bash
-   # 实时同步日志到外部存储
-   rsync -av --delete $HOME/ascend/log/plog/ /external/logs/plog/ &
-   ```
-2. 修改日志轮转配置（增大文件数）：
-   ```json
-   // /usr/local/Ascend/cann-8.5.0/tools/configure/acl.json
-   { "log_file_size": 200, "log_file_num": 50 }
-   ```
-3. 仅保留 WARNING 以上级别以减少日志量：
-   ```bash
-   export ASCEND_GLOBAL_LOG_LEVEL=2
-   ```
+- 盘点原始文件、轮转/压缩文件和实际进程日志路径，保留时间、大小与来源；不能通用假设10个100MB文件。
+- 按现场版本支持的日志配置扩大留存或配置持续归档，并核对磁盘预算。一次`rsync`不是持续采集，`--delete`可能删除归档中的旧证据。
+- 调高日志级别会丢失后续分析需要的上下文；根据目标选择范围，并记录配置变更及影响。现有缺失日志不能由配置调整补回。

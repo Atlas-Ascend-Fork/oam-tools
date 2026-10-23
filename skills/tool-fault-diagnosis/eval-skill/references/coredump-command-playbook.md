@@ -1,6 +1,6 @@
 # CANN Coredump Command Playbook
 
-Use these commands as templates. Replace placeholders before running commands and avoid modifying production library directories.
+本页提供命令模板，执行范围遵守 [处理流公共约定](fault-flows/common-flow.md#1-输入与证据保护)。已有日志诊断不执行本页的现场采集、附加进程或业务复跑命令；仅分析已提供的材料，缺失结果记录为证据边界。离线解析已有 core/符号前核对版本与适用参数，避免修改生产库目录。
 
 ## 1. Baseline Triage
 

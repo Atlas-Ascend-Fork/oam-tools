@@ -1,0 +1,87 @@
+{
+  "scope": "Offline API-documentation and public-source corpora for lookup_api_docs.py; regenerated on demand with scripts/export_offline_source.py, not distributed in this repository",
+  "note": "The .json.gz corpus files are intentionally untracked: repository binary-file gates reject them. Rebuild each corpus with the exact git revision below, then verify against corpus_sha256 before use. ops-nn source-code exceeds the 1 MB per-file export limit and must be split into .part00/.part01 (9000000-byte prefix + remainder) after export.",
+  "corpora": [
+    {
+      "corpus": "api-docs/asc-devkit-v9.0.0-beta.2.json.gz",
+      "repository": "https://gitcode.com/cann/asc-devkit",
+      "revision": "b0a2865d589f87342e4ef1e2a41aed7fcdffcf0b",
+      "version": "v9.0.0-beta.2",
+      "scope": "docs",
+      "document_count": 2093,
+      "bytes": 2327185,
+      "corpus_sha256": "ac9792d5bc4105ed721095fb28f08e6be3c76a63bbd1e394c97826a57e547c5c",
+      "license": "api-docs/LICENSE.asc-devkit (regenerated on export)"
+    },
+    {
+      "corpus": "api-docs/ops-nn-v9.0.0-beta.2.json.gz",
+      "repository": "https://gitcode.com/cann/ops-nn",
+      "revision": "f597f5b9a661711eb13d1fc5749f6ff900230a65",
+      "version": "v9.0.0-beta.2",
+      "scope": "docs",
+      "document_count": 407,
+      "bytes": 684874,
+      "corpus_sha256": "28b3d389bdd2c859dff09f5fd7968651edf868b6cf8dcbcb143483f347d77999",
+      "license": "api-docs/LICENSE.ops-nn (regenerated on export)"
+    },
+    {
+      "corpus": "api-docs/runtime-v9.0.0-beta.2.json.gz",
+      "repository": "https://gitcode.com/cann/runtime",
+      "revision": "330a3a72dd0836546e6a5d13d6ac2802f065b6ac",
+      "version": "v9.0.0-beta.2",
+      "scope": "docs",
+      "document_count": 614,
+      "bytes": 203803,
+      "corpus_sha256": "c9e319e9f2ec8e158e5b6272e86603cb3ede07908d318716277f13cc3282add2",
+      "license": "api-docs/LICENSE.runtime (regenerated on export)"
+    },
+    {
+      "corpus": "source-code/ops-blas-de9f1a4.json.gz",
+      "repository": "https://gitcode.com/cann/ops-blas",
+      "revision": "de9f1a415376a207850654041dd9d55b67a48d23",
+      "version": "commit de9f1a4 (2026-07-07); not a CANN release mapping",
+      "scope": "source",
+      "document_count": 701,
+      "bytes": 761003,
+      "corpus_sha256": "e4c0d371b8bdd2fdc47d48c15152963e6fd38d4c19ddb3ff118244e00ae1599f",
+      "license": "source-code/LICENSE.ops-blas (regenerated on export)"
+    },
+    {
+      "corpus": "source-code/ops-nn-v9.0.0-beta.2.json.gz.part00 + .part01",
+      "repository": "https://gitcode.com/cann/ops-nn",
+      "revision": "f597f5b9a661711eb13d1fc5749f6ff900230a65",
+      "version": "v9.0.0-beta.2",
+      "scope": "source",
+      "document_count": 11144,
+      "bytes": 12184634,
+      "corpus_sha256": "864eca8ebe8473d751b9f4b864aa011585c895835ba85c64b7cde2589ef7e01d (concatenated .part00+.part01)",
+      "part_sha256": {
+        "part00": "d2d664264c0d525ccc4765681f4ad47feb3bd4987a2330b37a67f6f5e1044bfa",
+        "part01": "19106375afc00d9cb5367d7fc4ce0870cabd20aaa423c7a64e61e9fc0d234cbe"
+      },
+      "license": "source-code/LICENSE.ops-nn (regenerated on export)"
+    },
+    {
+      "corpus": "source-code/ops-transformer-v9.0.0-beta.2.json.gz",
+      "repository": "https://gitcode.com/cann/ops-transformer",
+      "revision": "8270850b63f039cb6ba1814900df6992fe930f8d",
+      "version": "v9.0.0-beta.2",
+      "scope": "source",
+      "document_count": 6106,
+      "bytes": 10097981,
+      "corpus_sha256": "902e713c90ca2d6808c448ac397cf53d8e79a14595f4cdff4edf7ad77a26e4cb",
+      "license": "source-code/LICENSE.ops-transformer (regenerated on export)"
+    },
+    {
+      "corpus": "source-code/runtime-v9.0.0-beta.2.json.gz",
+      "repository": "https://gitcode.com/cann/runtime",
+      "revision": "330a3a72dd0836546e6a5d13d6ac2802f065b6ac",
+      "version": "v9.0.0-beta.2",
+      "scope": "source",
+      "document_count": 5007,
+      "bytes": 7226546,
+      "corpus_sha256": "3e77ab4ce8ba95bd177fe28469bb514e7871fdf4d72b07748898ba04735a040d",
+      "license": "source-code/LICENSE.runtime (regenerated on export)"
+    }
+  ]
+}

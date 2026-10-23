@@ -1,14 +1,14 @@
 # CANN Coredump Expert Report Template
 
-Use this template for the final answer. Write in Chinese by default and include concrete evidence, not only conclusions.
+Use the evidence and analysis sections to structure the final answer. Write in Chinese by default and include concrete evidence, not only conclusions. Default diagnosis replies explain confidence per claim and do not create scoring or archive files. The numeric score and case maintenance sections below apply only to an explicitly requested pipeline report or case maintenance task.
 
 ## 1. 问题摘要
 
-- 结论：`<一句话说明最可能原因；若证据不足，明确写“初步判断”。>`
+- 结论：`<已确认的直接机制、最可能的上游原因及尚未确定的细节；每项按实际证据表述。>`
 - 影响范围：`<进程/服务/模型/设备/版本/复现概率>`
 - 崩溃位置：`<模块/文件/函数/行号；未知则写未解析原因>`
 - 崩溃类型：`<SIGSEGV/SIGABRT/Device Stackcore/其他>`
-- 可信度：`<score>/100（HIGH/MEDIUM/LOW/INSUFFICIENT）`，详见第 10 节
+- 可信程度：`<已确认机制、上游候选和未决细节的证据及限制>`；流水线报告另附第10节评分
 
 ## 2. 输入材料与完整性
 
@@ -126,10 +126,10 @@ Use this template for the final answer. Write in Chinese by default and include 
 <gdb/asys/msnpureport/git/rg/readelf/addr2line 命令>
 ```
 
-## 10. 诊断可信度
+## 10. 流水线报告的完整性评分
 
 按 [confidence-assessment.md](confidence-assessment.md) 五维模型评分，
-用 `scripts/assess_confidence.py` 计算。
+用 `scripts/assess_confidence.py` 计算。总分描述材料完整程度，不代替逐项因果证据；缺证时仍保留已证实机制和有依据的候选根因，不自动补采。
 
 - 综合可信度：`<score>/100（HIGH/MEDIUM/LOW/INSUFFICIENT）`
 - 维度得分：证据完整性 `<x>`/25 · 证据一致性 `<x>`/20 · 因果链 `<x>`/25 · 复现验证 `<x>`/15 · 知识对齐 `<x>`/15
@@ -144,9 +144,9 @@ Use this template for the final answer. Write in Chinese by default and include 
 | 仍属推断 | `<推断内容 + 缺哪一步证据>` |
 | 已排除 | `<假设 + 排除依据>` |
 
-- 结论表述强度：`<可作定论 / 最可能原因 / 初步判断 / 仅给排查方向>`
+- 逐项证据状态：`<已确认机制 / 候选根因 / 未决细节及对应依据>`
 
-## 11. 案例库沉淀
+## 11. 案例维护任务的入库处置
 
 按 [case-contribution.md](case-contribution.md) 判定：
 
@@ -172,5 +172,5 @@ Before finalizing, check:
 - 是否给出源码仓 ref，而不只是文件名。
 - 是否避免在证据不足时下确定性结论。
 - 是否给出可执行的修复和验证建议。
-- 是否给出可信度分数、关键项是否满足，并区分「已证实」与「仍属推断」。
-- 是否给出案例库入库判定；判定为 accept 时是否已完成脱敏和重复检查。
+- 是否区分「已证实」与「仍属推断」，并说明各自证据；流水线报告另核对完整性分数与关键项。
+- 明确执行案例维护时，是否给出入库判定；判定为 accept 时是否已完成脱敏和重复检查。

@@ -29,6 +29,13 @@ run_pipeline = importlib.util.module_from_spec(spec)
 sys.path.insert(0, str(SCRIPT.parent))
 spec.loader.exec_module(run_pipeline)
 
+UNRELATED_CASE = (
+    "# Test fixture only\n\n"
+    "## CASE-100：通信超时\n\n"
+    "**关键日志特征**\n```\n"
+    "[ERROR][HCCL] EI0002 Communication_Error_Timeout\n```\n"
+)
+
 
 def load_detector():
     script = SCRIPT.parent / "detect_scenario.py"
@@ -44,10 +51,14 @@ class RoutingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "normal.txt"
             path.write_text("INFO job step completed\n", encoding="utf-8")
+            library = Path(temp) / "cases.md"
+            library.write_text(UNRELATED_CASE, encoding="utf-8")
             scan = detector.scan_input(path)
-            lookup = detector.lookup_cases(scan, "training interrupted")
-            plan = detector.build_plan(path, "training interrupted", case_lookup_result=lookup)
+            lookup = detector.lookup_cases(scan, "training interrupted", case_library=library)
+            plan = detector.build_plan(path, "training interrupted", case_library=library,
+                                       case_lookup_result=lookup)
         self.assertEqual(lookup["status"], "miss")
+        self.assertEqual(lookup["cases_examined"], 1)
         self.assertEqual(plan["case_lookup"]["status"], "miss")
         self.assertEqual(plan["primary"], "unknown")
         self.assertEqual(plan["route"]["pipeline_stages"], list(run_pipeline.STAGE_IDS))
@@ -278,13 +289,18 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "normal.txt"
             source.write_text("INFO job step completed\n", encoding="utf-8")
+            library = Path(temp) / "cases.md"
+            library.write_text(UNRELATED_CASE, encoding="utf-8")
             state = Path(temp) / "state"
             plan = Path(temp) / "plan.json"
-            lookup = detector.lookup_cases(source, "training interrupted")
+            lookup = detector.lookup_cases(source, "training interrupted", case_library=library)
             self.assertEqual(lookup["status"], "miss")
+            self.assertEqual(lookup["cases_examined"], 1)
             plan.write_text(json.dumps({
                 "input": {"path": str(source), "request": "training interrupted"},
-                "stages": {"clean": {"level": "DEBUG"}, "promote": {"enabled": False}},
+                "case_lookup": {"library_path": str(library)},
+                "stages": {"clean": {"level": "DEBUG"}, "promote": {"enabled": False},
+                           "diagnose": {"execution": "evidence_only"}},
             }, ensure_ascii=False), encoding="utf-8")
             command = [sys.executable, str(SCRIPT), "--plan", str(plan), "--state-dir", str(state)]
             first = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", timeout=30)

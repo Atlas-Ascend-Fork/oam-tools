@@ -1,6 +1,6 @@
 # CANN 日志规范
 
-> 本文档定义 Ascend NPU / CANN 8.5.0 各类日志的格式、字段含义和时序关系，用于日志清洗和分析阶段的正确解读。
+> 本文档提供常见日志格式和分析索引；具体字段、路径、默认值及行为需与现场版本、部署形态对应。下文简化序列是机制示意，不是所有版本都会打印的固定日志。
 > 官方参考：[日志简介（社区版 9.0.0-beta.2）](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900beta2/maintenref/logreference/logreference_0001.html) / [查看日志（Ascend EP）](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/900beta2/maintenref/logreference/logreference_0002.html)
 
 ## 通用日志格式
@@ -74,8 +74,7 @@ $HOME/ascend/log/
 | `debug/device-<id>/device-<pid>_*.log` | Device 侧调试日志 | AI CPU、HCCP 等 Device 侧组件 |
 | `run/device-<id>/device-<pid>_*.log` | Device 侧运行日志 | 同上（运行级别） |
 
-> **注意**：Device 侧应用类日志由 `slogd` 进程自动回传到 Host 侧（默认延时 2000ms）。若回传超时则直接在 Device 侧落盘。
-> **容器内**不支持查看 Device 侧系统类日志，也不支持通过 `msnpureport` 导出。
+> Device应用日志的回传与落盘取决于版本、配置及服务状态。容器内的设备可见性和权限也需核对；缺少系统日志时检查Host侧导出，不把容器内缺文件当作设备没有报错。
 
 ### 相关环境变量
 
@@ -84,8 +83,8 @@ $HOME/ascend/log/
 | `ASCEND_GLOBAL_LOG_LEVEL` | 设置全局日志级别（0=DEBUG, 1=INFO, 2=WARNING, 3=ERROR） | `export ASCEND_GLOBAL_LOG_LEVEL=1` |
 | `ASCEND_PROCESS_LOG_PATH` | 指定应用类日志落盘路径 | `export ASCEND_PROCESS_LOG_PATH=/data/logs` |
 | `ASCEND_SLOG_PRINT_TO_STDOUT` | 同时将日志打印到屏幕（1=开启） | `export ASCEND_SLOG_PRINT_TO_STDOUT=1` |
-| `ASCEND_HOST_LOG_FILE_NUM` | 每个进程保留的日志文件数（默认 10） | `export ASCEND_HOST_LOG_FILE_NUM=50` |
-| `ASCEND_LOG_DEVICE_FLUSH_TIMEOUT` | Device 侧日志回传到 Host 侧的超时时间（ms，默认 2000） | `export ASCEND_LOG_DEVICE_FLUSH_TIMEOUT=5000` |
+| `ASCEND_HOST_LOG_FILE_NUM` | Host日志文件留存数量；核对版本定义及有效值 | `export ASCEND_HOST_LOG_FILE_NUM=50` |
+| `ASCEND_LOG_DEVICE_FLUSH_TIMEOUT` | Device日志回传超时；核对版本支持及单位后设置 | 按现场版本文档配置 |
 | `ASCEND_LOG_SYNC_SAVE` | 日志拥塞时不丢弃日志（1=开启，影响性能） | `export ASCEND_LOG_SYNC_SAVE=1` |
 | `ASCEND_WORK_PATH` | 设置单机独享文件（含日志）的存储路径 | `export ASCEND_WORK_PATH=/workspace/rank0` |
 
@@ -116,8 +115,8 @@ plog-<pid>_<timestamp>.log
 
 | 字段名 | 示例 | 含义 |
 |--------|------|------|
-| `graph_id` | `graph_id=1` | 图唯一标识 |
-| `task_id` | `task_id=100` | 任务唯一标识 |
+| `graph_id` | `graph_id=1` | 图标识；结合进程、会话和生命周期解释，不代表图数量 |
+| `task_id` | `task_id=100` | 任务标识；结合设备、流、进程和生命周期关联，不是全局唯一或任务数量 |
 | `stream_id` | `stream_id=3` | 执行流编号（并行流） |
 | `op` / `op_type` | `op=MatMulV2` | 算子类型名称 |
 | `shape` | `shape=[1024,1024]` | Tensor 维度 |
@@ -128,24 +127,12 @@ plog-<pid>_<timestamp>.log
 
 ---
 
-## msnpureprot 日志规范
+## msnpureport 导出材料
 
-### 关键日志序列
+`msnpureport`是Device系统日志和其他维测信息导出工具，不是协议名。
+本技能的`msnpureprot`仅为采集脚本旧参数/目录名。导出方式见[全量采集流程](../../collect-skill/references/full-log-collection.md)。
 
-```
-[INFO][HOST] Send cmd to device, device_id=0, task_id=100, cmd_type=DISPATCH
-[INFO][DEVICE-0] Recv cmd, task_id=100, op=MatMulV2
-[INFO][DEVICE-0] Op execute done, task_id=100, retcode=0
-[INFO][HOST] Recv notify from device, task_id=100, retcode=0
-```
-
-### 关键字段
-
-| 字段名 | 含义 |
-|--------|------|
-| `device_id` | 设备编号（0~7） |
-| `cmd_type` | 命令类型（DISPATCH/SYNC/RESET） |
-| `retcode` | 设备侧返回码 |
+导出目录中的日志由Driver、Firmware、系统进程等不同组件产生，各有格式；Stackcore等二进制材料另需匹配的解析工具。保留原文件及来源层级，按实际字段关联设备和进程。设备ID范围取现场清单，不固定为0～7；不能虚构一套统一的Send/Recv协议日志作为缺失证据。
 
 ---
 
@@ -165,26 +152,22 @@ plog-<pid>_<timestamp>.log
 ## 日志时序关系
 
 ```
-宿主机时间       设备时间（可能有偏移，通常 < 1ms）
+宿主机时间       设备时间（偏移与漂移需核对）
     │                   │
     ├── Send cmd ───────►│
     │                   ├── Execute op
     │                   │    (time_cost)
     │◄─── Notify ───────┤
     │
-  total_time = send + execute + notify
+  Host观测跨度与Device执行时间分别定义和计算
 ```
 
-> **注意**：多设备场景下宿主机与设备时钟可能有微小偏移（通常 < 1ms），分析跨设备时序时需考虑此因素。
+> **注意**：先核对时钟来源、时区、同步/偏移、缓冲与异步上报。没有校准或关联事件时，不能将跨端时间戳直接排序为因果链。即使时间可比，首尾日志跨度也不等于kernel时长；使用匹配的开始/结束事件及同口径计时。
 
 ---
 
-## 日志轮转规则
+## 日志留存与轮转
 
-| 日志类型 | 单文件大小上限 | 保留文件数 | 存储路径 |
-|---------|-------------|----------|---------|
-| plog | 100 MB | 10 | `$HOME/ascend/log/plog/` |
-| slog/msnpureprot | 200 MB | 20 | `/var/log/npu/slog/` |
-| HCCL | 50 MB | 5 | `./hccl_logs/` |
+记录实际版本、有效日志路径、文件大小/数量配置及运行时环境变量。各组件可能采用不同轮转策略，不能用统一大小和保留数量解释日志缺失。本仓`src/asys/launch/asys_launch.py`还会设置`ASCEND_HOST_LOG_FILE_NUM=1000`，说明采集/复跑工具可能覆盖常规配置。
 
-> 长时间任务可能发生日志轮转，需采集全部轮转文件。
+盘点全部相关轮转和压缩文件，检查故障前后覆盖、运行用户与采集范围。文件缺失只说明当前材料不可见；需有轮转记录或配置/时间覆盖证据才归因为轮转，不能据此认定没有更早错误。

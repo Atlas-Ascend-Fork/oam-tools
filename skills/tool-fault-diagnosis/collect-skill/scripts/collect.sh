@@ -15,7 +15,7 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 # collect.sh — Ascend NPU 日志自动采集脚本
-# 用途：采集 msnpureprot、host、plog 日志到指定目录
+# 用途：复制本地 slog/CANN（旧名 msnpureprot）、host、plog 日志到指定目录
 # 平台：Ascend NPU, CANN 8.5.0, aarch64
 
 set -euo pipefail
@@ -39,7 +39,7 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --all                采集所有日志来源"
-    echo "  --msnpureprot        采集 msnpureprot 协议日志"
+    echo "  --msnpureprot        复制本地 slog/CANN 日志（旧参数名，不执行 msnpureport 导出）"
     echo "  --host               采集宿主机系统日志"
     echo "  --plog               采集 plog 框架日志"
     echo "  --output DIR         指定输出目录（默认：./logs）"

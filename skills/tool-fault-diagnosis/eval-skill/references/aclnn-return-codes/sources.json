@@ -1,0 +1,71 @@
+{
+  "scope": "Public ACLNN return-code definitions and descriptions; not AscendCL Runtime, internal Driver or process exit codes",
+  "files": [
+    {
+      "release": "v8.5.0",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "b27e949de1ce29df366a279adf3976f2660e669c",
+      "source_path": "include/nnopbase/opdev/op_errno.h",
+      "git_blob": "02634a93de8a653753c8a74c74913919d152fd89",
+      "local_path": "opbase-v8.5.0/include/nnopbase/opdev/op_errno_v8_5_0.h",
+      "bytes": 2080,
+      "sha256": "a142af4da24719f5b9a8c6c6269cd5cae77d43ca589882b4cb49c26a4eddb293",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v8.5.0",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "b27e949de1ce29df366a279adf3976f2660e669c",
+      "source_path": "docs/zh/nnopbase/opdev/aclnn返回码.md",
+      "git_blob": "de610ba47f04570146a509a9fcab11b64eb6accb",
+      "local_path": "opbase-v8.5.0/docs/zh/nnopbase/opdev/aclnn返回码.md",
+      "bytes": 30566,
+      "sha256": "2d0dcb23a68adfc6443feb294f9bb19d7a06b24f0c27c6165db5d36724c0e761",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v8.5.0",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "b27e949de1ce29df366a279adf3976f2660e669c",
+      "source_path": "LICENSE",
+      "git_blob": "483b705df4566bf0e3b725a1e5f83350089284fd",
+      "local_path": "opbase-v8.5.0/LICENSE",
+      "bytes": 5278,
+      "sha256": "cb282ac2b66d7d6734c3fb354db792b28cf23ab29fbc16d5cfd8bd542bedeb1e",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v9.0.0-beta.2",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "ed5bab5da501bc4af61d0518b70f9b3689582a74",
+      "source_path": "include/nnopbase/opdev/op_errno.h",
+      "git_blob": "93ddf9aa7374359ad6d0f883ff2012bb981f5b4d",
+      "local_path": "opbase-v9.0.0-beta.2/include/nnopbase/opdev/op_errno_v9_0_0_beta_2.h",
+      "bytes": 2249,
+      "sha256": "7f5feee5727751149ee5c72b9e8cc44af415a8b1b6bf3b98f8790d1eb12beda2",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v9.0.0-beta.2",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "ed5bab5da501bc4af61d0518b70f9b3689582a74",
+      "source_path": "docs/zh/nnopbase/opdev/aclnn返回码.md",
+      "git_blob": "de610ba47f04570146a509a9fcab11b64eb6accb",
+      "local_path": "opbase-v9.0.0-beta.2/docs/zh/nnopbase/opdev/aclnn返回码.md",
+      "bytes": 30566,
+      "sha256": "2d0dcb23a68adfc6443feb294f9bb19d7a06b24f0c27c6165db5d36724c0e761",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v9.0.0-beta.2",
+      "repository": "https://gitcode.com/cann/opbase.git",
+      "commit": "ed5bab5da501bc4af61d0518b70f9b3689582a74",
+      "source_path": "LICENSE",
+      "git_blob": "483b705df4566bf0e3b725a1e5f83350089284fd",
+      "local_path": "opbase-v9.0.0-beta.2/LICENSE",
+      "bytes": 5278,
+      "sha256": "cb282ac2b66d7d6734c3fb354db792b28cf23ab29fbc16d5cfd8bd542bedeb1e",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    }
+  ]
+}

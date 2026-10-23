@@ -1,6 +1,6 @@
 # 进程中断典型故障处理流
 
-> **执行入口**：入口场景 `crash`。已有 Host core、Device Stackcore、异常信号或明确进程中断记录时使用本流。只离线分析现有材料，不附加运行进程，不重新触发崩溃或抓取 core。现场解析（`gdb`/`asys analyze`）转为对已有 core/Stackcore 的离线解析。先读 [公共约定](common-flow.md)，特别是 §0 找首节点。
+> **执行入口**：入口场景 `crash`。已有 Host core、Device Stackcore、异常信号或明确进程中断记录时使用本流。只离线分析现有材料，不附加运行进程，不重新触发崩溃或抓取 core。现场解析（`gdb`/`asys analyze`）转为对已有 core/Stackcore 的离线解析。需要清洗或流水线产物时查 [公共约定](common-flow.md)。
 
 ## 问题现象
 
@@ -18,7 +18,7 @@ RuntimeError: CANN error, error code: ...
 
 ## 排查流程
 
-coredump 分为 **host coredump** 与 **device coredump** 两条线，各自有独立定位流程。默认 plog 部分卡有报错；若 plog 没有报错，优先上层分析。先判断本次中断属于哪条线，再进入对应子流程。
+coredump 按实际来源区分 **Host Linux core**、Host tracer Stackcore 与 **Device Stackcore**。按已有信号、进程及产物选择对应解析方法；plog 未报错只限制该来源的覆盖，不能据此确定责任在上层。
 
 ```mermaid
 flowchart TD
@@ -36,14 +36,15 @@ flowchart TD
     C4 -->|否| C7{能否锁定根因组件}
     C7 -->|是| C8[对应组件定位]
     C7 -->|否| C9[保留 undetermined]
-    D --> D0{是否确认 device core dump}
-    D0 -->|E39999 且 deviceos 无 error 日志| D1[找到 Device 报错原文]
-    D0 -->|plog 中 HDC send err ret 25| D1
-    D0 -->|否| D9[转其他流程]
+    D --> D0{是否有匹配的 Device 异常退出或 Stackcore}
+    D0 -->|有| D1[关联 Device 原文和进程]
+    D0 -->|仅 E39999/HDC关闭等线索| D8a[回查对端状态/清理/异常, 保留候选]
+    D0 -->|无 Device 证据| D9[继续其他现有中断证据]
+    D8a --> D1
     D1 --> D1a[按 plog 报错时间与 subProcPid 在 stackcore 目录定位 core 文件]
     D1a --> D2{是否有对应 core 文件}
-    D2 -->|是| D3[匹配版本对应 so 文件后用 stackview.sh 解析]
-    D2 -->|否| D4[核对 core 生成开关配置]
+    D2 -->|是| D3[核对版本/符号, 按实际可解析范围继续]
+    D2 -->|否| D4[核对生成/保存/导出/清理链路]
     D3 --> D5[首错组件分析]
     D5 --> D6{研发能否根据堆栈分析}
     D6 -->|是| D7[研发给结论]
@@ -53,26 +54,26 @@ flowchart TD
 | 顺序 | 证据 | 判断条件 | 下一步 | 中间过程记录 |
 | --- | --- | --- | --- | --- |
 | 1 | 信号、退出码、core 文件来源 | Host core / Device Stackcore | 进入对应线 | 记录信号类型、退出码、core 文件路径、来源是 Host 还是 Device |
-| 2a | 各 rank 退出时间、plog size、训练日志 | 有卡提前退出（未报超时 device 疑似退出；或 plog size 明显偏小；plog run 日志超时前有 `GEfinalize`；训练日志有业务报错 traceback） | 按 OOM/掉卡/通信流程定位该 rank | 记录提前退出 rank、退出时间与首报错时间对比、各 device plog size 对比、是否有 GEfinalize 打印、是否有 traceback |
-| 2b | core 文件、信号、堆栈、atrace、host message 日志 | 确认 Host 进程中断（训练日志 coredump 信号、atrace 堆栈、message 日志三重确认） | 继续 atrace 定位 | 记录 core 文件名、信号、是否有 atrace、message 日志是否记录 core 信号 |
-| 3 | atrace 日志 | 与 CANN 接口/资源相关 | 锁定根因组件 | 记录 atrace 中关键帧、是否涉及 CANN 接口 |
-| 4 | 堆栈归属 | 是否纯上层框架/业务 | 能确定→上层定位；不能→继续 | 记录堆栈中是否有 CANN 组件帧 |
-| 5 | 堆栈中 CANN 组件 | 能否锁定根因组件 | 锁定→对应组件；未锁定→undetermined | 记录组件归属（GE/ACL/HCCL/Runtime/驱动）、匹配符号状态 |
-| 6 | Device 报错原文、plog deviceos 日志 | 是否确认 device core dump：`E39999` 且 deviceos 无 error 日志，或 plog 中 `HDC send err ret(25)`/`hdc recv error 25` | 是→定位 core 文件；否→转其他流程 | 记录是否有 E39999、deviceos 是否有 error、是否有 HDC ret(25)/session has been closed、message 日志是否有 `Server destroy success` |
-| 6a | plog 报错时间、`slog/dev-os-*/debug/device-os/` 中 subProcPid | 在 `stackcore/dev-os-*/` 下按 subProcPid 匹配 core 文件 | 找到→解析；未找到→核对开关 | 记录报错 device_id、plog 报错时间、device-os 日志中的 subProcPid、stackcore 目录下 core 文件名是否含该 PID（如 `stackcore.aicpu_scheduler.<pid>.*`） |
-| 7 | Stackcore 存在性、版本对应 so 文件 | 有对应 core 文件且能匹配版本 so | 有→用 stackview.sh 解析；无→核对开关 | 记录 core 文件是否存在、core 生成开关状态、so 文件来源（aicpu_syskernels/aicpu_extend_syskernels/驱动包）、版本是否匹配 |
+| 2a | 各 rank 退出/进展、plog 覆盖、训练日志 | 按 PID/rank 关联真实退出记录及对应依赖；小文件、无超时或 `GEfinalize` 只作线索 | 有证据的退出原因按 OOM/掉卡/通信分支追踪，其他项保留未知 | 记录局部时间线、跨机时钟依据、清理与退出的区别及日志缺口 |
+| 2b | core 文件、信号、堆栈、atrace、host message 日志 | 用可用来源确认 Host 中断及实体关联，不要求固定三份材料 | 继续匹配符号和触发点 | 记录已提供的信号/产物及其范围，缺失来源不补造 |
+| 3 | atrace 日志 | 关键帧、接口及资源对应本次进程 | 定位直接执行点并继续追参数/生命周期 | 记录关键帧及符号可靠性，不将帧归属直接变成根因责任 |
+| 4 | 堆栈与对象来源 | 上层/CANN 帧及上游参数或写入关系 | 比较责任候选；缺帧不排除较早的破坏者 | 记录栈覆盖、参数流及反证 |
+| 5 | CANN 组件及更早事件 | 触发点是否与具体原因闭合 | 闭合→对应原因；未闭合→候选或undetermined | 记录直接组件、上游候选及证据边界 |
+| 6 | Device 原文、退出/信号记录、匹配 Stackcore | `E39999`、HDC 关闭和 `Server destroy success` 仅为候选线索，确认中断/core 须有对应证据 | 继续关联进程和材料；正常清理、外部终止及设备异常均按证据比较 | 记录原码、现场版本、PID/任务、关闭/退出状态与时间依据 |
+| 6a | plog 时间、Device组件及 subProcPid | 在 `stackcore/dev-os-*/` 按设备、PID和故障窗匹配core，防止PID复用 | 找到→核对符号；未找到→生成/保存/导出/清理链路 | 记录设备、时间、组件、PID和文件的对应关系 |
+| 7 | 已有 Stackcore、版本对应 so 和符号 | 分开判断core是否存在及符号是否匹配 | core存在且符号匹配→离线解析；缺/错符号→按地址/模块继续并记符号缺口；无core→核对保存链路 | 记录core实际状态、so/build-id来源和匹配范围；不把缺符号当成未生成core |
 | 8 | stackview.sh 解析后堆栈 | 首错组件 | 研发分析 | 记录首错组件、符号匹配状态、故障线程、故障地址、so 文件映射路径（如 `libaicpu_scheduler.so`/`libpt_kernels.so`） |
 | 9 | 研发分析记录 | 能否给结论 | 有→结论；无→hypothesis | 记录研发结论或"无研发记录" |
 
-每步的中间过程记录写入 `diagnosis.md` 的 `result.steps`，包含 step_id、检查内容、发现结果和下一步，便于追溯走到哪一步定位到问题。
+采用流水线产物模式时，每步过程写入 `diagnosis.md.result.steps`；默认诊断答复在正文说明关键核对过程及证据，不要求生成该文件。
 
 ### 判断属于哪条线
 
 | 判断依据 | host coredump | device coredump |
 | --- | --- | --- |
-| core/中断来源 | Host 侧进程 core（Linux core 文件）、SIGSEGV/SIGABRT | Device 侧 Stackcore、asys 输出、device 报错 |
-| 关键报错码/日志 | 训练日志中的 coredump 信号、atrace 记录的 core 信号与堆栈 | `E39999` 且 plog deviceos 日志无相应 error；或 plog 中 `HDC send err ret(25)`/`hdc recv error 25`（device 侧异常先释放 HDC 连接，message 日志有 `Server destroy success`） |
-| 前提材料 | plog、atrace 日志、host message 日志 | 能够收取 plog、device 日志 |
+| core/中断来源 | Host Linux core、Host tracer Stackcore 或 Host 信号记录，按真实来源解析 | 已关联 Device 的 Stackcore、异常退出/信号记录 |
+| 关键报错码/日志 | 训练日志信号、atrace 堆栈和 Host message 等可互证的来源 | `E39999`、HDC关闭或 server 销毁需回查具体事件；仅这些记录不确认 Device core |
+| 可用关联材料 | 已提供的 plog、atrace、message、core及退出记录 | 已提供的 plog、device、Stackcore及退出记录 |
 | 报错位置 | Host 进程堆栈 | Coredump 的 device 报错 |
 
 两条线可能同时存在；按任务关联和时间线区分本次主中断与传播，不按固定优先级覆盖较早事件。退出码 137 仅为 SIGKILL 线索，不能确认段错误或 OOM；退出状态含义结合 shell/容器/调度器原始记录核对。明确 Python 异常退出与 native signal core 分开记录；框架最后一条异常可能是此前 Device/OOM 故障的传播。
@@ -84,9 +85,11 @@ flowchart TD
 1. 从退出记录、信号文本和应用日志确定可确认的中断事实，并在 `first_error` 中引用原始位置；
 2. 以崩溃前后的日志、线程/任务标识和时间窗建立可见时间线，无法定位的事件保留为 `unknown`；
 3. 将"直接触发位置"与"上游根因"分别标记。只有信号而无访问地址或调用链时，`root_cause.status` 使用 `hypothesis` 或 `undetermined`；
-4. 在 `evidence_gaps` 说明缺失的 core、符号或版本信息及其影响，照常输出 `diagnosis.md`，不以缺少文件为由跳过诊断。
+4. 说明缺失的 core、符号或版本信息及其影响，照常交付诊断；流水线将缺口与结论写入 `diagnosis.md`，不以缺少文件为由跳过诊断。
 
 Python 异常栈只反映解释器层面的退出路径；除非有 native 信号、core 或设备错误与其形成时序和实体关联，否则不将 Python 最后一条异常升级为 native 崩溃根因。
+
+题面给出“传入空参数后SIGSEGV”时，可优先检查接口与调用者的空参处理，并给出条件修复。没有调用栈、故障指令和参数流时，库内解引用、调用者误用返回值以及具体发生在GetWorkspaceSize或执行段均需继续区分；初始化成功、缺少校验ERROR日志或未见device执行记录不能证明具体崩溃帧。首段定位沿用这一范围，不能先指定函数和责任方，再只在末尾声明未知。寄存器与gdb命令按core架构选择，不将x86的`rip`套用到AArch64现场。
 
 ## 证据盘点
 
@@ -104,10 +107,10 @@ Python 异常栈只反映解释器层面的退出路径；除非有 native 信�
 
 | 子检查 | 离线核对内容 |
 | --- | --- |
-| 如何打开 core 文件生成开关 | 核对已有配置是否开启：`core_pattern` 是否指向有效目录（如 `/npu/core_file/core.%t.%e.%p`）、`suid_dumpable` 是否为 1、`ulimit -c` 是否为 unlimited、device coredump 配置是否开启。未开启是 core 缺失的原因，写入 `evidence_gaps` |
-| 如何确定是否有卡提前退出 | host coredump 伴随两种现象：部分卡 plog 上报超时、或所有卡 plog 均未报错。按各 rank 退出时间与首报错关系判断：通信阶段 device 退出时未退出 device 会上报超时，找到未上报超时的 device；所有卡均未报错时按 `plog/run` 目录下各 device plog 的 size 分析，size 明显小于其他 device 的疑似提前退出。进程提前退出时 plog run 日志在超时时间点之前有 `GEfinalize` 打印，训练日志有业务报错 traceback |
-| 判断是否为 host Core Dump | 按三重依据判定：训练日志中是否有 coredump 信号（结合常见信号及原因判断）；atrace 日志是否记录 core 信号与堆栈信息；业务日志未记录时结合 host message 日志判断。三者综合确认是否为 host coredump |
-| 如何确定为 device core dump | 报错码为 `E39999` 且 plog deviceos 日志无相应 error 日志时大概率是 device coredump（一般 core 在 aicpu）；若无 `E39999`，plog 中有 `HDC send err ret(25)`/`hdc recv error 25` 打印，且 message 日志中 HDC 组件有 `Server destroy success` 的 info 级别提示，表示 device 侧异常先释放 HDC 连接导致 HCCP host 侧下发 opcode 报错 -25（session has been closed） |
+| core 文件生成与保存条件 | 先区分 Host Linux core、Host tracer Stackcore 和 Device Stackcore。Host 核对故障进程实际 RLIMIT、dumpable、`core_pattern` 的直接文件/管道处理器模式，以及目录权限、存储、处理器和清理/导出记录；有限上限可允许生成，管道模式按内核/处理器语义核对。普通进程不要求 `suid_dumpable=1`，该项针对受保护进程。Device 按对应版本配置核对。只有具体阻断/失败记录支持时才确认 core 缺失原因，否则记缺口；不修改现场配置 |
+| 如何确定是否有卡提前退出 | 按同一 PID/rank 的实际退出、信号、调度及进展记录核对生产者是否失去推进能力。小 plog、无超时报错和 `GEfinalize`/析构仅作覆盖或清理线索，不证明进程退出；关联时保留跨主机时钟误差和日志缺口 |
+| 判断是否为 Host Core Dump | 用实际信号、Host core、atrace、应用或 message 等可用来源交叉核对；信号事实、转储已生成与文件已收集分别记录，不设固定材料数量前置条件 |
+| 如何确定为 Device core dump | 核对匹配的 Device 进程异常退出/信号、Stackcore 和具体日志；`E39999` 或 HDC session closed/server 销毁不独自证明崩溃、先后或 core 已生成。正常清理、外部终止及上游故障的传播仍需区分，数字返回码按现场版本核对 |
 | 如何找到对应业务的 core 文件 | device 日志 slog 同级目录下有 `stackcore` 文件夹，进入后找到 core dump 的 device id，`stackcore/dev-os-*/` 下有 `stackcore.aicpu_scheduler.*` 的 core 文件（可能有多个）。按 plog 报错时间点，在 `slog/dev-os-*/debug/device-os/` 中根据 `subProcPid` 找到对应组件报错，再回到 `stackcore/dev-os-*/` 下匹配文件名包含该 subProcPid 的 core 文件 |
 | 如何解析 core 文件确定问题组件 | 解析 core 文件需匹配版本对应的 so 文件：按现网报错版本找到对应 opp 包解压；core 在 aicpu 组件找 `Ascend910-aicpu_syskernels.tar.gz`，core 在其他组件找 `Ascend910-aicpu_extend_syskernels.tar.gz`，部分 so 文件在驱动包的 `filesystem-le.cpio.gz` 中。将对应 so 文件与 core 文件放同级目录后，用 `stackview.sh -c <core文件> -p ./` 解析。解析后根据堆栈中 so 文件归属（如 `libaicpu_scheduler.so`/`libpt_kernels.so`）定位首错组件，交组件研发进一步分析 |
 | 首错组件分析 | 从解析堆栈/日志中定位首报错组件（GE/ACL/HCCL/Runtime/驱动等），区分首错与传播 |
@@ -126,9 +129,18 @@ Python 异常栈只反映解释器层面的退出路径；除非有 native 信�
 
 先解释直接触发点，再追上游原因。崩溃线程可能只是受害者；没有既有分配/写入证据时，不凭终点栈推定上游内存破坏者。
 
+ACLNN 二阶段执行附近的重复释放或对象失效，按
+[executor 所有权规则](../crash-reference.md#aclnn-executor-所有权与重复释放)
+区分普通自动释放与已启用复用后的显式销毁，结合实际对象/调用记录提出对应修复。
+
+`strcmp`、`memcpy` 等栈顶也可能访问非空的悬空、越界或损坏地址，不能只凭函数名
+确认空指针或库内责任。ABI 参数寄存器约定适用于调用入口；例如 AArch64 的
+`x0-x7` 在函数内部可存中间值，故障点需结合反汇编和数据流恢复实际操作数。
+x86 的 `MOVAPS`/`#GP` 与空信号地址需按[架构语义](../crash-reference.md#x86-对齐异常与信号地址)区分，不能用 `addr=(nil)` 直接反推出有效地址或寄存器值。
+
 ## 子步骤产物
 
-每步更新同一个 `diagnosis.md.result.steps`，包含公共状态、输入/证据引用、缺口与 next_step。
+流水线模式每步更新同一个 `diagnosis.md.result.steps`，包含公共状态、输入/证据引用、缺口与 next_step。
 
 | step_id | 执行动作 | findings 必含字段 |
 | --- | --- | --- |

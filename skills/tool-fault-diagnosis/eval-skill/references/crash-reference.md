@@ -1,346 +1,137 @@
 # 进程中断（Crash）专项诊断参考
 
-> **执行入口**：本页为离线分析参考，只分析已有材料，不执行现场命令、不附加运行进程、不重新触发崩溃或抓取 core。现场命令（`gdb`、`asys analyze`、`cat core` 等）转为对已有 core/Stackcore 文件的离线核对项。已有对应结果时可引用；缺失则记录 evidence_gaps 与结论边界，继续其他现有证据。
-
-> 本文档面向 CANN 日志中的进程中断问题，整理
-> 排查流程、关键证据和典型问题案例。用于分析 `Segmentation fault`、
-> `Aborted`、`E39999`、`HDC send err ret(25)`、`GEfinalize` 和 core dump 定位。
-
-## 目录
-
-- [问题现象](#问题现象)
-- [关键日志字段](#关键日志字段)
-- [证据收集](#证据收集)
-- [排查流程](#排查流程)
-- [分支说明](#分支说明)
-- [结论边界](#结论边界)
-- [案例库](#案例库)
+本页保留日志索引和机制线索。诊断步骤、首错关联、责任边界和验证状态统一见
+[进程中断处理流](fault-flows/crash-flow.md)，core 关联及保存条件见
+[Coredump 参考](coredump-reference.md)。只离线分析已有材料，不附加运行进程、
+修改转储配置或重新触发崩溃。
 
 ## 问题现象
 
-常见入口包括：
+`Segmentation fault`、`Aborted`、native 信号、明确的进程退出或 core 可作为
+中断入口。Python 异常退出、Host Linux core、Host tracer Stackcore 和 Device
+Stackcore 按来源区分，不能因名称含 core 就使用同一种解析方法。
 
-```text
-Segmentation fault (core dumped)
-Aborted (core dumped)
-Fatal Python error: Segmentation fault
-RuntimeError: CANN error, error code: E39999
-HDC send err ret(25)
-Server destroy success
-GEfinalize
-# 有时无明显报错，进程直接消失
-```
-
-退出码参考：139 = SIGSEGV（段错误），134 = SIGABRT（异常终止），137 = SIGKILL（被杀，
-可能是 OOM Killer，但不等于 OOM）。
-
-进程中断分为 **host coredump** 与 **device coredump** 两条线。host coredump 一般伴随
-两种现象：部分卡 plog 上报超时，或所有卡 plog 均未报错。device coredump 一般 core 在
-aicpu，报错码为 `E39999` 且 plog 的 deviceos 日志没有对应 error 日志。先判断本次中断
-属于哪条线，再进入对应子流程。
+常见 shell 的 `139/134/137` 可分别提示 SIGSEGV/SIGABRT/SIGKILL，但须核对实际
+退出状态、容器或调度记录；程序也可能主动返回该数值。SIGKILL 不证明 OOM，
+SIGSEGV 不独自证明空指针，SIGABRT 需追断言或主动 abort 的上游条件。
 
 ## 关键日志字段
 
-| 字段 | 含义 | 使用方式 |
+| 信号 | 解释与核对 |
+| --- | --- |
+| `E39999` | 读取具体详情、现场版本与 Device 进程状态；单码及无 deviceos ERROR 不确认 Device core |
+| `HDC send err ret(25)` / `hdc recv error 25` | 核对该版本返回值及关联会话；若详情为 closed，只确认关闭状态，继续查原因 |
+| `-25` / `session has been closed` | 关闭线索；正常销毁、取消、外部终止和异常均需按具体记录比较 |
+| `Server destroy success` | server 销毁记录，不证明崩溃或谁先关闭 |
+| `GEfinalize` / `GEFinalize` | GE 资源清理，不单独证明进程退出；须关联 PID/rank 和真实退出记录 |
+| `subProcPid` | Device 子进程关联线索，须同时匹配设备、故障时间窗和组件，防止 PID 复用 |
+| `stackcore.aicpu_scheduler*` | 一类 Stackcore 命名线索，不代表所有版本固定命名，也不说明根因已定位 |
+| atrace / native 栈 | 记录来源、故障线程、符号匹配及覆盖；存在 CANN 帧不直接确认责任，缺少 CANN 帧不排除更早写入者 |
+
+## 证据与定位
+
+核对已有 input、stdout、plog、device、atrace、message、退出记录及 core 的时间与
+实体；没有某类材料时说明限制，继续分析可见机制。缺少超时日志或 plog 较小只
+提示覆盖、退出或进展差异，不能直接认定某 rank 先退出。
+
+定位 core 时沿 Device/组件、时间窗和 `subProcPid` 到
+`slog/dev-os-*/debug/device-os/` 与 `stackcore/dev-os-*/`；同名 PID 不能替代事件
+匹配。符号和 exe/so 核对架构、build-id、版本及加载映射，再解释故障指令和栈帧。
+已有文件的离线命令见 [命令手册](coredump-command-playbook.md)。
+
+栈顶只定位观测时执行点。`strcmp`/`memcpy` 还可能访问悬空、越界或损坏的非空
+地址；对象分配、释放、参数流或更早写入者可能不在当前栈。ABI 入参寄存器在
+函数内部可被改写，不能把故障点寄存器直接等同原始入参。先解释直接失败，再
+比较有证据的上游原因及相应条件修复。
+
+### ACLNN executor 所有权与重复释放
+
+ACLNN 二阶段调用附近出现 `double free`、释放时崩溃或悬空对象时，核对
+`aclOpExecutor` 的模式和调用顺序。官方 opbase v8.5.0 与 v9.0.0-beta.2 的契约为：
+
+| 模式 | 生命周期 | 对应检查与修复 |
 | --- | --- | --- |
-| `E39999` | device core dump 错误码（core 在 aicpu） | 结合 plog deviceos 日志无 error 判断是否 device coredump |
-| `HDC send err ret(25)` | HDC 发送错误返回码 25 | 无 `E39999` 时在 plog 中查找此打印，表示对端 device session 已关闭 |
-| `Server destroy success` | HDC 组件 info 级日志 | message 日志中出现表示 device 侧已销毁 hdc server |
-| `-25` / `session has been closed` | HCCP host 侧 opcode 错误 | 表示对端（device）session 被关闭，非 host 侧 HDC 问题 |
-| `GEfinalize` | 进程结束标记 | plog run 日志中超时时间点之前出现此打印，表示进程提前退出 |
-| `subProcPid` | device 子进程 PID | 在 `slog/dev-os-*/debug/device-os/` 中定位报错组件，匹配 core 文件名 |
-| `stackcore.aicpu_scheduler*` | device core 文件命名模式 | 在 `stackcore/dev-os-*/` 目录下查找对应 core 文件 |
-| `core.%t.%e.%p` | host core 文件命名格式 | `%t`=时间戳，`%e`=可执行文件名，`%p`=PID |
-| 信号类型 | coredump 信号 | 训练日志/atrace/host message 日志中记录的信号及堆栈 |
-| atrace 堆栈 | host 侧调用栈 | host coredump 时 atrace 日志记录 core 信号与堆栈信息 |
+| 普通、未启用复用 | 一阶段生成 executor，二阶段由框架自动释放 | 若调用方在二阶段后再次销毁或使用该 executor，修正重复释放/使用；新一轮执行取得新的 executor |
+| 已成功启用复用 | 一阶段后立即调用 `aclSetAclOpExecutorRepeatable`，二阶段保留 executor | 使用结束后由调用方以 `aclDestroyAclOpExecutor` 销毁；检查重复销毁、过早销毁及未清理 |
 
-## 证据收集
+先从已有源码、调用记录或有效栈确认释放的对象与复用设置是否成功。
+只有 ACLNN 附近的 allocator 报错时，可将 executor 所有权列为有 API 依据的
+优先检查方向，同时保留 tensor、workspace 或更早内存破坏等有依据的候选；
+不能直接宣布 executor 就是被重复释放的对象。`free()` 栈顶也不证明 glibc 缺陷。
+失败返回不表示调用方必然仍拥有 executor：公开实现的部分错误分支同样销毁对象，
+应核对匹配版本、实际 API 路径及返回分支，再决定清理方式。
 
-至少收集以下材料：
+修复后在原调用方式下核对资源释放次数和完整运行结果；若要切换为复用模式，
+先确认对应算子和调用满足该版本的复用约束，不能仅为绕开崩溃盲目启用。
+executor 的 Host 管理规则不证明异步 Device 任务已完成，也不替代输入、输出和
+workspace 各自的有效期检查。
 
-1. 故障时间窗内的完整 CANN plog，包括 `plog/run` 和 `plog/debug` 目录。
-2. 训练打屏日志（stdout），用于查找业务报错 traceback 和 coredump 信号。
-3. atrace 日志（host coredump 时记录 core 信号与堆栈）。
-4. host message 日志（业务日志未记录时作为 fallback 判断 host coredump）。
-5. device 日志：`slog/dev-os-*/debug/device-os/`，用于按 `subProcPid` 匹配 core 文件。
-6. `stackcore/dev-os-*/` 目录下的 `stackcore.aicpu_scheduler*` 文件。
-7. core 文件生成开关配置记录：`ulimit -c`、`core_pattern`、device coredump 配置。
-8. 现网报错版本对应的 opp 包（用于解析 core 文件时匹配 so 文件）。
-9. CANN、Driver、Firmware、芯片型号和框架版本。
-10. 多卡场景的 rank、主机、Device、PID 映射及各 rank 退出时间。
+来源：[v8.5.0 销毁契约](https://gitcode.com/cann/opbase/blob/b27e949de1ce29df366a279adf3976f2660e669c/docs/zh/nnopbase/aclnn/aclDestroyAclOpExecutor.md)、
+[复用约束](https://gitcode.com/cann/opbase/blob/b27e949de1ce29df366a279adf3976f2660e669c/docs/zh/nnopbase/aclnn/aclSetAclOpExecutorRepeatable.md)、
+[v9.0.0-beta.2 销毁契约](https://gitcode.com/cann/opbase/blob/ed5bab5da501bc4af61d0518b70f9b3689582a74/docs/zh/nnopbase/aclnn/aclDestroyAclOpExecutor.md)。
+普通与复用分支见两个发布版的 `src/nnopbase/composite_op/aclnn_engine/op_executor.cpp`
+中 `CommonOpExecutorRun`，显式销毁见 `src/nnopbase/common/api/acl_op_api.cpp`。
+这些公开标签不保证对应所有商用包或后续版本，使用时核对现场配套。
 
-不能获得某项材料时，在报告中明确写为"未提供"，不要用猜测填补。
+### x86 对齐异常与信号地址
 
-## 排查流程
+x86 的 SSE `MOVAPS` 内存操作数要求 16 字节对齐，未对齐可触发 `#GP`。
+Linux x86 的用户态 `#GP` 路径可生成 `SIGSEGV/SI_KERNEL`，此路径不提供实际
+访存地址。因此报告中的 `addr=(nil)` 不总是指令访问了地址零，也不能反解
+出基址寄存器；用假设的零地址做减法或对齐运算只验证该假设下的算术。
+需结合匹配指令、现场寄存器、`si_code`/trap 信息和映射区分地址映射、对齐及
+其他保护异常；缺这些值时保留分支，不写“已验证空指针”或“已排除对齐”。
 
-```mermaid
-flowchart TD
-    A[收到进程中断信号/退出码/core 文件] --> B{core 来源判断}
-    B -->|Host 侧 core/SIGSEGV/SIGABRT| C[Host coredump 线]
-    B -->|Device Stackcore/device 报错| D[Device coredump 线]
-    C --> C1{是否有卡提前退出}
-    C1 -->|是| C1a[按其他问题流程定位该 rank]
-    C1 -->|否| C2[确定业务是否为 host core dump]
-    C2 --> C3{atrace 日志能否定位根因组件}
-    C3 -->|是| C4[锁定根因组件]
-    C3 -->|否| C5{能否确定与 CANN 无关}
-    C5 -->|是| C6[上层框架或业务侧定位]
-    C5 -->|否| C7{能否锁定根因组件}
-    C7 -->|能| C8[对应组件定位]
-    C7 -->|否| C9[核对 core 文件生成开关配置]
-    C9 --> C4
-    D --> D1[找到 Coredump 的 device]
-    D1 --> D2{报错业务是否有对应 core 文件}
-    D2 -->|是| D3[解析 core 文件]
-    D2 -->|否| D4[首错组件分析]
-    D3 --> D5[对应组件研发根据堆栈分析原因]
-    D4 --> D5
-```
+替包前后的一次成功/失败支持该输入的构建或依赖差异候选，不能据此推广为
+所有调用方必崩或整个包已定责。比较相同复现条件、实际加载库、构建选项及
+对象/栈对齐；回退后的业务结果和包级影响范围分别验证。
 
-| 顺序 | 证据 | 判断条件 | 下一步 | 中间过程记录 |
-| --- | --- | --- | --- | --- |
-| 1 | 信号、退出码、core 文件来源 | Host core / Device Stackcore | 进入对应线 | 记录信号类型、退出码、core 文件路径、来源是 Host 还是 Device |
-| 2 | 各 rank plog 退出时间、plog size | 是否有卡提前退出 | 有→按其他问题流程定位；无→继续确认 host core dump | 记录提前退出 rank、plog size 对比、退出时间与首报错时间对比；查找 `GEfinalize` 打印和业务 traceback |
-| 3 | 训练日志、atrace、host message 日志 | 确认是否为 host core dump | 是→继续锁定组件；否→按其他问题流程 | 记录 core 信号、atrace 堆栈关键帧、是否有 host message 日志佐证 |
-| 4 | atrace 日志堆栈 | 能否确定与 CANN 无关 | 能→上层框架/业务定位；否→继续锁定根因组件 | 记录堆栈中是否涉及 CANN 接口/组件、堆栈归属 |
-| 5 | 堆栈中 CANN 组件归属 | 能否锁定根因组件 | 能→对应组件定位；否→核对 core 生成开关并保留 | 记录组件归属（GE/ACL/HCCL/Runtime/驱动）、符号匹配状态 |
-| 6 | Device 报错原文、`E39999`、`HDC send err ret(25)` | 是否为 device core dump | 是→找到 coredump 的 device；否→其他流程 | 记录 device_id、错误码、plog deviceos 是否有 error 日志、`Server destroy success` 是否出现 |
-| 7 | `stackcore/dev-os-*/` 目录、`subProcPid` | 报错业务是否有对应 core 文件 | 有→解析 core 文件；无→首错组件分析 | 记录 core 文件路径、subProcPid 匹配结果、core 文件数量 |
-| 8 | 解析后堆栈（stackview.sh / asys） | 首错组件 | 研发根据堆栈分析原因 | 记录首错组件、符号匹配状态、故障线程、故障地址、so 文件来源 |
+来源：[Intel SDM Volume 2B，MOVAPS](https://cdrdv2.intel.com/v1/dl/getContent/671241)；
+Linux v6.12 的 [gp_user_force_sig_segv](https://github.com/torvalds/linux/blob/v6.12/arch/x86/kernel/traps.c#L684)
+与 [force_sig](https://github.com/torvalds/linux/blob/v6.12/kernel/signal.c#L1666)。
+这些说明限定于相应指令和操作系统路径，不把 x86 语义套到 AArch64，也不证明
+现场就是 `#GP`。
 
-每步的中间过程记录写入 `diagnosis.md` 的 `result.steps`，包含 step_id、检查内容、
-发现结果和下一步，便于追溯走到哪一步定位到问题。
+## 机制索引
 
-## 分支说明
+以下 C001-C005 保留原编号用于检索；本库没有其完整原始现场、修复和复跑记录，
+它们是机制参考，不是已验证案例或本次命中证明。
 
-### 是否有卡提前退出
+| 编号 | 方向 | 区分所需证据 |
+| --- | --- | --- |
+| C001 | AICPU/Device 中断 | 关联 Device 异常退出、信号或 Stackcore；不能仅用 E39999 和日志缺失 |
+| C002 | HDC 关闭与 Device 状态 | 会话、任务及关闭/退出顺序，区分正常清理和异常传播 |
+| C003 | 某 rank 提前退出后其他 rank 等待 | 真实退出原因、生产者依赖、参与集合及可靠时序 |
+| C004 | TDT 相关 Device 中断 | 匹配的组件、subProcPid、故障时窗、Stackcore 与符号 |
+| C005 | core 材料缺失 | 实际生成/保存/导出/清理证据及转储模式，不由文件未找到反推开关 |
 
-host coredump 一般伴随两种现象：部分卡 plog 上报超时，或所有卡 plog 均未报错。
+### C001：AICPU/Device 中断
 
-- **部分卡上报超时**：未退出的 device 会上报超时。找到未上报超时的 device，结合训练日志
-  和 `plog/run` 目录日志分析，确定是否提前退出。plog run 日志中超时时间点之前有
-  `GEfinalize` 打印、训练日志有业务报错 traceback，则确认提前退出。
-- **所有卡 plog 均未报错**：比较 `plog/run` 目录下各 device 对应 plog 的 size，size 明显
-  小于其他 device 的为疑似提前退出卡，再结合训练日志和 plog 进一步分析。
+匹配的异常退出或 Stackcore 支持 Device 中断。继续定位故障线程、指令与参数，
+区分直接触发和上游原因；没有 core 时仍可解释已有异常，不编造源码位置。
 
-提前退出判断需要 plog 和训练日志联合证据，不能仅凭单一来源定论。`GEfinalize` 必须出现在
-超时时间点之前才表示提前退出。plog size 最小仅为快速锁定方法，不是最终确认。
+### C002：HDC 会话关闭
 
-### 判断是否为 host Core Dump
+HDC 也在正常析构时关闭。先关联会话和任务，再核对对端活动、取消、退出或
+异常记录。关闭不能直接确认 Device 崩溃，也不能据此排除 Host/HDC 路径。
 
-三种方法交叉确认：
+### C003：提前退出与等待传播
 
-1. 训练日志中是否有 coredump 信号（如 `Segmentation fault`、`Aborted`），根据常见
-   coredump 信号及其原因判断是否为 host coredump。
-2. host coredump 时 atrace 日志会记录 core 的信号以及堆栈信息。
-3. 业务日志未记录时，结合 host message 日志判断是否为 host coredump。
+以真实退出记录和任务依赖证明参与者无法推进后，追其 OOM、信号、业务异常或
+外部终止原因。GE 清理、析构、文件大小和未报超时只提供检索线索。
 
-### 判断是否为 device core dump
+### C004：TDT 相关中断
 
-- **有 `E39999`**：报错码为 `E39999` 且 plog 的 deviceos 日志没有对应 error 日志，大概率
-  是 device coredump（core 在 aicpu）。
-- **无 `E39999`**：plog 日志中查找 `HDC send err ret(25)` 打印；message 日志中查找 HDC
-  组件 info 级日志 `Server destroy success`。机制为 device 侧 core → 进入销毁流程 → 释放
-  资源（包括销毁 device 侧创建的 hdc server）→ HCCP host 侧通过 hdc 通道下发 opcode 报错
-  `-25`（session has been closed，表示对端 device session 被关闭）。
+组件名和 PID 帮助找到材料；故障是否由 TDT 内部逻辑、输入、生命周期或其他
+路径引起，需匹配栈、指令和更早事件，不由当前组件名直接定责。
 
-`-25` 错误表示对端（device）session 已关闭，不是 host 侧 HDC 问题。`E39999` 路径是"大概率"，
-不是绝对定论。
+### C005：core 材料缺失
 
-### 如何找到对应业务的 core 文件
-
-1. device 日志 slog 同级目录下有 `stackcore` 文件夹，进入后找到 core dump 的 devid。
-2. `stackcore/dev-os-*/` 目录下有 `stackcore.aicpu_scheduler*` 文件，可能有多个 core 文件。
-3. 根据 plog 报错时间点，在 `slog/dev-os-*/debug/device-os/` 中找到报错组件，读取其
-   `subProcPid`。
-4. core 文件名中包含对应 `subProcPid` 值的即为该报错业务生成的 core 文件。
-
-### 如何解析 core 文件
-
-1. 将对应 core 文件取回本地（可直接 cat core 文件内容，复制到本地）。
-2. 根据现网报错版本找到对应的 opp 包并解压。
-3. 区分组件类型找 so 文件路径：
-   - core 在 aicpu 组件 → 找 `Ascend910-aicpu_syskernels.tar.gz`
-   - core 在其他组件 → 找 `Ascend910-aicpu_extend_syskernels.tar.gz`
-   - 部分 so 文件在驱动包中 → 找 `filesystem-le.cpio.gz`
-4. 将 so 文件和 core 文件放在同级目录下。
-5. 在存放 core 文件和 so 文件的目录下运行 `stackview.sh` 解析 core 文件。
-
-解析 core 文件通常由 AICPU 调度器团队找到对应组件，由组件研发进一步解析 core 文件分析。
-工具无法解析时，不要把工具失败改写成根因，应补齐版本、符号或编译产物。
-
-### 如何打开 core 文件生成开关
-
-host 需要手动先打开 core 文件生成开关，必须在 host core dump 发生之前完成：
-
-- 核对 core 文件输出目录是否已创建（如 `/npu/core_file/`）。
-- 核对 `core_pattern` 是否配置为带时间戳/可执行文件名/PID 的格式（如
-  `core.%t.%e.%p`）。
-- 核对 `suid_dumpable` 是否已启用。
-- 核对 `ulimit -c` 是否设置为 unlimited。
-
-未开启 core 生成开关是 core 文件缺失的原因，应写入 `evidence_gaps`。
-
-### 无 core 或符号不可用时
-
-没有 Host core、Device Stackcore 或可读符号时，仍按本流程完成诊断：
-
-1. 从退出记录、信号文本和应用日志确定可确认的中断事实。
-2. 以崩溃前后的日志、线程/任务标识和时间窗建立可见时间线，无法定位的事件保留为
-   `unknown`。
-3. 将"直接触发位置"与"上游根因"分别标记。只有信号而无访问地址或调用链时，根因状态使用
-   `hypothesis` 或 `undetermined`。
-4. 在 `evidence_gaps` 说明缺失的 core、符号或版本信息及其影响。
-
-Python 异常栈只反映解释器层面的退出路径；除非有 native 信号、core 或设备错误与其形成
-时序和实体关联，否则不将 Python 最后一条异常升级为 native 崩溃根因。
+按 [core 保存条件](coredump-reference.md#core-生成与保存条件)核对实际模式。
+未找到文件先记材料缺口；已有配置或处理器失败证据支持时才确定缺失原因。
 
 ## 结论边界
 
-- 退出码 137 仅为 SIGKILL 线索，不能确认段错误或 OOM；退出状态含义结合 shell/容器/调度器
-  原始记录核对。
-- `E39999` 路径是"大概率"device coredump，不是绝对定论，须结合 plog deviceos 无 error
-  日志交叉确认。
-- `HDC send err ret(25)` 和 `Server destroy success` 表示 device 侧已进入销毁流程，不等于
-  host 侧 HDC 故障。
-- `GEfinalize` 必须出现在超时时间点之前才表示提前退出；之后出现是正常结束流程。
-- plog size 最小仅为快速锁定疑似异常 device 的方法，不是最终确认，须结合训练日志和 plog
-  进一步分析。
-- core 文件名 `subProcPid` 匹配是定位对应业务 core 文件的依据，但 core 文件存在不等于
-  根因已定位。
-- 堆栈解析中 `??` 帧通常表示缺少符号、卸载的共享库、stripped 二进制、exe/core 不匹配或
-  栈损坏，不能直接跳过。
-- 没有复现、修复后复跑和回归结果时，不得声明根因或解决方案已验证。
-- 两条线（host/device）可能同时存在；按任务关联和时间线区分本次主中断与传播，不按固定
-  优先级覆盖较早事件。
-
-## 案例库
-
-案例库只收录已给出问题现象、定位依据、故障根因和处理方法的典型案例，
-用于匹配明确的日志或堆栈特征。案例不能替代当前现场的版本、设备、首错
-和复现证据。
-
-### 案例索引
-
-| 编号 | 案例 | 首要识别特征 |
-| --- | --- | --- |
-| `C001` | device core dump（aicpu） | `E39999`、plog deviceos 无 error 日志 |
-| `C002` | device core dump（无 E39999） | `HDC send err ret(25)`、`Server destroy success`、opcode `-25` |
-| `C003` | host coredump 伴随卡提前退出 | `GEfinalize` 打印在超时前、训练日志 traceback、plog size 偏小 |
-| `C004` | TDT 组件 device core dump | `subProcPid` 匹配 core 文件、TDT 组件报错 |
-| `C005` | core 文件缺失 | core 生成开关未开启、`ulimit -c` 为 0 |
-
-### 案例详解
-
-#### C001：device core dump（aicpu）
-
-> 本案例与 [coredump-reference](coredump-reference.md) 的 CD001 同源，专项排查以 CD001 为准。
-
-**问题现象**
-
-- 报错码为 `E39999`。
-- plog 的 deviceos 日志没有对应的 error 日志。
-
-**故障根因**
-
-device 侧 aicpu 发生 core dump。`E39999` 表示 device 侧 aicpu 异常，plog deviceos 日志
-无 error 日志说明非 deviceos 组件直接报错，大概率是 aicpu 进程 core。
-
-**处理方法**
-
-1. 确认 `E39999` 报错码，核对 plog deviceos 日志确实无对应 error。
-2. 在 `stackcore/dev-os-*/` 目录下查找 `stackcore.aicpu_scheduler*` 文件。
-3. 按 `subProcPid` 匹配对应业务的 core 文件。
-4. 使用 `stackview.sh` 或 `asys analyze` 解析 core 文件，由组件研发根据堆栈分析原因。
-
-#### C002：device core dump（无 E39999）
-
-> 本案例与 [coredump-reference](coredump-reference.md) 的 CD002 同源，专项排查以 CD002 为准。
-
-**问题现象**
-
-```text
-HDC send err ret(25)
-Server destroy success
-opcode error -25 (session has been closed)
-```
-
-**故障根因**
-
-device 侧发生 core 后进入销毁流程，释放资源时销毁了 device 侧创建的 hdc server。HCCP
-host 侧通过 hdc 通道下发 opcode 时报错 `-25`（session has been closed），表示对端 device
-session 已被关闭。
-
-**处理方法**
-
-1. 在 plog 中查找 `HDC send err ret(25)` 打印。
-2. 在 message 日志中查找 HDC 组件 info 级日志 `Server destroy success`。
-3. 确认 device 侧 session 关闭时间与 host 侧 opcode 报错时间的先后关系。
-4. 按 device core dump 流程查找并解析 core 文件。
-
-#### C003：host coredump 伴随卡提前退出
-
-**问题现象**
-
-- 部分卡 plog 上报超时，未上报超时的 device 疑似提前退出。
-- plog run 日志中超时时间点之前有 `GEfinalize` 打印。
-- 对应节点训练日志有业务报错 traceback。
-
-**故障根因**
-
-某 rank 进程在通信阶段提前退出（业务侧原因导致），未退出的 device 在通信中等待对端
-导致上报超时。`GEfinalize` 出现在超时时间点之前确认了进程提前退出。
-
-**处理方法**
-
-1. 找到未上报超时的 device，结合训练日志和 `plog/run` 目录日志确认是否提前退出。
-2. 核对 `GEfinalize` 打印是否在超时时间点之前。
-3. 查看训练日志中业务报错 traceback，确定提前退出的业务侧原因。
-4. 按业务报错原因处理，不属于 CANN 侧问题。
-
-#### C004：TDT 组件 device core dump
-
-> 本案例与 [coredump-reference](coredump-reference.md) 的 CD005 同源，专项排查以 CD005 为准。
-
-**问题现象**
-
-- plog 显示 device6 coredump，plog 在 22:36:33 报错。
-- device 日志 `slog/dev-os-6/debug/device-os/` 对应时间点附近有 TDT 组件报错。
-- `subProcPid=7518`。
-- `stackcore/dev-os-6/` 文件夹下有 4 个 core 文件。
-
-**故障根因**
-
-TDT 组件在 device 侧发生 core dump。通过 `subProcPid` 匹配到文件名包含 7518 的 core
-文件，即为该笔报错业务生成的 core 文件。
-
-**处理方法**
-
-1. 根据 plog 报错时间和 device 日志找到报错组件（TDT）及其 `subProcPid`。
-2. 在 `stackcore/dev-os-6/` 中找到文件名包含 `subProcPid` 值的 core 文件。
-3. 取回 core 文件，根据报错版本找到对应 opp 包。
-4. 区分组件类型（core 在其他组件 → `Ascend910-aicpu_extend_syskernels.tar.gz`），解压
-   获取 so 文件。
-5. 将 so 文件和 core 文件放在同级目录，运行 `stackview.sh` 解析。
-
-#### C005：core 文件缺失
-
-> 本案例与 [coredump-reference](coredump-reference.md) 的 CD006 同源，专项排查以 CD006 为准。
-
-**问题现象**
-
-- 进程中断发生但未找到 core 文件。
-- `stackcore/dev-os-*/` 目录下无 `stackcore.aicpu_scheduler*` 文件。
-
-**故障根因**
-
-host 侧 core 文件生成开关未开启，或 device 侧 coredump 配置未启用。`ulimit -c` 为 0、
-`core_pattern` 未配置或 `suid_dumpable` 未启用时，进程崩溃不会生成 core 文件。
-
-**处理方法**
-
-1. 核对 `ulimit -c` 是否设置为 unlimited。
-2. 核对 `core_pattern` 是否配置为有效路径和命名格式（如 `core.%t.%e.%p`）。
-3. 核对 `suid_dumpable` 是否启用。
-4. 核对 device 侧 coredump 配置是否开启。
-5. 在下次复现前开启 core 生成开关，记录缺失为 `evidence_gaps`。
+没有 core 或符号仍交付已知中断事实、局部机制、候选及缺口。没有实际修复和
+原条件/回归执行记录时，验证是计划，不能宣称解决。流水线产物约定见
+[处理流](fault-flows/crash-flow.md#子步骤产物)，普通诊断直接交付完整正文。

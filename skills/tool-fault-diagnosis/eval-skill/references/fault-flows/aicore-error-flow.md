@@ -1,6 +1,6 @@
 # AI Core Error 典型故障处理流
 
-> **执行入口**：入口场景 `aicore_error`。先读 [公共约定](common-flow.md)，再核对 [AI Core Error 专项](../ai-core-reference.md) 的适用边界。只分析已提供的 plog、event、exception dump、算子产物、工具结果及验证记录，不执行硬件压测、换卡复跑或重新抓 dump。现场操作（`ascend-dmi` 压测、`msaicerr`、换 Device 复现等）不执行，只在已有材料中找对应结果/字段；没有这些结果时记 `evidence_gaps`，继续现有日志证据分析。
+> **执行入口**：入口场景 `aicore_error`。核对 [AI Core Error 专项](../ai-core-reference.md) 的适用边界；需要清洗或流水线产物时查 [公共约定](common-flow.md)。只分析已提供的 plog、event、exception dump、算子产物、工具结果及验证记录，不执行硬件压测、换卡复跑或重新抓 dump。现场操作（`ascend-dmi` 压测、`msaicerr`、换 Device 复现等）不执行，只在已有材料中找对应结果/字段；没有这些结果时记 `evidence_gaps`，继续现有日志证据分析。
 
 ## 问题现象
 
@@ -16,57 +16,68 @@ fault kernel_name=MatMulV2.op123
 
 `EZ9999` 是上层通用错误码，不能单独作为根因。必须继续提取嵌套错误中的 `serial number`、`chipId`、`core id`、`error code`、`errorStr`、`fault kernel_name`、`device_id`、`stream_id` 和 `task_id`。
 
+自定义 kernel 涉及 Fixpipe、GlobalTensor、GM/UB 搬运或 TQue 时，按
+[公开 API 约束](../ascend-kernel-api-contracts.md)核对具体修改对象、参数单位和
+条件修复；没有源码或参数转储时仍区分公开契约、候选原因与已确认现场。
+CUBE/MMAD 操作数、L1 到 Fixpipe Buffer、LOAD3DV2 或 DataCopyPad 线索则选读
+[Cube/MTE 约束](../ascend-cube-mte-contracts.md)，检查实际派生指针、布局、单位
+及完整访问跨度；不能由单码补造具体 API、参数值或芯片容量。
+
 ## 排查流程
 
-AIC Error 定位流程主干：**找到首报错 → 首报是否为算子 AICERROR → 查 RAS 件故障（event_id）→ 查网络 → ECC error 关键字 → 通用排查 → 疑似硬件 → DMI 压测 → 压测结果分支 → 软硬件判定 → 每次同 Device → 固决软件/新增硬件/资源池观察**。
+AIC Error 定位流程主干：**关联本次任务 → 解释错误解码及可计算的访问约束 → 并行核对硬件、输入、实现、依赖与环境证据 → 比较候选根因 → 给出针对性修复和未解决边界**。日志未提供的检查结果保持未知；某分支无支持不影响已有直接机制的确认。
+
+设备错误解码后增加一个强制的“实现线索检索”步骤：在当前 `log/` 全范围检索 `DataCopyPad`、`Fixpipe`、`LoadData2D/3D`、`asc_copy`、`workspace`、`tiling`、`PI`、`capture`、`IMP/DISP`、`ACSVIOL`、`ECC`，对每个命中读取前后完整上下文，并用 kernel/hash/PC 与任务绑定。若命中具体 API 参数、源码片段、参数转储或题面已报告的实现结论，必须将其纳入 `implementation_root_cause` 和修复绑定表；没有命中才保留为 hypothesis/undetermined。该步骤不能由单个错误码、kernel 名或后置 `Task run failed` 代替。
+
+### 构建标签到源码分支
+
+`build_error.log` 中的构建目录是当前产物的现场线索。读取标签后，使用当前材料中可获得的
+任务标识（例如 `errorStr`、kernel/hash、PC、参数快照、时间和设备）交叉核对它是否属于
+同一执行产物；某个标识缺失时记录证据缺口并降低标签置信度，但不阻断设备错误的直接机制
+诊断。随后把标签绑定到**可检查的源码对象**。标签可以收窄排查分支和修复对象，但不能
+凭目录名补出源码常量、指令操作数或执行结果。下面的映射只在设备错误与标签一致时成立：
+
+| 标签示例 | 与错误串一致时的优先检查 | 仍不能直接断言 |
+| --- | --- | --- |
+| `atomic_dirty_cacheline` | scalar 访问内部 buffer 越界：先按设备 `errorStr` 检查 UB/内部 buffer 声明、标量 store 偏移和完整访问范围；只有日志另有 atomic 指令/目标证据时，才把 cacheline 冲突列为上游候选 | 标签不证明 atomic 路径实际执行，也不能补出 `OOB_OFFSET`、buffer 大小或 OOB 兜底分支顺序 |
+| `dcache_biu_response` | scalar 访问 GM 超过 48 位：检查 kernel 内部指针算术、整数转换和 scalar 直接解引用的派生地址；入口 args 合法时优先追派生地址 | `1ULL << 48`、实际 badGm、Dcache/BIU 指令序列，除非有源码或反汇编 |
+| `fixp_b4_misalign` | FIXP 读取 L0C 越界：先确认芯片、CANN 版本和实际 API 变体；若确为 `FixpipeParamsV220`，核对其源布局、完整读取跨度及 `mSize/nSize/srcStride/ndNum/srcNdStride/unitFlag`，否则按对应变体契约核对等价字段，再按现场地址判断 B4 对齐分支 | 目录中的 `misalign` 不证明对齐是实际触发项，也不能把 V220 的单位/范围套到未确认的变体，更不能补出具体 stride 或 unitFlag |
+| `fixpipe_addr_misalign` | FIXP 读取 L0C 越界：先确认 API 变体后，按该变体的源地址、stride、切片偏移和完整读取范围比较候选；只有现场地址不满足约束时才把对齐列为首要上游原因 | 某个固定偏移或 `srcStride` 数值，不能把标签单独升级为源码级根因 |
+
+输出时仅在标签与设备错误一致时把标签写入 `upstream_trigger` 的证据引用；标签冲突时
+写入 `classification_conflicts` 或 `evidence_gaps`，不能作为支持证据。设备错误串写入
+`direct_mechanism`。如果标签只支持“该变体针对某类缺陷构建”，就给出该类缺陷对应的
+条件修复和验证判据，同时明确缺少的字段；不要将标签改写成已确认的 `file:line` 或
+现场实参。这样既能利用构建产物收窄故障对象，也能避免把一个标签误当成精确源码证明。
 
 ```mermaid
 flowchart TD
-    A[收集 CANN 日志、exception dump、算子 .o/.json] --> B[打开对应 Device 的 event 系统日志]
-    B --> C{是否存在 event_id}
-    C -->|是| D[按 event_id 查询健康管理故障定义并处理 RAS 故障]
-    C -->|否| E[打开故障时间附近的 plog]
-    E --> F{是否有 ECC 报错或同一 chipId 多次报错}
-    F -->|是| G[使用 ascend-dmi 压测 AI Core]
-    G --> H{压测是否正常}
-    H -->|否| I[已知硬件故障, 联系技术支持更换硬件]
-    H -->|是| J{换其它 Device 后是否复现}
-    J -->|否| K[可能为硬件故障, 联系技术支持更换硬件]
-    J -->|是| L[进入软件故障排查]
-    F -->|否| L
-    L --> M{是否为索引类算子 0x800000 报错}
-    M -->|是| M1{是否为 A3 超节点}
-    M1 -->|是| M2[排查灵衢网络是否存在网络故障]
-    M2 -->|是| M3[解决网络问题, 转网络排查流]
-    M2 -->|否| N
-    M1 -->|否| N
-    N --> O{是否确认输入数据问题}
-    O -->|是| P[修复输入数据]
-    O -->|否| Q[联系技术支持并提供已收集信息]
-    M -->|否| R[运行 msaicerr 生成 info.txt]
-    R --> Q
-    Q --> S{是否每次在同一 Device 发生}
-    S -->|是| T[倾向硬件, 新增硬件/板分]
-    S -->|否| U[固决软件问题]
-    T --> V[资源池继续观察]
-    U --> V
+    A[关联本次 Device/kernel/stream/task] --> B[原始错误解码与访问约束]
+    B --> C[硬件证据: 相关 RAS/ECC 与既有检测记录]
+    B --> D[软件证据: 输入/指令参数/地址来源/依赖]
+    B --> E[环境证据: 版本/产物与适用条件]
+    C --> F[对照支持证据和反证, 缺失保持 unresolved]
+    D --> F
+    E --> F
+    F --> G[确认直接机制, 限定上游根因及实现细节]
+    G --> H[条件明确的修复与验证计划]
 ```
 
 | 顺序 | 证据 | 判断条件 | 下一步 | 中间过程记录 |
 | --- | --- | --- | --- | --- |
-| 1 | Device event 日志 | 存在 `event_id` | 先处理 RAS 硬件故障 | 记录 event_id 值、对应健康管理定义、是否与本次故障时间关联 |
-| 2 | 故障时间附近的 plog | ECC 或同一 `chipId` 多次报错 | 运行 `ascend-dmi` AI Core 压测 | 记录 chipId 值、重复次数、ECC 类型；无 ECC 则跳至软件排查 |
-| 2a | `ascend-dmi` 压测结果 | 压测异常（`GENERAL_WARN`/`EMERGENCY_WARN`） | 联系技术支持处理硬件 | 记录压测结果、异常详情 |
-| 2b | 换 Device 复现记录 | 原 Device 异常、其它 Device 不复现 | 倾向原硬件问题 | 记录原 Device ID、换后 Device ID、复现/不复现结果 |
+| 1 | Device event 日志 | 与本次关联的 `event_id` 已按型号和版本解码 | 评估对应 RAS 故障；未知定义不猜测 | 记录 event_id、定义、时间和设备关联；缺日志则分支未解决 |
+| 2 | 故障时间附近的 plog | ECC 或同一 `chipId` 多次报错 | 查阅已有硬件检测与控制变量对照 | 记录 chipId、独立事件数、ECC 类型；重复位置不单独证明坏卡 |
+| 2a | `ascend-dmi` 压测结果 | 匹配本次设备和环境的既有异常 | 支持硬件候选，结合告警与业务故障关联 | 记录异常详情；PASS 只说明该次检测未发现异常，不排除间歇问题 |
+| 2b | 换 Device 复现记录 | 原 Device 异常、其它 Device 不复现 | 在控制输入/产物/配置后提高硬件候选优先级 | 记录各设备结果、重复次数和控制变量；一次不复现不确诊硬件 |
 | 2c | 产品型号、`error code`、网络诊断记录 | A3 超节点且 `0x800000`：核对灵衢网络是否有端口闪断/超时代答/信用证反压/非法报文 | 有网络故障→转网络排查流；无→继续索引检查 | 记录产品型号、是否 A3 超节点、网络诊断结论、是否有端口闪断/超时代答等告警 |
 | 3 | 算子类型、`error code`、输入 | 索引类算子出现 `0x800000` | 检查输入索引范围 | 记录算子名、error code、errorStr、index 值与输入维度对比 |
 | 4 | exception dump、`.o/.json` | 不是已确认的索引输入问题 | 使用 `msaicerr` 解析并保留 `info.txt` | 记录 dump 路径、算子 hash、msaicerr 根因结论、解析是否成功 |
-| 5 | 历史记录 | 是否每次在同一 Device 发生 | 是→倾向硬件；否→倾向软件 | 记录历次 Device ID 是否相同、后续是否再次发生 |
-| 6 | 软件修复验证 / 硬件换板记录 / 资源池观察 | 是否有验证/观察记录 | 有验证→已解决；观察中→hypothesis | 记录修复措施、验证结果或观察状态 |
+| 5 | 历史记录 | 是否每次在同一 Device 发生 | 比较设备与输入/产物/作业分配的相关性 | 记录历次 Device ID、负载和复现条件；不依据位置独立作软硬件判定 |
+| 6 | 软件修复验证 / 硬件换板记录 / 资源池观察 | 原失败条件下首错消失且结果/回归符合预期 | 验证通过才记已解决；失败保留未解决，观察中保留 hypothesis | 记录修复措施、控制条件、实际结果与回归范围 |
 
-每步的中间过程记录写入 `diagnosis.md` 的 `result.steps`，包含 step_id、检查内容、发现结果和下一步，便于追溯走到哪一步定位到问题。
+采用流水线产物模式时，每步过程写入 `diagnosis.md.result.steps`；默认诊断答复在正文说明关键核对过程及证据，不要求生成该文件。
 
-`msaicerr` 不是所有 AI Core Error 的第一步。它位于 RAS、ECC/硬件和明确的索引类输入检查之后。案例候选必须核对算子、版本、设备、首错和输入条件；相同 kernel 或十六进制寄存器值不等于相同根因。core 与 AI Core Error 同时存在时，按任务关联和时间线区分 Device 异常、Host 传播及独立崩溃，不按固定优先级覆盖较早事件。
+按现有证据并行核对 RAS/ECC、明确的索引类输入问题和匹配的 `msaicerr` 结果，不要求补齐某一分支后才能分析其他分支。案例候选必须核对算子、版本、设备、首错和输入条件；相同 kernel 或十六进制寄存器值不等于相同根因。core 与 AI Core Error 同时存在时，按任务关联和时间线区分 Device 异常、Host 传播及独立崩溃，不按固定优先级覆盖较早事件。
 
 ## 证据盘点
 
@@ -84,9 +95,9 @@ flowchart TD
 
 | 子检查 | 离线核对内容 |
 | --- | --- |
-| Ascend DMI 工具压测核对 | 核对已有 `ascend-dmi` 压测/诊断结果：AI Core 压测命令为 `ascend-dmi -dg -i aicore -s`，AI Core 诊断命令为 `ascend-dmi -dg -i aicore`。结果为 `PASS` 表示正常；出现 `GENERAL_WARN` 或 `EMERGENCY_WARN` 表示可能存在 AI Core 硬件问题。压测需占用 Host 约 20~40GB 内存，诊断完成后须检查 aic 和 bus 电压是否正常。未提供压测结果时记 `evidence_gaps`，不执行新压测 |
+| Ascend DMI 工具压测核对 | 核对已有 `ascend-dmi` 结果的版本、设备、检测项及覆盖范围。`PASS` 只表示本次检测未发现异常；`GENERAL_WARN` 或 `EMERGENCY_WARN` 须解释具体异常及其与业务事件的关联。工具参数和资源需求按该版本帮助核对。未提供结果时记 `evidence_gaps`，不执行新压测 |
 | 硬件故障定位子流程 | 硬件故障定位流程：① 收集 Device 日志、BMC 日志后核对是否有 RAS 告警；② RAS 告警与 AICERROR 是否关联（时间、设备、芯片）；③ 无 RAS 告警时核对是否有其他已知问题；④ 隔离问题节点后核对单算子微流程用例是否必现；⑤ 用典型高压用例（FA、MatMul 等）压测是否复现；⑥ 重启后用复现场景再次复现；⑦ AC 下电再上电后再次复现；⑧ 收集实验数据（是否固定 core、错误码、报错算子、bus CPM、aic CPM、复现时间、相关寄存器信息）交芯片团队给结论。每步仅核对已有记录，不执行现场复现 |
-| 软件故障定位子流程 | 软件故障定位流程：① 单算子复现微流程——核对信息是否完整（异常算子编译信息 `.o/.json`、ERROR 级别 plog、异常算子 dump 数据），完整则核对 `msaicerr` 复现结果，不完整则核对 asys 或手工收集记录；② 是否复现问题——复现则算子侧研发分析，未复现则按错误码分支处理：`0x800000`+`mte_biu_rdwr_resp`→多 bit ECC 硬件或 A3 超平面超时代答，`0x0`/timeout/trap→排查 AIC/V Timeout 历史案例，其他错误码→`msSanitizer` 工具诊断。仅核对已有工具结果，不执行新工具 |
+| 软件故障定位子流程 | 核对异常算子 `.o/.json`、原始 plog、dump 与已有 `msaicerr` 或检测结果的对应关系。`0x800000`+`mte_biu_rdwr_resp` 时检查实际访问地址、映射、生产者和生命周期；有相关 ECC 或适用 A3 网络证据时再提高对应候选优先级。`0x0`、timeout 或 trap 也须结合任务进展及指令解释，不能直接套用历史根因。工具结果缺失不妨碍分析已有证据；仅核对已有结果，不执行新工具 |
 | A3 超节点灵衢网络排查 | A3 超节点出现 `0x800000` 时核对灵衢网络诊断记录：有网络诊断平台时优先核对诊断结果；无诊断平台时核对网络设备告警信息——端口闪断/Down、超时代答、信用证反压、非法报文。核对结果区分灵衢侧异常（给解决方案）与昇腾侧异常（昇腾研发分析）。记录网络诊断结论、告警类型、是否与本次 AICERROR 时间关联 |
 
 ## 分支与竞争假设
@@ -104,7 +115,7 @@ flowchart TD
 
 ### 分支决策顺序
 
-对每个入口错误按以下顺序记录结果，任一分支证据不足都继续后续分支，不因缺失材料提前结束：
+以下为证据检查索引，按本次错误涉及的分支展开，不因缺失材料提前结束。默认诊断答复只需解释有信息量的核对结果；不要求将全部分支排成排除表：
 
 1. **事件关联**：确认错误与 host/PID/rank/device/stream/task 及时间窗属于同一任务；关联失败时只保留为候选。
 2. **RAS/ECC**：查找同一 Device 的 `event_id`、ECC 类型和处置状态；有明确且匹配的定义时标记硬件分支支持。
@@ -113,11 +124,13 @@ flowchart TD
 5. **工具解析**：仅对版本、Device、stream/task、hash 均匹配的已有 dump 使用 `msaicerr`；解析失败记录为工具结果和证据缺口。
 6. **版本/产物**：核对运行时与编译产物版本/hash；不匹配只降低该证据的可用范围，不直接生成根因。
 
-每个分支都写入 `branch_decisions`，至少包含 `branch`、`status`（`supported`/`excluded`/`unresolved`）、`evidence_refs`、`counter_evidence` 和 `reason`，确保缺证与排除理由可追溯。
+流水线模式把各分支写入 `branch_decisions`，至少包含 `branch`、`status`（`supported`/`excluded`/`unresolved`）、`evidence_refs`、`counter_evidence` 和 `reason`，确保缺证与排除理由可追溯。默认答复可在相关结论旁直接说明支持、反证和限制。
+
+`excluded` 需要与具体假设不相容的证据。未出现相关关键词、某错误位为零、非空且对齐的 args、正常资源回收、PC 距入口较近，均不能单独排除非法地址、上游写坏、生命周期或硬件分支；也不能把未观测到的分支写入“已证实排除”。没有支持时记录 `unresolved` 并说明当前优先级。最终正文与分支表采用同一结论，不能在摘要中把“无支持”改成“已排除”。
 
 ## 子步骤产物
 
-所有步骤写入 `diagnosis.md.result.steps`，每项带公共状态、输入/证据引用、缺口及 next_step。
+流水线模式的步骤写入 `diagnosis.md.result.steps`，每项带公共状态、输入/证据引用、缺口及 next_step。
 
 | step_id | 执行动作 | findings 必含字段 |
 | --- | --- | --- |
@@ -135,7 +148,7 @@ A4 同步填充公共诊断字段。`serial number` 只能在可比较的同一�
 - D1/D2 首错与互证须对应同次任务；D3 仅 kernel 名不满足根因已定位；D4 无已有修复记录不记已验证；D5 案例命中需核对版本及实际证据异同。
 - `msaicerr` 报错本身不为 `source_code_confirmed` 加分。只在已有匹配源码与现场证据证实推断时填 true。
 
-案例参考先沿用 `case-match.md` 候选，再核对 [专项案例](../ai-core-reference.md)；未命中仍完成全部诊断。建议只写适用前提与已有验证状态，不执行修复生产环境。
+案例参考先核对已有检索候选（流水线使用 `case-match.md`），再核对 [专项案例](../ai-core-reference.md)；未命中仍完成全部诊断。建议只写适用前提与已有验证状态，不执行修复生产环境。
 
 ## 案例覆盖矩阵
 
@@ -145,16 +158,16 @@ A4 同步填充公共诊断字段。`serial number` 只能在可比较的同一�
 | --- | --- | --- | --- |
 | OFFICIAL-0009 | `0x80E01809`/`0x80E01801`、multi-bit ECC | RAS/ECC | event 定义、Device、地址与处置状态 |
 | OFFICIAL-0010 | `0x80C98000`、`compare_fail_num != 0` | RAS/ECC | trace 与 event 时间、适用产品 |
-| OFFICIAL-0011 | data-cache 2-bit ECC | RAS/ECC | 已有 AI Core 诊断结果或压测记录（未提供则保持缺口） |
+| OFFICIAL-0011 | data-cache 2-bit ECC | RAS/ECC | 型号/版本解码、任务关联与恢复状态；DMI 为补充证据，缺失不抹去已检测 ECC |
 | OFFICIAL-0012 | 索引类算子 + `0x800000` | 索引/地址 | index、shape、dim 和地址生产者 |
-| OFFICIAL-0013 | built-in sample operator 失败 | 工具解析/环境 | `msaicerr` 输出及环境版本 |
-| OFFICIAL-0014 | single-operator test 失败 | 工具解析/环境 | 算子输入、产物与测试结果 |
+| OFFICIAL-0013 | built-in sample operator 失败 | 工具解析/环境 | 详细失败阶段、环境/编译结果及是否实际出现样例 Device 异常 |
+| OFFICIAL-0014 | single-operator test 失败 | 工具解析/环境 | 区分未执行成功与实际复现 AI Core Error，核对输入、产物及测试日志 |
 | OFFICIAL-0015 | atomic add precision overflow | 任务与内存 | 算子类型、输入范围与已有验证 |
 | OFFICIAL-0016 | input/output address abnormal | 索引/地址 | 地址范围、分配记录和上下游任务 |
 | OFFICIAL-0017 | args before/after execute 不一致 | 任务与内存 | 参数快照、stream/task 和时间顺序 |
-| OFFICIAL-0018 | failed to get dump data | 工具解析 | 原始失败行、dump 可用性与解析限制 |
+| OFFICIAL-0018 | failed to get dump data | 工具解析 | 取数阶段/返回码、上下文与对象生命周期；失败本身不证明原访问地址非法 |
 | OFFICIAL-0019 | args after execute 含错误地址 | 任务与内存 | Host/Device 地址、参数来源和版本/hash |
 
-未命中上述案例时仍按六个分支完成 `A1`–`A4`，并在 `case_comparison` 中写明未命中原因。
+未命中上述案例时继续从本次错误字段、输入和执行过程分析，不套用最近似案例的上游根因。流水线模式仍完成 `A1`–`A4` 并在 `case_comparison` 中说明案例差异。
 
 参考：[公共约定](common-flow.md)、[AI Core Error 专项](../ai-core-reference.md)、[故障处理专题](../fault-handling.md)、[网络排查流](network-flow.md)、[错误码](../err-messages.md)、[可信度规范](../confidence-assessment.md)。

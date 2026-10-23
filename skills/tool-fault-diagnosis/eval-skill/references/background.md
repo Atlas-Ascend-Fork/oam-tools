@@ -1,83 +1,50 @@
 # CANN 日志分析背景介绍
 
-> 本文档为 LLM 提供分析 Ascend NPU 日志所需的领域背景知识。
+本文提供组件和执行阶段的索引。硬件规格、日志格式及 API 行为需要与现场型号和软件版本对应。
 
-## 硬件平台
+## 先核对平台
 
-| 属性 | 值 |
-|------|-----|
-| 芯片型号 | Ascend NPU |
-| 架构 | aarch64 |
-| AICore 数量 | 48 |
-| UB (Unified Buffer) per Core | 256 KB |
-| HBM 带宽 | ~2 TB/s |
-| 支持数据类型 | FP32, FP16, BF16, INT8, INT4 |
+| 信息 | 核对方式与诊断用途 |
+|------|--------------------|
+| NPU 型号、设备与可见资源 | 现场 `npu-smi`、asys 的 hardware/status 信息；区分物理设备与进程可见设备 |
+| Host CPU 架构 | Host OS 信息；不能由 Ascend NPU 推定宿主机一定为 aarch64 |
+| AI Core / AI Vector Core、UB 等片上存储 | 对应型号的平台信息及编译目标；不通用假设48核或256KB UB |
+| HBM 容量、带宽及支持的数据类型 | 对应型号和数据类型的规格，结合现场可用容量、配额及有效配置 |
+| CANN、Driver、Firmware、框架及插件版本 | 安装记录、实际加载库和构建目标；不能仅由安装目录名认定运行版本 |
 
-## 软件栈（CANN 8.5.0）
+本仓 asys 的现场信息结构见 oam-tools 的`docs/zh/user_guide/asys/rerun_fault_information_collection.md`。已有产物可以直接读取；复跑需属于当前任务范围。
 
-```
-应用层（PyTorch / MindSpore / TensorFlow）
-       │
-       ▼
-  CANN 框架层
-  ┌─────────────────────────────────────┐
-  │  GE（Graph Engine）图编译与优化      │
-  │  HCCL  多卡/多机通信库              │
-  │  ACL   设备管理与内存 API            │
-  │  TBE   算子编译（Cube/Vector）       │
-  └─────────────────────────────────────┘
-       │
-       ▼
-  驱动层（Ascend HDK Driver）
-       │
-       ▼
-  硬件（Ascend NPU）
-```
+## 软件栈与日志线索
 
-## 关键组件说明
+应用可能通过框架、图执行或单算子接口使用 CANN。并非每次故障都经过全部组件。
 
-### GE (Graph Engine)
-- 负责接收来自框架的计算图，进行图优化（算子融合、内存复用）和图编译
-- 日志前缀：`[GE]`
-- 关键阶段：`GRAPH_BUILD` → `GRAPH_COMPILE` → `GRAPH_LOAD` → `GRAPH_RUN`
+| 组件 | 作用 | 常见日志线索 |
+|------|------|--------------|
+| GE（Graph Engine） | 图优化、编译、加载和执行管理 | 图ID、编译阶段、内存规划与图执行错误 |
+| TBE / Ascend C 等算子工具链 | 生成面向目标芯片的算子产物 | shape/dtype约束、编译目标、tiling及产物hash |
+| AscendCL / Runtime | 设备、上下文、流、任务、内存与执行接口 | API返回码、device/stream/task、任务异常及同步报错 |
+| HCCL | AllReduce、AllGather、Broadcast、ReduceScatter等集合通信 | rank、通信域、操作序列、建链与执行阶段 |
+| HIXL / LLM-DataDist | 单边点对点传输 / KV Cache 数据传输 | engine/endpoint、协议、建链请求/响应、底层通道和传输完成；见[HIXL参考](hixl-reference.md) |
+| Driver / Firmware | 设备管理、资源与异常上报 | 驱动返回值、设备事件、RAS/ECC及恢复记录 |
 
-### TBE (Tensor Boost Engine)
-- 负责单算子的内核编译，生成 AICore/AIVector 可执行指令
-- 编译失败常见原因：shape 不支持、dtype 不匹配、UB 内存溢出
-- 日志前缀：`[TBE]` / `[TE]`
+HCCL 的传输路径随设备和拓扑变化；建链超时与执行超时分别核对现场配置及版本定义，不能统一写成默认120秒。等待方报超时还需回查对端进展、退出及更早错误。
 
-### ACL (Ascend Computing Language)
-- 提供设备上下文管理、内存分配（HBM）、数据传输（H2D/D2H）
-- 错误码以 `ACL_ERROR_` 开头
-- 日志前缀：`[ACL]`
+### msnpureport 与本技能的旧命名
 
-### HCCL (Huawei Collective Communication Library)
-- 多卡通信原语：AllReduce、AllGather、Broadcast、ReduceScatter
-- 依赖 ROCE 或 PCIe 网络，超时默认 120s
-- 日志前缀：`[HCCL]`
+`msnpureport` 是导出 Device 系统日志和其他维测信息的工具，不是通信协议。
+本技能 `collect.sh --msnpureprot` 和 `logs/msnpureprot/` 是沿用的本地复制参数/目录名；它们不会自动执行该工具。
+实际导出方式见[全量采集流程](../../collect-skill/references/full-log-collection.md)，先核对现场工具帮助。
+导出产物的日志来源、设备范围和文件类型需逐一确认，不能把全部内容当成算子下发/完成轨迹。
 
-### msnpureprot
-- 协议层，宿主机与 NPU 设备间的消息通信
-- 记录算子下发（dispatch）和执行完成（notify）事件
+## 执行阶段与诊断方向
 
-## 常见执行阶段与日志对应
+| 已观察到的阶段或现象 | 继续核对的证据 |
+|--------------------|----------------|
+| 图/算子编译失败 | 首个具体约束、输入shape/dtype、编译目标及匹配源码 |
+| 图加载或内存申请失败 | 请求大小、资源类型、同口径可用量、配额和对象生命周期 |
+| AI Core执行异常 | 内嵌errorStr、分名寄存器、任务关联与匹配产物；同步API可能只是上报位置 |
+| 通信等待或无输出 | 各rank进展、相同通信序列、对端退出及超时阶段 |
+| NaN或精度不达标 | 首次异常位置、输入范围、计算/累加类型、参考值和业务容限 |
+| 性能下降 | 同条件基线与profiling关键路径，区分Host、计算、访存、通信及同步 |
 
-| 阶段 | 日志特征 | 常见问题 |
-|------|---------|---------|
-| 图编译 | `[GE][COMPILE]` BUILD_GRAPH | shape 推导失败、不支持的算子 |
-| 算子编译(TBE) | `[TBE]` compile op | 编译超时、UB 溢出 |
-| 图加载 | `[GE]` load graph to device | 内存不足（HBM OOM） |
-| 算子执行 | `[SCHE]` dispatch task | 执行超时、返回码非 0 |
-| 通信同步 | `[HCCL]` allreduce | 超时、rank 断联 |
-| 数据传输 | `[ACL]` memcpy | H2D/D2H 失败 |
-
-## 常见错误类型速查
-
-| 错误现象 | 初步排查方向 |
-|---------|-------------|
-| 训练 loss 为 NaN | 溢出（FP16 精度问题）、权重初始化异常 |
-| 任务挂死无输出 | HCCL 通信死锁、某 rank 崩溃导致其余 rank 等待 |
-| OOM (Out of Memory) | HBM 容量不足，需减小 batch size 或启用重计算 |
-| 算子不支持 | dtype/shape 超出 TBE 支持范围，需换算子或转换数据类型 |
-| 图编译超时 | 图过大或 TBE 编译复杂，可尝试开启编译缓存 |
-| 精度不达标 | 算子精度 bug、量化配置错误、通信精度损失 |
+这些是调查入口，不构成唯一根因。错误码、局部资源统计与正常清理均应放回同一故障事件解释。

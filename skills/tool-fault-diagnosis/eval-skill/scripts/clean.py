@@ -18,12 +18,8 @@
 """
 clean.py — Ascend NPU 日志清洗脚本
 
-功能：
-  - 去除冗余的 DEBUG 级别日志（可配置）
-  - 提取关键错误/警告行
-  - 统一时间戳格式
-  - 去重重复行
-  - 支持多日志来源合并并按时间排序
+保留日志原文、级别、重复记录、堆栈及文件内顺序。
+--level 仅用于标记关注级别，不删除上下文；合并不跨主机排序。
 
 用法：
   python3 clean.py --input <log_file> --output <output_file>
@@ -121,64 +117,38 @@ def is_noise(line: str) -> bool:
 
 
 def clean_lines(lines: list[str], min_level: str = "INFO") -> list[str]:
-    """
-    清洗日志行列表。
+    """Return a lossless line view; level selection never discards evidence."""
+    if min_level.upper() not in LOG_LEVELS:
+        raise ValueError("Unknown focus level: " + min_level)
+    return [line.rstrip("\n") for line in lines]
 
-    Args:
-        lines: 原始日志行
-        min_level: 最低保留级别（DEBUG/INFO/WARNING/ERROR/FATAL）
 
-    Returns:
-        清洗后的日志行
-    """
-    min_priority = LOG_LEVELS.get(min_level.upper(), 1)
-    seen = set()
-    result = []
-
-    for line in lines:
-        line = line.rstrip("\n")
-
-        # 过滤空行（单独处理，不计入去重）
-        if not line.strip():
-            continue
-
-        # 去重
-        if line in seen:
-            continue
-        seen.add(line)
-
-        # 噪声过滤
-        if is_noise(line):
-            continue
-
-        # 日志级别过滤
-        level = parse_log_level(line)
-        if LOG_LEVELS.get(level, 1) < min_priority:
-            # 即使低于最低级别，包含重要关键字的行也保留
-            if not any(kw in line.lower() for kw in IMPORTANT_KEYWORDS):
-                continue
-
-        result.append(line)
-
-    return result
+def merge_files(log_files: list[Path], output_path: Path) -> int:
+    """Validate all inputs before creating an output, preserving local byte order."""
+    if output_path.exists() or output_path.is_symlink():
+        raise ValueError("Refusing to overwrite existing evidence: " + str(output_path))
+    if any(path.resolve() == output_path.resolve() for path in log_files):
+        raise ValueError("Input and output paths must differ")
+    payloads = [path.read_bytes() for path in log_files]
+    for payload in payloads:
+        payload.decode("utf-8-sig", errors="strict")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("xb") as stream:
+        previous = b""
+        for payload in payloads:
+            if payload and previous and not previous.endswith(b"\n"):
+                stream.write(b"\n")
+            stream.write(payload)
+            if payload:
+                previous = payload
+    return sum(len(payload.splitlines()) for payload in payloads)
 
 
 def process_file(input_path: Path, output_path: Path, min_level: str = "INFO") -> int:
     """处理单个日志文件，返回保留的行数"""
-    try:
-        with open(input_path, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-    except OSError as e:
-        print(f"[ERROR] 无法读取 {input_path}: {e}", file=sys.stderr)
-        return 0
-
-    cleaned = clean_lines(lines, min_level)
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(cleaned) + ("\n" if cleaned else ""))
-
-    return len(cleaned)
+    if min_level.upper() not in LOG_LEVELS:
+        raise ValueError("Unknown focus level: " + min_level)
+    return merge_files([input_path], output_path)
 
 
 # ===================== CLI =====================
@@ -198,14 +168,14 @@ def main():
 
     parser.add_argument(
         "--level",
-        default="INFO",
+        default="DEBUG",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "FATAL"],
-        help="最低保留日志级别（默认：INFO）",
+        help="关注级别（保留全部上下文，默认：DEBUG）",
     )
     parser.add_argument(
         "--merge",
         action="store_true",
-        help="将所有日志合并为单文件并按时间排序（配合 --output 使用）",
+        help="按文件名合并，保留各文件原始顺序（配合 --output 使用）",
     )
 
     args = parser.parse_args()
@@ -221,7 +191,7 @@ def main():
 
     elif args.input_dir:
         # 批量模式
-        log_files = list(args.input_dir.rglob("*.log"))
+        log_files = sorted(args.input_dir.rglob("*.log"))
         if not log_files:
             print(f"[WARN] 在 {args.input_dir} 中未找到 .log 文件", file=sys.stderr)
             sys.exit(0)
@@ -229,25 +199,8 @@ def main():
         output_dir = args.output_dir or args.input_dir.parent / (args.input_dir.name + "_cleaned")
 
         if args.merge and args.output:
-            # 合并模式：读取所有文件、清洗、按时间戳排序后写入单文件
-            all_lines = []
-            for f in log_files:
-                try:
-                    with open(f, "r", encoding="utf-8", errors="replace") as fh:
-                        all_lines.extend(fh.readlines())
-                except OSError:
-                    pass
-            cleaned = clean_lines(all_lines, args.level)
-            # 尝试按时间戳排序
-            def sort_key(line):
-                ts = extract_timestamp(line)
-                return ts or datetime.min
-            cleaned.sort(key=sort_key)
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            with open(args.output, "w", encoding="utf-8") as fh:
-                fh.write("\n".join(cleaned) + "\n")
-            print(f"[INFO] 合并完成 → {args.output}（保留 {len(cleaned)} 行）")
-            total_kept = len(cleaned)
+            total_kept = merge_files(log_files, args.output)
+            print(f"[INFO] 合并完成 → {args.output}（保留 {total_kept} 行）")
         else:
             for log_file in log_files:
                 rel = log_file.relative_to(args.input_dir)
@@ -260,4 +213,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (OSError, ValueError, UnicodeError) as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        sys.exit(2)

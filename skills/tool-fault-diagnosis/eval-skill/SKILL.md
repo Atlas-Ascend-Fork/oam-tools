@@ -1,230 +1,88 @@
 ---
 name: eval-skill
-description: 对 Ascend NPU 的已有日志和故障现场进行清洗、专项评估和诊断分析。当用户明确指定 eval-skill、已经由 orchestrator-skill 路由到本技能，或明确指定单一故障类型（如 AI Core Error、OOM、coredump、通信超时）时使用；仅从日志内容看到这些词不构成直接触发，缺少明确专项或上游编排结果时由 orchestrator-skill 先处理。技能结合领域知识、错误库和历史案例定位根因，评估诊断可信度并输出供度量报告使用的评估结论。
+description: 根据已有 CANN/Ascend NPU 日志与故障现场进行专项诊断，结合错误码、字段语义和案例定位故障机制及修复方向。用户明确指定本技能、单一故障专项或由 orchestrator-skill 路由时使用；泛化或多组件诊断由 orchestrator-skill 协调。
 license: Apache-2.0
 ---
 
-# 日志评估技能 (Eval Skill)
+# CANN 专项诊断
 
-## 适用场景
+当前 Agent 负责从已有原文解释具体失败机制及传播链，比较有依据的上游原因，给出对应的条件修复与验证方向。先读 [诊断与字段约定](references/diagnostic-reasoning.md)。用户报告的观察、定位和处置结果按其来源、版本与条件保留，与本次独立验证区分；作者的猜测作为待核候选。
 
-- 已有完整日志（msnpureport / host / plog 或其组合），需要分析问题根因
-- orchestrator-skill 已完成案例检索和场景识别，并路由到本技能进行清洗、诊断或可信度评估
-- 用户明确指定单一故障类型、专项分析或直接使用 eval-skill；泛化的“分析/诊断日志”请求先走 orchestrator-skill
-- 用户提供或提到 coredump / Linux core / Stackcore / msnpureport / asys 输出，需要分析 CANN 崩溃根因
-- 算子执行失败、训练 loss 异常、精度不达标、任务挂死或性能劣化
-- 需要将日志信息映射到具体算子/代码位置
+主结论给出有证据支持的优先诊断和针对性修复，并注明其为已确认还是最可能。某个源码行、参数值或补丁未知，只限制该实现细节；不要把整份诊断写成未知，也不要把没有本例支持的理论可能性与优先根因等量并列。错误日志描述的是当前实现的行为，是否符合预期接口契约须另行核对，不能由参数检查报错直接认定调用方有错。
 
-## 与统一调度的边界
+## 用户材料线索优先绑定
 
-本技能负责被路由后的日志清洗、专项诊断、可信度评估和案例处置，不负责决定是否需要多个专项 skill 协作。没有上游 `scenario.md` 时，遇到泛化日志分析请求应先让 orchestrator-skill 完成入口检索和场景分类；本技能的 `diagnosis.md` 必须保留证据时间线，供最终报告汇总。
+开始读日志前，先盘点用户描述、附件、环境清单和原始材料中的现象、日志源、硬件、CANN/Driver/Firmware、分支或提交、测试脚本/包名、算子或 API、已知问题单及复现条件。把这些字段建立为“现场线索表”，逐项绑定到后续日志中的 PID、设备、任务、时间窗和版本。用户材料明确写出的 `OOM`、`crash`、分支名、包名或“已知修复”不是装饰性标签，也不能仅因日志没有重复同一个词就排除；它们是需要用日志、公开源码和版本差异验证的上游候选。只有在同一故障窗口存在相反证据时，才降低该候选，并说明冲突。
 
-## 评估流程
+现象字段里的具体错误串、触发条件和对照结果同样是证据：例如 `invalid port speed`、非连续
+`asstrided`、某个 kernel/模式、注入 HBM UCE 后出现 Oops，或“打开 debug 后不复现”。
+它们必须出现在首错证据表和候选排序中，并与日志的更底层对象、时间和版本绑定；不能只复述
+后置的 `507034/507035`、`EZ9999` 或“任务失败”。对照条件可降低或提高竞争候选的优先级，
+但不能单独证明因果；用户材料与日志冲突时保留两层事实并指出需要的判别材料。
 
-```
-原始日志
-  │
-  ▼
-[Step 1] 清洗 → 去噪、格式化、提取关键片段
-  │
-  ▼
-[Step 2] 错误识别 → 比对 errMsg 文档，分类问题类型
-  │
-  ▼
-[Step 3] 上下文分析 → 结合日志规范和背景介绍，理解执行时序
-  │
-  ▼
-[Step 4] 代码定位 → 通过算子名称和堆栈查找源码
-  │
-  ▼
-[Step 5] 案例匹配 → 比对历史案例库，查找已知解决方案
-  │
-  ▼
-评估结论
-  │
-  ▼
-[Step 6] 可信度评估 → 五维打分 → HIGH/MEDIUM/LOW/INSUFFICIENT
-  │
-  ├─ HIGH 且关键项满足 ──→ [Step 7] 沉淀到案例库 cases.md ──┐
-  ├─ MEDIUM/待补证 ──→ 写入候选区 cases-pending.md      │
-  └─ LOW/证据不足 ──→ 回到采集补齐证据后重评             │
-                                                        │
-              案例匹配增强下一次诊断 ←──────────────────┘
-```
+错误串若已经明确写出访问对象和违反的约束（例如 scalar 访问内部 buffer 越界、GM 地址超过
+48 位、FIXP 读取 L0C 越界、LOAD3D 起始点非法），要把这条“对象 + 约束违反”直接写入主诊断和
+`direct_mechanism`；与同一故障任务绑定后可确认这一级机制。不要退化成只有 `AI Core exception`、
+`507035` 或“地址可能有问题”。`upstream_trigger` 仍需独立的触发证据；源码变量、实际地址、偏移常量和触发指令须单独标成
+`implementation_root_cause` 的待确认细节；这条边界不应阻止交付已被错误串直接支持的机制。
 
-可信度决定结论的表述强度和能否入库：HIGH 可作定论，MEDIUM 表述为"最可能原因"，
-LOW 必须写作"初步判断"，INSUFFICIENT 只给排查方向不给根因结论。
+用户报告的线索与现场直接机制分层表达：日志可确认的异常仍作为直接机制，用户材料提供的版本/分支/问题单作为上游触发候选。若用户报告或附件使用“经定位/根因是/已确认/重复问题单/回退后恢复/修复后恢复”等措辞给出既有结论，应保留为 `reported_finding`，与日志直接机制并列核对，不得被后置传播错误覆盖。此类结论必须进入最终答复的“主诊断”首段，明确标注来源、适用的版本/条件以及本次日志是否独立复核；不能因为缺少源码、core 或同一批次的复现而把它改写成“无法确定”。独立验证不足时，只降低 `implementation_root_cause` 的确认状态，不删除 `reported_finding`。若用户材料已经给出明确的分支、问题单或修复时间，优先查本地公开资料和对应实现，核对该版本是否包含修复；不要把“缺少现场 OOM 字符串”当成排除软件回退或已知缺陷的充分理由。
 
-## 子组件
+用户提供的附件、排查记录和复测结果中的既有结论同样按 `reported_finding` 处理，引用实际文件及位置；区分作者已报告定位和作者推测。材料中的“当前检查要求”与“预期应允许/应拦截”冲突时，要解释该冲突，按 [契约与优先诊断](references/diagnostic-reasoning.md#契约与优先诊断) 比较接口实现、封装适配与调用方的责任。
 
-| 组件 | 路径 | 用途 |
-|------|------|------|
-| 清洗脚本 | `scripts/clean.py` | 预处理日志，去除冗余信息，提取关键行 |
-| 背景介绍 | `references/background.md` | 为 LLM 提供 CANN 领域上下文 |
-| errMsg 文档 | `references/err-messages.md` | 官方错误码体系（模块映射、完整错误码列表、常见消息速查） |
-| 日志规范 | `references/log-spec.md` | 官方日志格式、字段定义、路径结构、相关环境变量与时序说明 |
-| 故障处理参考 | `references/fault-handling.md` | AI Core Error / 内存 OOM / 进程中断 / 进程卡住 四大典型故障专题（含完整定位流程、msaicerr/asys 工具使用、子类型判断和典型案例），以及故障定位工具使用指南 |
-| AI Core Error 专项参考 | `references/ai-core-reference.md` | CANN 9.0.0 官方 AI Core / AI Vector Core 排查流程、关键证据和典型案例；仅在现场版本和适用条件可核对时使用 |
-| Coredump 命令手册 | `references/coredump-command-playbook.md` | Host core、Device Stackcore、msnpureport/asys、符号路径、源码映射和日志关联的命令模板 |
-| Coredump 报告模板 | `references/coredump-report-template.md` | CANN 崩溃专项分析报告模板和证据完整性检查清单 |
-| 代码仓地址 | `references/code-repos.md` | CANN 及相关开源仓库地址，便于溯源 |
-| 常见案例库 | `references/cases.md` | 历史典型问题及解决方案 |
-| 可信度评估规范 | `references/confidence-assessment.md` | 五维评分模型（证据完整性/一致性/因果链/复现验证/知识对齐）、入库关键项、可信度等级与处置 |
-| 可信度评分脚本 | `scripts/assess_confidence.py` | 按检查表计算可信度分数、等级和案例库入库判定 |
-| 案例沉淀规范 | `references/case-contribution.md` | 入库门槛、案例格式、去重合并、脱敏要求、案例库维护 |
-| 案例沉淀脚本 | `scripts/promote_case.py` | 把高可信报告转为规范案例写入 `cases.md` 或候选区 |
-| 候选案例库 | `references/cases-pending.md` | 待补证的候选案例（首次沉淀时自动创建） |
+## 现场与专项知识
 
-## 使用步骤
+读取用户描述、环境和原始材料，保留任务身份、阶段、关键原文及位置。大日志或多次运行按 [日志窗口与签名](references/diagnostic-reasoning.md#大日志与重复运行) 检查覆盖和失败归属。根据当前错误机制查阅下表；只加载相关资料。
 
-### 1. 清洗日志
+需要核实具名 API 的参数、单位、存储空间或生命周期时，先读取
+[离线官方文档入口](references/api-docs.md)选择所属仓库的语料，再按完整 API 名查询并读取
+匹配变体的参数和约束原文。检索器默认只查 Ascend C，不会自动搜索 ACLNN 等其他语料。
+核对版本及型号条件；头文件摘要或另一型号的测试不能代替本型号的接口约束。
 
-先识别用户提供的日志路径：
-- 如果是 `.zip` 压缩包，先解压到临时目录，再按目录模式清洗
-- 如果是目录，递归清洗目录中的 `*.log`
-- 如果是单个日志文件，按单文件模式清洗
+用户材料给出仓库、commit、具名API或测试入口时，先核对[离线公开源码](references/offline-source-code.md)
+是否包含对应实现。即使日志短或未提供core，也利用匹配实现追踪参数检查、调用与资源依赖，
+给出有源码依据的具体机制候选和修复对象；公开实现事实与本次实际执行到该路径的证据分开。
+
+| 现场问题 | 参考入口 |
+| --- | --- |
+| 错误码、嵌套错误 | [err-messages](references/err-messages.md)；字段或路径含义不明时查 [log-spec](references/log-spec.md) |
+| AI Core / AI Vector / UB / MTE / FIXP | [AI Core 处理流](references/fault-flows/aicore-error-flow.md)、[CANN 9.0.0 专项](references/ai-core-reference.md)；自定义 kernel 的 Fixpipe、GM/UB 搬运或队列问题选读 [API 约束](references/ascend-kernel-api-contracts.md)，CUBE、LOAD3D 或 DataCopyPad 选读 [Cube/MTE 约束](references/ascend-cube-mte-contracts.md)，核对型号、版本及条件 |
+| 掉卡、设备不可见 | [掉卡处理流](references/fault-flows/card-drop-flow.md) |
+| 卡住、HCCL / Notify / Event / Stream 超时 | [超时处理流](references/fault-flows/hang-flow.md) |
+| Host core、Device Stackcore、进程中断 | [崩溃处理流](references/fault-flows/crash-flow.md)、[离线解析命令](references/coredump-command-playbook.md)、[专项报告](references/coredump-report-template.md) |
+| 内存分配失败、OOM | [OOM 处理流](references/fault-flows/oom-flow.md) |
+| HIXL、单边通信、UB/灵衢 | [HIXL 专项](references/hixl-reference.md) |
+| 精度、NaN/Inf、融合 | [精度处理流](references/fault-flows/precision-flow.md) |
+| 性能劣化 | [性能处理流](references/fault-flows/performance-flow.md) |
+| ATC、离线推理 | [离线推理处理流](references/fault-flows/offline-inference-flow.md) |
+| RoCE、网络、端口告警 | [网络处理流](references/fault-flows/network-flow.md) |
+
+[故障处理专题](references/fault-handling.md) 和 [背景](references/background.md) 提供补充知识；[代码仓地址](references/code-repos.md) 用于获准的源码溯源。按现场签名定向检索 [案例库](references/cases.md)，核对适用条件后使用，不把相似案例当作当前根因。
+
+## AI Core 字段工具
+
+需要核对 kernel/hash、PC、task、args 等多字段时，先执行现有只读提取器，再回读来源上下文。以下命令从本技能目录执行：
 
 ```bash
-# 解压 zip 日志包
-unzip ./logs.zip -d ./logs_unpacked/
-
-# 清洗单个日志文件
-python3 scripts/clean.py --input ./logs/plog_runtime.log --output ./cleaned/plog_clean.log
-
-# 清洗整个目录
-python3 scripts/clean.py --input-dir ./logs/ --output-dir ./cleaned/
-
-# 仅提取 ERROR 及以上级别
-python3 scripts/clean.py --input ./logs/merged.log --level ERROR --output ./cleaned/errors_only.log
+python3 scripts/extract_aicore_evidence.py --input <已解压日志路径> --summary --max-file-bytes 268435456 --max-total-bytes 536870912
 ```
 
-### 2. 分析清洗后日志
+核对 `files` 覆盖、完整多值异常签名和 `partial` 范围。计数是逐行观测，不是独立任务数；相同签名不证明同一根因。需要全部字段时去掉 `--summary`，按 [字段视图](references/diagnostic-reasoning.md#ai-core-字面字段视图) 控制输出。执行失败则保留实际错误并继续原文分析。
 
-将清洗后的日志与以下参考文档结合进行分析：
-- 先查阅 `references/err-messages.md`，识别错误码含义
-- 对照 `references/log-spec.md`，理解日志字段和时序
-- 搜索 `references/cases.md`，查找相似历史案例
-- 如果存在 coredump、core 文件、Stackcore、SIGSEGV/SIGABRT 或 asys/msnpureport 崩溃产物，加载 `references/coredump-command-playbook.md` 与 `references/coredump-report-template.md` 做专项分析
+AI Core 设备错误解码后，必须在当前 `log/` 全范围检索并回读上下文：`DataCopyPad|Fixpipe|LoadData2D|LoadData3D|asc_copy|workspace|tiling|PI|capture|IMP|DISP|ACSVIOL|ECC`，同时用 kernel/hash/PC 绑定源码或产物线索。命中 API、参数转储、源码片段或用户材料已报告的实现结论时，将具体字段/值写入 `implementation_root_cause`；未命中时才保留为 `hypothesis/undetermined`。只引用错误码、kernel 名或最后一条 `Task run failed` 不算完成该步骤。
 
-### 3. 典型故障分析
+若 `errorStr` 本身已经给出对象和边界，命中该语义即可形成“直接机制 + 约束违反”的两层结论：例如
+`The GM address accessed by scalar exceeds 48 bits` 应明确写成“scalar 对 GM 的有效地址超出
+48 位约束”，`The address for FIXP to read L0C is out of bounds` 应明确写成“FIXP 读取 L0C
+的地址/跨度越界”。只有在需要落到源码变量、指令操作数或具体偏移时，才等待参数、反汇编或
+源码证据；不要因为缺少这些更深层材料而把已明确的约束违反写成未知。
 
-当识别到以下典型故障时，先读 [处理流公共约定](references/fault-flows/common-flow.md)，再按对应处理流进行深入分析：
+`build_error.log`、编译器输出和产物路径也属于当前现场材料。若其中出现 `Build files have been written to`、目标名或稳定的测试目录标签（例如 `.../fixp_...`、`.../load3d_...`、`.../mte_...`），必须记录该标签，并与 `errorStr`、错误位、PC、kernel/hash 交叉核对。标签能直接说明该运行产物针对的缺陷类别时，可作为 `reported_finding` 或最可能上游触发写入主诊断；它不能单独证明源码行、现场参数值或实际执行分支。若标签与设备错误冲突，保留冲突并以同一任务的设备首错为直接机制。
 
-| 场景 | 剧本 | 流程 | 重点 |
-| --- | --- | --- | --- |
-| `card_drop` | [掉卡](references/fault-flows/card-drop-flow.md) | 掉卡定位流程 | npu-smi 查卡/PCIe 断链/告警/单点芯片故障更换 |
-| `aicore_error` | [AI Core Error](references/fault-flows/aicore-error-flow.md) | AIC Error 定位流程 | EZ9999 嵌套详情、首错、RAS/ECC、DMI 压测、软硬件判定 |
-| `hang` / `comm_timeout` | [卡住与通信超时](references/fault-flows/hang-flow.md) | 超时类问题定位流程 | Notify/Event/Host 建链/流同步 4 类超时、各 rank 进展/退出 |
-| `crash` | [进程中断](references/fault-flows/crash-flow.md) | coredump 类问题定位流程 | host dump/device dump 两条线、信号/符号匹配、首错组件 |
-| `oom` | [OOM](references/fault-flows/oom-flow.md) | NPU OOM 问题定位流程 | 长稳变化/各组件内存/空闲占用/变化点 |
-| `precision` | [精度异常](references/fault-flows/precision-flow.md) | 精度异常定位流程 | 调优前检查/浮点溢出/融合检测/UB Fusion 伪码 |
-| `performance` | [性能问题](references/fault-flows/performance-flow.md) | 性能问题定位流程 | Host 慢/Device 瓶颈、profiling 定位、计算/访存/通信/IO 分维 |
-| `offline_inference` | [离线推理/ATC](references/fault-flows/offline-inference-flow.md) | 离线推理定位流程/ATC | 版本确认/参数校验/环境变量/内存不足/算子报错 |
-| `network` | [网络排查](references/fault-flows/network-flow.md) | 排查网络 | 诊断平台/端口闪断/RoCE 侧/超时代答 |
+## 交付与其他模式
 
-其他场景按 [错误码](references/err-messages.md)、[日志规范](references/log-spec.md) 和 [背景](references/background.md) 分析，保留其原场景，不硬塞进上述类别。
+直接交付诊断正文和关键日志引用。正文固定包含：首错证据表；`direct_mechanism / upstream_trigger / implementation_root_cause` 三层根因状态；每跳带证据和反证的因果链；绑定具体字段/约束、修改对象和验证判据的修复表；证据缺口与可信度。错误模块、kernel 名、等待函数或单个错误码只能确认直接机制；没有现场参数、源码 `file:line` 或等价实现证据时，实现根因必须写为 `hypothesis/undetermined`，不能把检查清单写成已确认根因。未执行的验证写为计划。无需为普通诊断运行清洗、完整性评分或入库脚本；确需清洗时查 [证据保护约定](references/fault-flows/common-flow.md)。
 
-### 4. 代码定位
+若存在 `reported_finding`，正文顺序固定为：用户材料已报告的主诊断及来源/边界；日志独立支持的直接机制和首错；三层根因状态及其中哪些尚未独立确认；冲突或缺口；修复与验证。用户材料报告的具体问题单、PR、分支回退或恢复现象必须按原意复述，并与“本次现场已确认”的措辞区分。
 
-如果日志中出现算子名称或文件路径，参考 `references/code-repos.md` 找到对应源码仓库进行深入分析。
-
-### 5. 可信度评估（必做）
-
-得出评估结论后，必须按 `references/confidence-assessment.md` 对结论本身做可信度评估，
-不要直接把推断当成定论输出。
-
-```bash
-# 生成检查表
-python3 scripts/assess_confidence.py --template > confidence.json
-
-# 按诊断实际情况把 checks 中的 value 填为 true/false，然后打分
-python3 scripts/assess_confidence.py --input confidence.json
-
-# 输出机器可读结果，供案例沉淀脚本消费
-python3 scripts/assess_confidence.py --input confidence.json --json > confidence_result.json
-```
-
-填写要点：
-
-- 五维共 17 个检查项，逐项按"是否有证据支撑"判定，没有把握的一律填 `false`
-- 关键项（首报错已定位、因果链无跳跃）未满足时不允许入库，无论总分多少
-- 非崩溃场景的 `has_crash_artifacts` 填 `true`
-- 评分结果的 `missing_items` 直接作为"待补材料"清单写进报告
-
-按可信度等级调整结论表述：
-
-| 等级 | 分数 | 表述方式 |
-| --- | --- | --- |
-| HIGH | ≥ 85 | 可作定论 |
-| MEDIUM | 70–84 | "当前证据下最可能的原因" |
-| LOW | 50–69 | "初步判断" |
-| INSUFFICIENT | < 50 | 不给根因结论，只给排查方向和补采建议 |
-
-### 6. 沉淀到案例库
-
-可信度评估的 `case_gate` 字段决定是否入库，规则见 `references/case-contribution.md`。
-
-```bash
-# 干跑确认将写入的案例内容
-python3 scripts/promote_case.py \
-    --report ./diagnosis_report.md \
-    --confidence ./confidence_result.json \
-    --dry-run
-
-# 正式写入（accept → cases.md，pending → cases-pending.md）
-python3 scripts/promote_case.py \
-    --report ./diagnosis_report.md \
-    --confidence ./confidence_result.json
-
-# 候选案例补齐证据、重评达 HIGH 后转正
-python3 scripts/promote_case.py --promote PCASE-001 --confidence ./confidence_result.json
-```
-
-脚本会自动做三件事，命中任一即中断，需要人工处理后重试：
-
-- **入库门槛**：`reject` 时直接退出并列出缺失证据（退出码 2）
-- **脱敏检查**：命中 IP、家目录、凭据、邮箱等模式时中断（退出码 3）
-- **重复检索**：疑似已有同类案例时提示优先合并，确认为不同根因用 `--force`（退出码 4）
-
-案例库是被后续诊断复用的知识，错误案例会持续误导诊断。宁可留在候选区，也不要污染主库。
-
-## 评估输出
-
-评估结论应包含以下内容：
-
-```markdown
-## 评估结论
-
-### 问题分类
-- 类型：[算子计算错误 / 编译失败 / 性能劣化 / 通信超时 / OOM / 其他]
-- 严重程度：[FATAL / ERROR / WARNING]
-
-### 根因分析
-- 根因描述（具体到算子/模块）
-- 相关日志行：`<日志片段>`
-- 对应错误码：ExxYYYZZZ（含义：...）
-
-### 影响范围
-- 受影响的 rank/设备
-- 执行阶段（编译期/运行时）
-
-### 建议修复方向
-1. ...
-2. ...
-
-### 关联案例
-- 参考案例：cases.md#<案例ID>
-
-### 诊断可信度
-
-- 综合可信度：<score>/100（<HIGH/MEDIUM/LOW/INSUFFICIENT>）
-- 维度得分：证据完整性 <x>/25 · 证据一致性 <x>/20 · 因果链 <x>/25 · 复现验证 <x>/15 · 知识对齐 <x>/15
-- 关键项：<全部满足 / 首报错日志行未定位 / 因果链存在跳跃>
-- 已证实事实：
-  - <由源码/复现/多源日志证实的结论>
-- 仍属推断：
-  - <推断内容 + 缺哪一步证据>
-- 待补材料：
-  - <具体材料 + 拿到后能提升哪个维度>
-- 案例库沉淀：<已入库 CASE-xxx / 进候选区 PCASE-xxx / 不入库（原因）>
-```
+明确要求流水线、度量/HTML报告或案例维护时，读取 [流水线使用指南](../orchestrator-skill/references/pipeline-usage.md)。`run_pipeline.py` 只准备证据草稿，其固定未知结论不能代替分析。完整性分数决定案例准入，不是根因概率。

@@ -107,6 +107,7 @@ line 是原始 1 基行号；被折叠行的 output_line=null、action=collapsed
 
 | result 字段 | 明确内容 |
 | --- | --- |
+| analysis_status | 自动证据草稿为 draft，Agent 完成实质诊断和逐项审核后改为 reviewed；evidence_only 仅用于用户明确要求的证据摘要。保留 draft 不能进入后续评分和报告 |
 | first_error | `{file,line,text,timestamp,entities,association}` 或 null；明确是否仅为最早可见候选 |
 | timeline | 事件数组：ID、时间/时钟、host/PID/rank/device、业务阶段、原文引用、正常/异常/传播角色；无时序证据时明确写无法建立时序 |
 | causal_chain | 每跳 from/to、支持证据、反证、supported/unresolved；无闭合链可为空 |

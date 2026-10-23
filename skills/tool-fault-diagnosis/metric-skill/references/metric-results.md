@@ -230,21 +230,22 @@ result_<算子或模型名>_<YYYYMMDD_HHMMSS>_rank<N>.json
 
 > 直接取评估 Skill `assess_confidence.py --json` 的输出，字段名保持一致。
 > 与 `errmsg_analysis` 的区别：后者衡量日志质量，前者衡量结论可信程度。
+> 评分与等级统一见 [可信度规范](../../eval-skill/references/confidence-assessment.md)；本表不增加报告完成门槛或评分上限。逐项结论强度来自实际证据。
 
-| 字段 | 类型 | 说明 | 达标标准 |
+| 字段 | 类型 | 说明 | 输出要求 |
 |------|------|------|--------|
-| `final_score` | int | 综合可信度（0~100）= 五维得分之和 | ≥ 70 |
-| `level` | string | HIGH(≥85) / MEDIUM(70~84) / LOW(50~69) / INSUFFICIENT(<50) | ≥ MEDIUM |
-| `dimensions.D1_evidence_completeness` | int | 证据完整性（满分 25） | ≥ 20 |
-| `dimensions.D2_evidence_consistency` | int | 证据一致性（满分 20） | ≥ 14 |
-| `dimensions.D3_causal_chain` | int | 因果链闭合性（满分 25） | ≥ 20 |
-| `dimensions.D4_reproduction` | int | 复现与验证（满分 15） | ≥ 9 |
-| `dimensions.D5_knowledge_alignment` | int | 知识对齐（满分 15） | ≥ 10 |
-| `unmet_critical` | array | 未满足的入库关键项（`has_first_error_line` / `chain_no_gap`） | 应为空 |
-| `conclusion_strength` | string | `definitive` / `most_likely` / `preliminary` / `direction_only` | — |
-| `confirmed_facts` | array | 已由源码/复现/多源日志证实的结论 | 非空 |
+| `final_score` | int | 综合可信度（0~100）= 五维得分之和 | 原样记录 |
+| `level` | string | 可信度规范定义的等级 | 原样记录 |
+| `dimensions.D1_evidence_completeness` | int | 证据完整性（满分 25） | 原样记录 |
+| `dimensions.D2_evidence_consistency` | int | 证据一致性（满分 20） | 原样记录 |
+| `dimensions.D3_causal_chain` | int | 因果链闭合性（满分 25） | 原样记录 |
+| `dimensions.D4_reproduction` | int | 复现与验证（满分 15） | 原样记录 |
+| `dimensions.D5_knowledge_alignment` | int | 知识对齐（满分 15） | 原样记录 |
+| `unmet_critical` | array | 未满足的入库关键项（`has_first_error_line` / `chain_no_gap`） | 如实保留，不阻断报告 |
+| `conclusion_strength` | string | `definitive` / `most_likely` / `preliminary` / `direction_only` | 说明适用的主张；其他主张分别保留证据状态 |
+| `confirmed_facts` | array | 现有材料已证实的结论 | 只列有证据的事实 |
 | `inferences` | array | 仍属推断的内容（含缺失的证据环节） | — |
-| `missing_evidence` | array | 待补材料清单（取评分结果的 `missing_items`） | 应为空 |
+| `missing_evidence` | array | 材料缺口清单（取评分结果的 `missing_items`） | 说明具体影响，不自动补采 |
 | `case_gate` | string | 案例库入库判定：`accept` / `pending` / `reject` | — |
 | `case_id` | string | 已沉淀的案例编号（`CASE-xxx` / `PCASE-xxx`），未入库时为 null | — |
 

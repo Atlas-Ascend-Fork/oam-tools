@@ -1,63 +1,33 @@
-# msnpureprot 日志采集规范
+# msnpureprot 本地日志采集与 msnpureport 导出
 
-## 概述
+## 名称与范围
 
-msnpureprot（MindSpore NPU Protocol）是 CANN 框架中用于宿主机与 NPU 设备之间通信的协议层日志。该日志记录算子下发指令、设备响应状态及底层驱动交互信息，是定位算子执行失败、超时或结果异常的关键依据。
-
-## 日志位置
-
-| 路径 | 说明 |
-|------|------|
-| `/var/log/npu/slog/host-0/` | 宿主机侧协议日志（按日期分目录） |
-| `/var/log/npu/slog/device-*/` | 设备侧协议日志（`*` 为设备 ID，0~7） |
-| `/usr/local/Ascend/cann-8.5.0/log/` | CANN 框架内部协议日志 |
-
-## 日志级别
-
-| 级别 | 数值 | 说明 |
-|------|------|------|
-| DEBUG | 0 | 详细通信帧信息 |
-| INFO  | 1 | 正常下发与响应 |
-| WARNING | 2 | 非致命异常，可能影响性能 |
-| ERROR | 3 | 执行失败，需要重点关注 |
-| FATAL | 4 | 不可恢复错误 |
-
-## 开启采集
+`msnpureport` 是导出Device系统日志和其他维测信息的工具。
+`msnpureprot` 是本技能采集脚本沿用的参数和目录拼写，不代表“MindSpore NPU Protocol”或任何通信协议。
 
 ```bash
-# 设置日志级别为 INFO（推荐）
-export ASCEND_GLOBAL_LOG_LEVEL=1
-
-# 或通过配置文件修改（持久化）
-vim /usr/local/Ascend/cann-8.5.0/tools/configure/acl.json
-# 修改 "log_level" 字段为 1
+bash <skill_root>/scripts/collect.sh --msnpureprot --output <collection_root>
 ```
 
-## 采集命令
+该参数只复制脚本配置的本地slog与CANN目录日志，不会执行工具导出，不能据此声称已获得完整Device现场。保留旧参数及`msnpureprot/`目录以兼容现有调用。
 
-```bash
-# 采集当前设备所有 msnpureprot 日志
-cp -r /var/log/npu/slog/ ./logs/msnpureprot/
+## 路径与设备核对
 
-# 仅采集最近 1 小时的日志（按修改时间过滤）
-find /var/log/npu/slog/ -name "*.log" -mmin -60 -exec cp {} ./logs/msnpureprot/ \;
+脚本历史默认检查`/var/log/npu/slog/`和`/usr/local/Ascend/cann-8.5.0/log/`；它们不是所有版本的固定日志位置。核对实际安装、运行用户、Host/Device日志分类、节点/设备/rank及轮转范围，再补齐其他路径。
 
-# 采集特定设备的日志（设备 ID=0）
-cp /var/log/npu/slog/device-0/*.log ./logs/msnpureprot/device-0/
-```
+设备ID范围取现场清单，不能固定为0～7；容器可见ID与物理设备ID的对应也需确认。文件内字段由实际产生日志的组件解释，不能给所有导出内容套用一套dispatch/notify协议格式。
 
-## 关键字段说明
+## 导出与补采
 
-| 字段 | 示例 | 含义 |
-|------|------|------|
-| `[taskid]` | `[task:1024]` | 任务唯一标识 |
-| `[streamid]` | `[stream:3]` | 执行流编号 |
-| `[retcode]` | `retcode=0` | 返回码，非 0 表示异常 |
-| `[op_type]` | `MatMul` | 算子类型 |
-| `[time_cost]` | `1.23ms` | 执行耗时 |
+按[全量采集流程](full-log-collection.md#3-导出-device-和综合现场)先查看实际Driver工具帮助，在新的可写目录执行该版本支持的导出命令。保留完整生成目录及stdout/stderr、退出码和设备覆盖；权限或设备不可用时记录失败。
 
-## 注意事项
+本仓asys在独立导出目录调用`msnpureport -f`，见`src/asys/collect/asys_collect.py`；这是本仓实现的接口证据，不能推定所有Driver版本均使用同一命令。
 
-- 采集前确认 `/var/log/npu/` 目录权限（通常需要 root 或 HwHiAiUser）
-- 日志文件可能较大（单文件可达数 GB），按需使用时间范围过滤
-- 采集后建议压缩：`tar -czf msnpureprot_logs.tar.gz ./logs/msnpureprot/`
+应用类日志级别与Device系统日志配置分别核对。不要将修改`acl.json`当作通用系统日志配置，也不要为采集现有材料默认变更日志级别或重跑任务。
+
+## 完整性
+
+- 保留源目录层级及轮转文件，避免同名文件平铺覆盖。
+- 修改时间筛选不能代替日志内事件时间；过滤时记录可能遗漏的上下文。
+- 核对文件非空、故障时间覆盖和设备范围；产物目录存在不代表成功。
+- 导出产物可能包括系统日志、Stackcore及其他DFX信息，内容随型号/版本/状态变化；不承诺每个目录都有全部类型。

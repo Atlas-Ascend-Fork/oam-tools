@@ -30,16 +30,13 @@ license: Apache-2.0
 
 ## 平台信息
 
-- 设备：Ascend NPU（aarch64）
-- CANN 版本：8.5.0
-- CANN 安装路径：`/usr/local/Ascend/cann-8.5.0/`
-- AICore 数量：48，UB per core：256KB
+从目标现场记录Host架构、NPU型号、可见设备、CANN/Driver/Firmware及框架版本、实际安装路径。核数、UB与HBM容量取对应型号和配置；不能把脚本中的历史默认路径或规格当成现场事实。
 
 ## 采集来源说明
 
 | 来源 | 说明 | 参考文档 |
 |------|------|----------|
-| msnpureprot | NPU 内核与驱动间的通信协议日志，记录算子下发、执行状态及返回码 | `references/msnpureprot-collection.md` |
+| msnpureprot（脚本旧名称） | 复制本地slog及CANN安装目录日志；不是协议名，也不会自动执行msnpureport导出 | `references/msnpureprot-collection.md` |
 | host 日志 | 宿主机侧系统日志，包含设备挂载、内存分配、进程状态等信息 | `references/host-log-collection.md` |
 | plog | CANN 框架运行时日志，记录图编译、算子调度、执行时序等 | `references/plog-collection.md` |
 | 全量补采 | 轮转日志、应用/HCCL/profiling、msnpureport/asys、已有 core/Stackcore/dump 和环境信息 | [全量采集流程](references/full-log-collection.md) |

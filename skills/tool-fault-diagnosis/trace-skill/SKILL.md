@@ -74,4 +74,4 @@ Context defaults to 1,000,000 us before and 100,000 us after the anchor, with at
 - `3`: no usable timestamped event or no usable/requested anchor.
 - `4`: generation, Schema validation, rendering, or artifact-write failure.
 
-When status is `3`, inspect `fault-trace-inventory.json` when present before requesting more logs. For contract fields and integration details, read [docs/specs/fault-trace-skill.md](docs/specs/fault-trace-skill.md).
+When status is `3`, inspect `fault-trace-inventory.json` when present and record the specific evidence gaps. Continue diagnosis from the available material without automatically requesting or collecting more logs. For contract fields and integration details, read [docs/specs/fault-trace-skill.md](docs/specs/fault-trace-skill.md).

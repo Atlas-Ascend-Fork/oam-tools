@@ -44,7 +44,7 @@ display hccs proxy response detail interface 200GHL1/X/X
 # 查看代答详情，包含 ProxyType、ResponseType、Address、CollectTime
 
 display for info enp s 1 c <chip-id> "get port statistic count port <port-id> module 10 type 0 path 2"
-# 查询端口是否有 rp 窝包，有 rp_id_using_cnt 字段则表示有窝包
+# 按现场版本核对 rp_id_using_cnt 的定义、取值和变化；字段存在不证明窝包
 ```
 
 ### 3. 问题根因
@@ -55,11 +55,11 @@ display for info enp s 1 c <chip-id> "get port statistic count port <port-id> mo
 **临时规避**：无通用临时规避，需根据具体代答类型定位后处理。
 
 **长期解决**：
-1. 查询超时代答开关：`disp for info enp s 1 c 0 "get oda table hccs rplp timeout"`，倒数第三列为 0 表示已关闭超时代答
-2. 查询代答统计：`display hccs proxy response statistics`，记录非 0 端口
+1. 先核对现场交换芯片、固件及命令手册；超时代答开关的查询命令和列含义以该版本为准，不固定取倒数第三列
+2. 查询代答统计：`display hccs proxy response statistics`，核对计数起点、故障时窗内增量及非 0 端口；累计非 0 不直接关联本次故障
 3. 查询代答详情：`display hccs proxy response detail interface <端口名>`，提取代答类型、端口、1520 芯片号、对端设备、代答地址、端侧设备、时间等信息
-4. 查询窝包：`display for info enp s 1 c <chip-id> "get port statistic count port <port-id> module 10 type 0 path 2"`，逐个接口查询
-5. 根据代答类型填写分析模板，结合路由 miss、port en 丢包、信用证反压等统计定位故障点
+4. 按适用版本逐接口查询资源占用，并结合多次采样、持续时间及收发进展判断是否存在持续滞留；不以字段存在或单次非 0 确认窝包
+5. 根据代答类型填写分析模板，结合路由 miss、port en 丢包及对应链路信用统计定位故障点；具体判据见 [掉卡参考](card-drop-reference.md) 与 [网络处理流](fault-flows/network-flow.md)
 
 **元信息**
 - 可信度：72/100
@@ -115,8 +115,8 @@ display for info enp s 1 c <chip-id> "get port statistic count port <port-id> mo
 1. 找到首报错，确认首报错是否为 OOM
 2. 了解业务背景状态（长稳运行态 / 网络调试态）
 3. 长稳运行态：检查报错前后是否有变化（业务代码/参数、CANN 版本、框架版本），找到变化点后由业务侧或相关组件分析
-4. 网络调试态：分析各组件内存使用情况，若框架侧使用过多则限制框架内存使用（PyTorch/MindSpore 参考对应文档设置内存参数）
-5. 空闲状态下检查内存占用是否异常，若有残留内存则清理
+4. 核对同阶段活跃量、缓存、框架配额及其他组件预算，按本次失败约束决定调整方向；框架占用高不直接要求降低配额
+5. 空闲高占用时核对进程/对象归属，区分有效工作、可复用缓存和已证实残留；具体分支以 [OOM处理流](fault-flows/oom-flow.md) 为准
 
 **元信息**
 - 可信度：72/100
@@ -1223,36 +1223,24 @@ NPU 训练或推理性能不达预期，包括首步性能差、长稳性能劣�
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# Host Core Dump：
-# - plog 部分卡有报错（若 plog 没有报错，优先上层分析）
-# - 是否有卡提前退出 → 确定业务是否为 host core dump
-# - 能否确定和 CANN 无关 → 能则上层框架或业务侧定位
-# - 不能则能否锁定根因组件 → 能则对应组件定位，不能则配置 core 文件
-
-# Device Core Dump：
-# - 报错码 E39999，plog 的 deviceos 日志没有相应的 error 日志 → 大概率 device coredump
-# - 或 plog 日志中有 HDC send err ret(25) 的打印信息
-# - device 侧 core，进入销毁流程，释放资源（包括销毁 hdc server）
+# Host：按信号、PID、退出状态、core 或 tracer 栈关联同次运行。
+# plog 无错、缺少 CANN 帧或没有 core 均不能独自确定责任组件。
+# Device：核对对应 Device、PID/subProcPid、时窗和 Stackcore/异常记录。
+# E39999、HDC session 关闭或 hdc server 销毁只提供回溯线索，不确认 core。
 ```
 
 ### 3. 问题根因
-本条为定位流程类，无单一根因。Host Core Dump 可能根因：程序 bug 导致 segment fault、host OOM 杀进程、框架/业务侧问题。Device Core Dump 可能根因：AICPU 组件异常、TDT 组件异常、device 侧程序 bug。
+本条为定位流程类，无单一根因。Host 信号崩溃与 OOM killer 等退出机制需分别核对；后者不等于生成 core。Device 异常需由同实体的异常记录或 Stackcore 支持，通信通道关闭本身不能确认其原因。
 
 ### 4. 解决方案
 
 **临时规避**：无。
 
 **长期解决**：
-1. 判断是 Host Core Dump 还是 Device Core Dump（参见 PCASE-035、PCASE-027）
-2. Host Core Dump：
-   - 检查是否有卡提前退出（参见 PCASE-037）
-   - 确定 business 是否为 host core dump（参见 PCASE-035）
-   - 能否确定和 CANN 无关：能→上层框架或业务侧定位；否→能否锁定根因组件，能→对应组件定位，否→配置 core 文件（参见 PCASE-039）
-3. Device Core Dump：
-   - 找到 Core Dump 的 device（参见 PCASE-027）
-   - 报错业务是否有对应的 core 文件（参见 PCASE-028）
-   - 解析 core 文件确定问题组件（参见 PCASE-029）
-   - 对应组件研发根据堆栈分析原因
+1. 按 [Crash处理流](fault-flows/crash-flow.md) 区分 Host 信号崩溃、其他退出和 Device 异常，先关联 PID、Device 与同次运行时窗
+2. 已有 core 时核对可执行文件、映射和匹配符号；缺少 so 不等于 core 开关未开。没有 core 时再核对实际进程限制、保存链路与采集覆盖
+3. 结合调用链、故障指令、参数和内存证据确定机制；栈顶组件或缺少某组件帧不直接确定责任
+4. 按已证实机制提出修复和验证；尚缺材料时明确其可区分的候选，不由通道关闭反推已发生 Device core
 
 **元信息**
 - 可信度：74/100
@@ -1394,7 +1382,7 @@ A3 场景下排查灵衢网络故障，包括端口闪断/Down、超时代答、
 ### 1. 问题现象描述及版本信息
 
 **1.1 问题描述**
-使用 Ascend DMI 工具进行 AICORE 压测和 AICORE 诊断，用于硬件故障定界（判断 AICERROR 是否为硬件问题）。工具为 Atlas 产品的标卡、板卡及模组类产品提供带宽测试、算力测试、功耗测试等功能。影响范围为硬件故障定界辅助。
+使用 Ascend DMI 的适用检测项辅助分析 AICORE 故障。检测覆盖和资源需求依产品、工具版本及项目而异；结果需与原故障实体、时窗和错误类型关联。
 
 **1.2 配套版本信息**
 
@@ -1409,7 +1397,8 @@ A3 场景下排查灵衢网络故障，包括端口闪断/Down、超时代答、
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# AICORE 压测（占用 HOST 约 20~40GB 内存，需预留足够内存）
+# 下列为历史命令示例；执行前核对现场版本、支持产品、检测项及资源需求。
+# AICORE 压测示例：
 ascend-dmi -dg -i aicore -s -sc 3 -q
 # 输出示例：
 # Stress test is being performed, please wait.
@@ -1421,21 +1410,21 @@ ascend-dmi -dg -i aicore -s -sc 3 -q
 
 # AICORE 诊断
 ascend-dmi -dg -i aicore -q
-# 诊断完成后检查环境 aic 和 bus 电压是否正常，若异常立即执行 ascend-dmi -r 恢复 NPU 环境
+# 检查结果和检测后的设备状态；恢复操作按适用产品/工具文档及当前条件决定。
 ```
 
 ### 3. 问题根因
-本条为工具使用类，无单一根因。Ascend DMI 用于辅助定界 AICERROR 是否为硬件问题：压测出问题→已知硬件问题 SOP 处理；压测没问题→疑似软件问题。
+本条为工具使用类，无单一根因。失败需区分工具/环境失败与具体检测异常，并核对其与原故障的关联；通过仅说明本次检测覆盖内未发现异常，不能排除间歇性或未覆盖硬件故障。
 
 ### 4. 解决方案
 
 **临时规避**：无。
 
 **长期解决**：
-1. AICORE 压测：`ascend-dmi -dg -i aicore -s -sc 3 -q`，压测出问题则判定为硬件问题，按标准 SOP 处理
-2. AICORE 诊断：`ascend-dmi -dg -i aicore -q`，诊断完成后检查 aic 和 bus 电压是否正常
-3. 若诊断后环境异常，立即执行 `ascend-dmi -r` 恢复 NPU 环境
-4. 压测/诊断均无问题则转入软件故障定位流程（参见 PCASE-025）
+1. 核对工具版本、产品适配及检测项，按文档确认资源需求和执行条件后选择命令
+2. 保留具体检测结果、错误类型及设备状态，与原故障的 Device、时窗和机制关联；失败不直接等于硬件损坏
+3. 检测后若状态异常，仅在对应产品/工具文档与当前条件支持时提出恢复动作，记录其适用前提
+4. 通过检测不终止其他证据分支；按 [AI Core处理流](fault-flows/aicore-error-flow.md) 继续区分硬件、地址、算子及环境候选
 
 **元信息**
 - 可信度：73/100
@@ -1536,36 +1525,31 @@ AICERROR 问题排查中，硬件压测无问题后转入软件故障定位流�
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# 定位 AICERROR 问题必要前置条件：收集 plog 日志、dump 数据、异常算子 .o 文件、msnpureport -f 获取的 device 日志
-# 单算子复现需要三类日志：异常算子编译信息（.o 和 .json）、至少 ERROR 级别的 plog 日志、异常算子 dump 数据
+# 已有 plog、dump、异常算子 .o/.json、device 日志按任务/版本关联；缺一类不阻止分析其他证据
+# 单算子工具需要的材料按其版本核对，未执行与实际复现/通过分别记录
 
 # 使用 msaicerr 工具快速定位 AI Core Error 关键原因
 python3 msaicerr.py -p ${HOME}/aic_err_info_timestamp -out $HOME/result
 # 执行后生成 info_{时间戳}/aicerror_{number}_{时间戳}/info.txt 及 test_single_op.py
 
 # 错误码分类：
-# 0x800000, mte_biu_rdwr_resp → 硬件多 bit ECC 或 A3 超平面超时代答
-# 0x0, timeout or trap error → 排查 AIC/V Timeout 类问题历史案例集
-# 其他错误码 → msSanitizer 工具诊断
+# 0x800000, mte_biu_rdwr_resp → 按适用定义比较非法GM地址、跨设备访问超时；ECC/代答另需关联证据
+# 0x0, timeout or trap error → 核对任务进展和指令
+# 其他错误码 → 按现场解码及已有检测结果继续分析
 ```
 
 ### 3. 问题根因
-本条为定位流程类，无单一根因。按错误码分类：0x800000（mte_biu_rdwr_resp）→ 硬件多 bit ECC 或 A3 超时代答；0x0（timeout or trap error）→ AIC/V Timeout 类问题；其他错误码 → 软件问题（数据越界等），需算子侧研发分析。
+本条为定位流程类，无单一根因。错误码用于选择核对入口：0x800000（mte_biu_rdwr_resp）须结合实际地址、生命周期及已有 ECC/A3 网络证据；0x0（timeout or trap error）须结合任务进展与指令解释；其他错误码按现场解码继续比较实现、输入、环境和硬件候选，不按码值直接定性为软件问题。执行与分支判定以 [AI Core Error 处理流](fault-flows/aicore-error-flow.md) 为准。
 
 ### 4. 解决方案
 
 **临时规避**：无。
 
 **长期解决**：
-1. 收集单算子复现所需信息（异常算子 .o/.json、plog、dump 数据），若信息不完整则使用 asys 工具或手工收集补充
-2. 使用 msaicerr 工具复现：`python3 msaicerr.py -p <info_path> -out <result_path>`
-3. 是否复现问题：
-   - 复现 → 算子侧研发分析解决
-   - 未复现 → 根据错误码处理：
-     - 0x800000, mte_biu_rdwr_resp → 硬件多 bit ECC（硬件维护 SOP）或 A3 超时代答（网络维护 SOP）
-     - 0x0, timeout or trap error → 排查 AIC/V Timeout 类问题历史案例集，已知问题按解决方案闭环，非已知问题转算子研发
-     - 其他错误码 → msSanitizer 工具诊断（参见 PCASE-026）后转算子研发
-4. 如未自动生成 test_single_op.py，可仿照用例手动构造单算子测试脚本
+1. 核对已有异常算子 .o/.json、完整 plog、dump 与工具版本；缺材料只限制相应判断，离线分析不自行补采
+2. 已有 msaicerr 结果按实际状态解释，区分依赖/编译、未执行、真正复现与成功；不将工具失败名当硬件或算子根因
+3. 复现仍须对齐原机制、输入与产物；未复现不排除原故障，错误码按上文适用定义比较候选
+4. 新复现/检测仅作为有条件验证计划，具体执行与分支判定见 [AI Core处理流](fault-flows/aicore-error-flow.md)
 
 **元信息**
 - 可信度：75/100
@@ -1659,7 +1643,7 @@ mssanitizer --tool=memcheck --check-unused-memory=yes application
 ### 1. 问题现象描述及版本信息
 
 **1.1 问题描述**
-训练或推理过程中需要判断是否发生了 Device Core Dump。Device Core Dump 一般 core 在 aicpu，需通过报错码和日志特征确认。影响范围为 device 侧进程异常退出。
+训练或推理过程中需要判断是否发生了 Device Core Dump。需关联同一 Device、进程和时窗的异常记录或 Stackcore；报错码及通信通道关闭只用于寻找相关材料。
 
 **1.2 配套版本信息**
 
@@ -1674,8 +1658,8 @@ mssanitizer --tool=memcheck --check-unused-memory=yes application
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# 判断方法 1：报错码 E39999 + plog 的 deviceos 日志没有相应的 error 日志 → 大概率 device coredump
-# 判断方法 2：plog 日志中有 HDC send err ret(25) 的打印信息
+# E39999、缺少相应 deviceos ERROR 或 HDC ret(25) 均不能单独确认 Device core。
+# 先核对现场版本的返回码定义，再关联对应设备/进程的异常和 Stackcore。
 
 # 典型日志：
 [ERROR] HCCP(550,python):2025-08-09-10:39:47.343,446 [ra_hdc.c:280]tid:6540,hdc_send_recv_pkt_recv(280) : [recv][hdc_send_recv_pkt]HDC recv msg err ret(25)
@@ -1683,22 +1667,22 @@ mssanitizer --tool=memcheck --check-unused-memory=yes application
 [ERROR] HCCP(550,python):2025-08-09-10:39:47.343,466 [ra_hdc.c:427]tid:6540,ra_hdc_process_msg(427) : [process][ra_hdc_msg]hdc_send_recv_pkt opcode(6) failed ret(25) phy_id(0)
 [ERROR] HCCP(550,python):2025-08-09-10:39:47.343,506 [ra_hdc.c:131]tid:6540,hdc_send_recv_pkt_send(131) : [send][hdc_send_recv_pkt]HDC send err ret(25)
 
-# 机制：device 侧 core，进入销毁流程，释放资源（包括销毁 device 侧创建的 hdc server），
-# 导致 HCCP host 侧通过 hdc 通道下发 opcode 报错 -25（session has been closed）
+# 上述为 HDC 通道收发失败示例；通道关闭可发生于多种清理或异常路径。
+# 只有找到同实体的崩溃及清理证据后，才能将其解释为本次 Device core 的后果。
 ```
 
 ### 3. 问题根因
-本条为定位方法类。Device Core Dump 后 device 侧进入销毁流程，释放 hdc server，导致 host 侧通过 hdc 通道下发 opcode 报错 ret(25)（session has been closed）。
+本条为定位方法类。Device core 是通道关闭的候选原因之一；正常清理、主动关闭及其他连接异常也需保留。HDC 返回码按现场版本解释，不由返回码直接反推进程崩溃。
 
 ### 4. 解决方案
 
 **临时规避**：无。
 
 **长期解决**：
-1. 检查报错码是否为 E39999，且 plog 的 deviceos 日志没有相应的 error 日志 → 大概率 device coredump
-2. 若无 E39999 报错码，检查 plog 日志中是否有 `HDC send err ret(25)` 打印信息
-3. 确认为 Device Core Dump 后，找到对应 device 的 core 文件（参见 PCASE-028）
-4. 解析 core 文件确定问题组件（参见 PCASE-029）
+1. 按 [Crash处理流](fault-flows/crash-flow.md) 关联报错业务的 Device、PID/subProcPid 与同次运行时窗，核对日志覆盖
+2. 查找对应进程的异常信号、Stackcore 或其他崩溃证据；HDC 关闭与 E39999 仅作回溯入口
+3. 有对应 core 时核对文件身份及符号并解析（参见 PCASE-028、PCASE-029）；没有 core 不直接认定未崩溃或保存配置错误
+4. 将已证实异常、通道清理与后继错误串联；证据不足时保留关闭原因未知
 
 **元信息**
 - 可信度：76/100
@@ -2231,7 +2215,7 @@ grep -e "error cqe" -e "Heartbeat Lost Occurred" -e "sdma error" -e "type:SDMA, 
 ### 1. 问题现象描述及版本信息
 
 **1.1 问题描述**
-训练或推理过程中出现 `error cqe status: 0x15` 报错，代表 RoCE 重传超次。可能原因是对端退出或网络故障。需先判断对端是否先退出，再排查网络问题。影响范围为通信中断，任务挂死。
+训练或推理过程中出现 `error cqe status: 0x15` 报错，需按现场版本核对其含义及关联操作。可从对端进展/退出、连接与网络状态并行回溯；单条状态码不能唯一定位原因。
 
 **1.2 配套版本信息**
 
@@ -2246,15 +2230,15 @@ grep -e "error cqe" -e "Heartbeat Lost Occurred" -e "sdma error" -e "type:SDMA, 
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# error cqe status: 0x15 代表 RoCE 重传超次
-# 判断对端是否先退出：
+# 先核对版本中的 CQE 状态定义；0x15 与下列 status[12] 不默认等价。
+# 查找关联心跳记录的历史命令示例：
 grep "cqe error status\[12\]" -r
 # 得到结果：
 [ERROR] HCCL(PID,python):YYYY-MM-DD-HH:MM:SS [heartbeat.cc:913][tid][Heartbeat]cqe error status[12], time:[YYYY-MM-DD HH:MM:SS],localIP[10.x.x.x], remoteIP:[10.x.x.x]
 # remoteIP 就是对端 IP，localIP 是本端
 
-# 通过对端 IP 找相应 run 目录 plog，如果日志里有 Destructor，且时间比 error cqe 还早，说明对端先退出了
-# 典型对端退出日志：
+# 用 IP、rank、PID、连接与操作身份关联对端；跨主机先后需核对时钟或因果依赖。
+# 下列析构仅说明组件清理，不证明整个进程退出或本次通信对端已不可用：
 [INFO] RUNTIME(PID,python):YYYY-MM-DD-HH:MM:SS [task_fail_callback_manager.cc:57] PID ~TaskFailCallBackManager: Destructor.
 [INFO] RUNTIME(PID,python):YYYY-MM-DD-HH:MM:SS [runtime.cc:2033] PID ~Runtime: deconstruct runtime
 
@@ -2272,14 +2256,11 @@ grep "ip of the pod" -rn
 **临时规避**：无。
 
 **长期解决**：
-1. 找到首报错，确认首报错为 `error cqe status: 0x15`
-2. 判断对端是否先退出：`grep "cqe error status\[12\]" -r` 获取对端 IP
-3. 通过对端 IP 找相应 run 目录 plog，检查日志中是否有 Destructor 且时间比 error cqe 早，有则对端先退出→排查对端退出原因
-4. 对端未先退出→排查网络：
-   - 排查网络诊断平台（有则根据结果排查）
-   - 本端/对端网络闪断
-   - 链路心跳丢失→找到共同关联的 rank，排查该 rank 相关的链路
-   - 排查交换机：拥塞、丢包/错包/广播风暴、芯片故障丢包
+1. 按现场版本解释实际状态码，记录本端/对端、连接和失败操作身份，确认输入覆盖与时间关系
+2. 关联对端的真实退出状态、信号、持续活动及任务进展；Destructor 不直接作为进程退出证据
+3. 若已证实对端退出在相关通信失败之前且影响该操作，追查退出原因；只有墙钟顺序时先核对时钟与依赖
+4. 同时核对相关链路、端口与故障时窗的网络证据，保留连接异常、对端阻塞等候选；未见先退出不能直接判网络故障
+5. 具体判据与覆盖边界见 [通信等待处理流](fault-flows/hang-flow.md) 和 [网络处理流](fault-flows/network-flow.md)
 
 **元信息**
 - 可信度：76/100
@@ -2325,13 +2306,13 @@ Host Core Dump 一般伴随两种现象：plog 部分卡上报超时，或所有
 # 从 plog/run 目录下各 device 对应 plog 的 size 分析
 # size 明显小于其他 device 的 → 结合训练日志和 plog 进一步分析是否提前退出
 
-# 进程提前退出的日志特征：
-# plog run 日志在超时时间点之前会有 GEfinalize 的打印
-# 训练日志中对应节点会有业务报错的 traceback 信息打印
+# 退出/清理检索线索：
+# GEfinalize只说明GE清理，结合真实退出记录核对，不单独确认进程退出
+# traceback提示业务异常路径，仍需关联PID/rank、实际退出和依赖
 ```
 
 ### 3. 问题根因
-本条为定位方法类。通过比较各 device plog size、检查 GEfinalize 打印和训练日志 traceback 确定是否有卡提前退出。
+本条为定位方法类。plog大小、GEfinalize和traceback提供检索线索；是否提前退出需匹配的PID/rank、实际退出和可靠时序证据，不能由清理记录单独确定。
 
 ### 4. 解决方案
 
@@ -2340,7 +2321,7 @@ Host Core Dump 一般伴随两种现象：plog 部分卡上报超时，或所有
 **长期解决**：
 1. 通信阶段有 device 退出：找到未上报超时的 device，从训练日志和 plog/run 目录日志联合分析
 2. plog 所有卡都未报错：比较各 device 对应 plog 的 size，size 明显小于其他 device 的优先排查
-3. 确认进程提前退出：plog run 日志在超时时间点前有 `GEfinalize` 打印；训练日志有业务报错 traceback
+3. 按真实退出/信号/调度记录与任务依赖确认状态；`GEfinalize`、traceback及小plog不独自证明提前退出
 4. 确认提前退出后，排查退出原因（host OOM、segment fault、程序 bug 等）
 
 **元信息**
@@ -2443,7 +2424,7 @@ for i in {0..7}; do hccn_tool -i $i -vnic -g ; done
 ### 1. 问题现象描述及版本信息
 
 **1.1 问题描述**
-Host 侧需要手动打开 core 文件生成开关，以便在进程发生 Core Dump 时生成 core 文件用于后续解析。影响范围为 Core Dump 调试辅助。
+核对Host转储的生成与保存条件，以解释已有core材料缺口；普通进程不要求固定的suid_dumpable、unlimited或直接文件模板。
 
 **1.2 配套版本信息**
 
@@ -2458,26 +2439,24 @@ Host 侧需要手动打开 core 文件生成开关，以便在进程发生 Core 
 再次发生同问题时，维护人员如何确认是同一个问题：
 
 ```
-# Host 侧打开 core 文件生成开关
-mkdir -p /npu/core_file/
-echo /npu/core_file/core.%t.%e.%p > /proc/sys/kernel/core_pattern
-echo 1 > /proc/sys/fs/suid_dumpable
-ulimit -c unlimited
+# 核对故障进程实际RLIMIT、dumpable及core_pattern的文件/管道处理器模式
+# 核对处理器、存储、导出和清理记录；当前终端ulimit不代替故障进程配置
+# 离线诊断不修改现场转储配置
 ```
 
 ### 3. 问题根因
-本条为工具配置类。Host 侧默认可能未开启 core 文件生成，需手动配置 core_pattern、suid_dumpable 和 ulimit -c 以生成 core 文件。
+本条为工具配置参考。core未找到可能受生成、保存、处理器、导出或清理影响，只有具体配置/失败记录支持时才确认原因。普通可dump进程不要求suid_dumpable=1，有限上限可允许生成，管道模式另按内核和处理器语义核对。
 
 ### 4. 解决方案
 
 **临时规避**：无。
 
 **长期解决**：
-1. 创建 core 文件存放目录：`mkdir -p /npu/core_file/`
-2. 设置 core 文件命名格式：`echo /npu/core_file/core.%t.%e.%p > /proc/sys/kernel/core_pattern`
-3. 允许 SUID 程序生成 core：`echo 1 > /proc/sys/fs/suid_dumpable`
-4. 取消 core 文件大小限制：`ulimit -c unlimited`
-5. 配置完成后，进程 Core Dump 时将在 `/npu/core_file/` 目录下生成 core 文件
+1. 区分Host Linux core、Host tracer和Device Stackcore，不跨来源套开关
+2. 核对故障进程的实际RLIMIT/dumpable和文件/管道模式
+3. 核对目录权限/存储或处理器的过滤、限额与失败记录
+4. 核对导出覆盖和清理记录，不能由未收集反推未生成
+5. 具体条件见 [core保存参考](coredump-reference.md#core-生成与保存条件)，新配置或复现只作为后续计划
 
 **元信息**
 - 可信度：73/100

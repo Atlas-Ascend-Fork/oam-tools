@@ -44,7 +44,8 @@ class PipelineSyncTest(unittest.TestCase):
             source = input_dir / "fault.log"
             source.write_bytes(original)
             plan_path = root / "plan.json"
-            plan_path.write_text(json.dumps({"input": {"path": str(input_dir)}}), encoding="utf-8")
+            plan_path.write_text(json.dumps({"input": {"path": str(input_dir)},
+                                             "stages": {"diagnose": {"execution": "evidence_only"}}}), encoding="utf-8")
             state_dir = root / "state"
 
             completed = subprocess.run(

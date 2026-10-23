@@ -3,6 +3,9 @@
 > 本文档基于 CANN 8.5.0（商用版）/ CANN 9.0.0-beta.2（社区版）官方故障处理文档整理，用于日志评估阶段的故障定位与处理。
 > 官方参考：[故障处理简介（商用版 8.5.0）](https://www.hiascend.com/document/detail/zh/canncommercial/850/maintenref/troubleshooting/troubleshooting_0001.html) / [AI Core Error 问题现象描述（商用版 8.5.0）](https://www.hiascend.com/document/detail/zh/canncommercial/850/maintenref/troubleshooting/troubleshooting_0002.html)
 
+> 执行范围遵守 [处理流公共约定](fault-flows/common-flow.md#1-输入与证据保护)。下文现场采集、检测、修复和复跑步骤用于理解既有记录或提出有条件的计划，已有日志诊断不自动执行；缺少结果时记录影响并继续分析现有材料。
+> 实时堆栈导出会向目标进程发送信号 35。执行 `asys collect -r=stacktrace` 前须核对信号处理配置；`ASCEND_COREDUMP_SIGNAL=none` 等禁用接收的状态可能导致进程终止，不能当作无副作用的离线解析。
+
 ---
 
 ## 故障处理总体流程
@@ -76,10 +79,10 @@ there is an aivec error exception, core id is 11, error code = 0x10, dump info:
 
 | 字段 | 说明 | 诊断用途 |
 |------|------|---------|
-| `chipId` / `dieId` | 报错芯片 ID | 多次报错 chipId 固定 → 硬件故障特征 |
-| `serial number` | 报错序号 | 异步场景下取序号最小的为首报错，从首报错开始排查 |
-| `core id` | 报错芯片核 ID | core id 固定 → 特定核硬件问题 |
-| `error code` | AI Core Error 错误码 | 如 `0x10`=Illegal instruction, `0x800000`=数组越界 |
+| `chipId` / `dieId` | 报错芯片 ID | 关联物理位置及独立事件；固定位置也可能与作业分配或相同输入有关 |
+| `serial number` | 报错序号 | 在同一可比较范围内结合任务标识和局部时序选择首报错候选 |
+| `core id` | 报错芯片核 ID | 固定位置是候选线索，须结合负载、RAS/ECC 与受控设备对照 |
+| `error code` | AI Core Error 错误码 | 按型号/版本结合 errorStr 解码；`0x800000` 单独出现不证明数组越界 |
 | `errorStr` | 错误码文字描述 | 直接说明错误类型 |
 | `fault kernel_name` | 报错算子 kernel 名称 | **分析的首要入口**，定位到具体算子 |
 | `task_id` / `stream_id` | 报错任务和流编号 | 关联 plog 中的算子执行记录 |
@@ -87,14 +90,14 @@ there is an aivec error exception, core id is 11, error code = 0x10, dump info:
 | `pc start` | 程序计数器起始地址 | 定位算子内部的出错指令位置 |
 | `vec error info` | 向量单元错误信息 | AI Vector Core (aivec) 报错时的寄存器 dump |
 | `mte error info` | 内存传输单元错误信息 | 数据搬运相关错误 |
-| `ifu error info` | 指令取指单元错误信息 | 非零 → 指令缓存校验失败，排查硬件 |
-| `ccu error info` | Cube 计算单元错误信息 | AI Cube Core (aicore) 矩阵计算相关错误 |
-| `aic error mask` | AI Core 错误掩码 | 标识哪些子单元报错 |
-| `para base` | 参数基址 | 地址为 0x0 等异常值 → 内存越界/释放后使用 |
+| `ifu error info` | 取指单元状态 | 按版本解码错误位，非零原始值不单独证明校验失败或硬件损坏 |
+| `ccu error info` | CCU 状态 | 不等同 `cube error info`；结合该版本寄存器定义解释 |
+| `aic error mask` | AI Core 错误掩码 | 掩码不是已触发错误清单，结合状态寄存器和解码文本 |
+| `para base` | 任务参数块基址 | 不是全部 GM buffer 的合法区间，也不单独证明越界/释放后使用 |
 | `aivec error exception` | AI Vector Core 报错 | 向量运算单元异常 |
-| `aicore error exception` | AI Cube Core 报错 | 矩阵运算单元异常 |
+| `aicore error exception` | AI Core 异常 | 结合解码判断具体故障单元，不能仅据此认定 Cube 异常 |
 
-> **注意**：异步场景下多个算子可能连续报错，须从**首报错算子**（serial number 最小）开始排查。
+> **注意**：异步场景下首报错算子可能是受害者；serial number 只在可比较范围内辅助排序，继续回溯其输入和依赖。
 
 ### 完整定位流程
 
@@ -104,18 +107,18 @@ Step 1: 从屏幕日志提取 fault kernel_name
     ▼
 Step 2: 在 plog 中搜索 "Aicore kernel execute failed"
     │   获取完整错误上下文，确认是否多个算子报错
-    │   如有多个，按 serial number 排序，从最小的开始
+    │   如有多个，按同一可比较范围内的序号及任务时序选择首错候选
     ▼
 Step 3: 收集 Device 侧系统日志
-    │   msnpureport -d <device_id> -output ./msnpureport_output/
+    │   按现场 msnpureport --help 确认导出参数、设备范围与输出位置
+    │   保留实际生成的整个目录，参见全量采集流程
     ▼
 Step 4: 使用 msaicerr 工具分析 AI Core Error
-    │   msaicerr -i ./msnpureport_output/ -task_id <task_id> -o ./analysis/
-    │   查看 info.txt 中的 Root cause conclusion
+    │   msaicerr -p ./aic_err_info/ -out ./analysis/
+    │   在生成结果中核对 device_id / stream_id / task_id，再查看 Root cause conclusion
     ▼
-Step 5: 判断是否固定芯片/核报错
-    │   chipId/coreId 固定 → 倾向硬件故障
-    │   chipId/coreId 不固定 → 倾向软件/算子问题
+Step 5: 核对芯片/核与负载的关联
+    │   固定或不固定均不独立判定软硬件；结合 RAS/ECC、既有检测与受控对照
     ▼
 Step 6: 根据 msaicerr 分析结果判断子类型
     │   按 "常见 AI Core Error 子类型" 表格匹配
@@ -126,16 +129,16 @@ Step 7: 按子类型进行针对性排查
 ### msaicerr 工具使用详解
 
 msaicerr 专门用于解析 AI Core Error，将二进制错误信息还原为可读的算子错误报告。
+以下参数来自 oam-tools 的 `src/msaicerr/msaicerr.py`：`-p/--report_path` 指向故障信息目录，
+`-out/--output_path` 指定输出位置。现场版本仍须核对帮助；离线诊断仅引用已有结果。
+本接口没有 task_id 过滤参数，应在结果中关联设备、流和任务，不能用不存在的选项筛选。
 
 ```bash
-# 基本用法：分析整个 msnpureport 导出目录
-msaicerr -i ./msnpureport_output/ -o ./analysis_result/
+# 分析含匹配日志、exception dump 与算子产物的故障信息目录
+msaicerr -p ./aic_err_info/ -out ./analysis_result/
 
-# 指定 task_id 精确分析（推荐，避免并发任务干扰）
-msaicerr -i ./msnpureport_output/ -task_id 442 -o ./analysis_result/
-
-# 查看分析结果
-cat ./analysis_result/info.txt
+# 查找实际生成的报告；不要假定输出根目录直接包含 info.txt
+find ./analysis_result/ -name info.txt
 ```
 
 **info.txt 输出结构：**
@@ -160,7 +163,7 @@ cat ./analysis_result/info.txt
 input[0] addr: 0x124080042000 end_addr:0x124080042100 size: 0x100
 input[1] addr: 0xaaaaaaaa end_addr:0xaaaaaab2 size: 0x8   # [ERROR] out of range
 input[2] addr: 0x0 end_addr:0x4 size: 0x4                 # [ERROR] out of range
-# addr 为 0x0 或 0xaaaaaaaa 等异常值 → 内存越界/释放后使用
+# 以上仅为异常地址示例；须核对有效分配范围和地址来源，UAF 还需释放时序
 ```
 
 **分析结果包含：**
@@ -176,8 +179,9 @@ input[2] addr: 0x0 end_addr:0x4 size: 0x4                 # [ERROR] out of range
 cp -r $HOME/ascend/log/debug/plog/ ./collected/plog/
 cp -r $HOME/ascend/log/run/plog/ ./collected/plog_run/
 
-# 2. 用 msnpureport 导出 Device 侧系统日志
-msnpureport -d 0 -output ./collected/device0_syslog/   # -d 指定 device_id
+# 2. 查看现场工具帮助，再按支持的参数导出Device系统日志
+msnpureport --help
+# 完整步骤见 collect-skill/references/full-log-collection.md；保留整个导出目录
 
 # 3. 手动收集算子编译信息（算子 .o 和 .json 文件）
 find ~/.cache/atc/ -name "*.o" -o -name "*.json" | \
@@ -199,15 +203,15 @@ npu-smi info -t board -i 0 > ./collected/board_info.txt
 
 | 子类型 | 典型现象 | 判断依据 | 根因 | 处理方向 |
 |--------|---------|---------|------|---------|
-| **HBM 比特 ECC 故障** | 固定 chipId 报错 | dmesg 含 `ECC error`；chipId 多次报错不变 | HBM 硬件位翻转 | 联系硬件支持；迁移工作负载到其他芯片 |
-| **icache 数据校验故障** | `ifu error info` 非零，固定 core 报错 | core id 多次报错不变；ifu error info 非零 | 指令缓存校验失败 | 排查硬件；考虑算子改写绕过 |
-| **AI Core 超时故障** | `EE1002 Execution_Error_Stream_Synchronize_Timeout` | 错误码 EE1002；plog 显示 task dispatch 后无 done 记录 | 算子执行挂起 | 检查算子 tiling；排查死循环逻辑 |
-| **AI Core 硬件故障** | 持续固定 chipId/coreId 报错 | 同一位置重复报错；`npu-smi info -t health` 异常 | 芯片损坏 | 联系硬件支持，更换硬件 |
-| **索引类算子索引越界** | `error code=0x800000` (数组越界) | error code 为 0x800000 | 算子输入 index 超出 Tensor 范围 | 检查算子输入 index Tensor 数值是否越界 |
-| **atomic add 精度溢出** | msaicerr 输出 "Atomic add has a precision overflow" | msaicerr 结论为精度溢出；**且** slog 日志无 "Vm fault failed" 关键字 | FP16/BF16 atomic add 溢出 | 换用 FP32 accumulate；检查学习率；精度调优 |
-| **算子输入输出数据地址异常** | msaicerr 输出 "memory address is abnormal" | info.txt 中 input[N] addr 为 0x0 或 0xaaaaaaaa 等异常值 | 内存越界 / 释放后使用 | 离线推理检查应用源码；框架场景联系技术支持 |
-| **算子输入 args 下发前后不一致** | 结果随机错误 | msaicerr 无法定位明确错误；问题随机出现 | 多线程竞争 / 内存覆写 | 检查多流并发写入保护 |
-| **Dump 数据失败** | Dump 目录无文件 | `EP0001`/`EP0002` 错误码 | Dump 路径/权限/磁盘问题 | 检查 Dump 路径权限和磁盘空间 |
+| **HBM 比特 ECC 候选** | 匹配设备和时间的 ECC 事件 | 按型号/版本解码事件类型、地址和严重程度；区分 Host 内存与 Device HBM | 支持相应内存硬件分支，关联本次任务后判断影响 | 根据具体告警处置，必要时安排受控设备对照 |
+| **icache 数据校验候选** | 解码明确指向取指/缓存校验 | 核对实际错误位、产物及已有 RAS/检测记录；IFU 非零或固定 core 不单独成立 | 缓存、取指或产物相关原因待缩界 | 比较匹配产物、设备记录和故障指令，不直接宣告坏卡 |
+| **AI Core 超时故障** | `EE1002 Execution_Error_Stream_Synchronize_Timeout` | 结合任务类型、日志覆盖范围及 dispatch/done/依赖 | 已确认未按期完成；死循环、等待、丢失进展记录等需区分 | 追踪生产者及调度进展，有执行证据再检查内核循环 |
+| **AI Core 硬件候选** | 重复设备异常并有相关健康/检测信息 | 解释实际健康告警，并核对 RAS/ECC、受控复现及作业分配 | 可能硬件故障；固定位置和笼统 health 异常不等于芯片损坏 | 按具体硬件事件隔离或检测，证据确认后安排硬件处理 |
+| **索引类算子索引越界** | 索引算子发生地址异常 | 必须比较实际 index 与对应维度，不能仅凭 `0x800000` | 只有范围约束确被违反才确认输入索引越界 | 修正非法 index；缺输入时保留地址来源、tiling 和生命周期分支 |
+| **atomic add 精度溢出候选** | msaicerr 输出 "Atomic add has a precision overflow" | 核对产品适用性、并发误报、slog 覆盖与输入范围；缺少 `Vm fault failed` 不独立确诊 | 可能数值溢出，亦可能工具误报或其他访问异常 | 证实数值分支后再评估累加精度与输入范围，并验证数值语义 |
+| **算子输入输出数据地址异常** | msaicerr 输出 "memory address is abnormal" | 核对该工具使用的实际有效分配区间、访问大小和异常原文 | 地址访问异常；越界、未初始化或释放后使用等须追踪来源 | 检查传入地址与分配记录；UAF 需关联实际释放与使用时序 |
+| **算子输入 args 下发前后不一致** | 同一任务执行前后参数快照有实际差异 | 核对任务、参数块、快照阶段及其预期可变性；随机错误本身不足 | 参数区可能被覆写或存在竞争，具体写入者待核实 | 追踪参数区写入者、访问范围与多流依赖 |
+| **Dump 数据失败** | 原始日志明确报告 dump 失败 | 区分配置/路径/权限/空间错误与输入输出地址不可读；目录空不独立确诊 | 工具采集失败，可能另有上游访问异常 | 按实际失败原文处理，不把 dump 失败当作业务根因 |
 
 ### atomic add 精度溢出详细诊断
 
@@ -218,8 +222,8 @@ npu-smi info -t board -i 0 > ./collected/board_info.txt
 grep -r "Vm fault failed" ./msnpureport_output/*/slog/dev-os-*/debug/device-os/device-os_*.log
 ```
 
-- **无 "Vm fault failed"** → 确认是 atomic 精度溢出问题，通过精度调优解决
-- **有 "Vm fault failed"** → 实际是内存越界问题，不是精度溢出，需按地址异常排查
+- **未见 "Vm fault failed"**：先确认已提供的 slog 覆盖本次任务和时间窗，再结合产品型号、并发误报和输入范围评估精度溢出候选，不能凭关键词缺失确诊。
+- **出现相关 "Vm fault failed"**：优先追踪地址映射、访问范围及生命周期；关联本次任务后分析访问异常，不能把它泛化为所有任务的唯一根因。
 
 > **注意**：Atlas A2 训练/推理系列产品上，由于硬件优化，不会出现 atomic add 精度溢出问题。
 
@@ -299,20 +303,15 @@ OOM 现象
 ### HBM 内存分析工具
 
 ```bash
-# 实时监控 HBM 使用（指定 device_id）
+# 核对现场npu-smi帮助中卡/芯片ID定义后查看内存，勿混用逻辑device_id
 npu-smi info -t memory -i 0
 
-# CANN 各组件内存统计（需应用进程在运行时）
-# 通过设置环境变量让 CANN 打印内存统计
-export CANN_MEMORY_DEBUG=1
-
-# 查看 GE 内存分配日志
+# 从已有日志核对内存统计，保留文件内顺序；新增统计需核对版本支持
 grep -i "memory\|alloc\|free" $HOME/ascend/log/debug/plog/plog-*.log | \
-    grep -i "GE\|ACL" | sort -k5
+    grep -i "GE\|ACL"
 
-# 查看 Device 业务进程内存（通过 msnpureport 导出后分析 device syslog）
-msnpureport -d 0 -output ./syslog/
-grep -i "memory" ./syslog/*.log | grep -i "used\|free\|total"
+# Device业务进程内存：按现场帮助完成msnpureport导出后，检索实际目录
+grep -Ri "memory" <device_export_dir> | grep -i "used\|free\|total"
 ```
 
 ### Host 侧内存分析
@@ -333,64 +332,30 @@ grep -i "hccl.*buffer\|hccl.*memory" $HOME/ascend/log/debug/plog/plog-*.log
 
 ### asan 工具检测内存错误（Host 侧）
 
-```bash
-# 编译时开启 asan（检测越界、use-after-free 等）
-export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libasan.so.5
-export ASAN_OPTIONS="halt_on_error=0:log_path=/tmp/asan_report"
-python train.py
+ASan需要编译器插桩及匹配的运行库。可重构建的Host native模块按对应工具链在编译与链接阶段启用`-fsanitize=address`，保留符号并核对Host架构和运行库版本，再在复现条件下分析报告。仅给现有Python进程预加载固定路径的libasan，不会给全部未插桩native代码补上访存检查，也不检查Device kernel。
 
-# 查看 asan 报告
-cat /tmp/asan_report.*
-```
+没有可重构建模块或匹配运行库时，说明检测覆盖限制，继续分析已有core/堆栈和内存证据。不要把未执行的插桩验证写成已排除越界。
 
 ### 典型 OOM 场景与解决方案
 
-| 场景 | 现象 | 根因 | 解决方案 |
+| 场景 | 现象 | 待验证候选 | 条件修复与验证 |
 |------|------|------|---------|
-| 大模型推理图加载 OOM | `Load graph failed`, HBM 100% | 模型参数+激活+KV cache 超 HBM 容量 | 模型并行/量化推理/减小 KV cache |
-| 训练激活内存 OOM | 训练中 step 开始时 OOM | 激活内存未复用/未重计算 | 开启 activation checkpointing/recompute |
-| HCCL 通信 buffer OOM | 通信阶段 OOM | HCCL 内部 buffer 占用过多 | 减小 buffer_size/减少通信频率 |
-| 数据预处理 Host OOM | DataLoader 阶段 Host OOM Kill | num_workers 过多/预取缓存过大 | 减少 num_workers/prefetch_factor |
-| 多卡训练某 rank OOM | 某 rank 被 Kill，其余 rank 卡住 | 该 rank 额外分配了内存（如日志/缓存） | 均衡各 rank 内存分配 |
+| 推理图加载申请失败 | `Load graph failed`及内存错误 | 容量/预算、图资源、其他占用或碎片 | 先量化故障时刻同口径占用，按已确认组成调整，不由阶段推定KV/激活大小 |
+| 训练step内存申请失败 | step内出现OOM | 活跃tensor峰值、保留缓存、额外图/通信等 | 激活占用已证实时测试检查点；比较同输入峰值与训练语义 |
+| 通信阶段资源失败 | HCCL分配或资源创建失败 | 通信内存、SQ/CQ等配额、其他进程/通信域占用 | 先确认失败资源类型；调整buffer仅适用于已证实的内存贡献 |
+| 预处理进程退出 | DataLoader附近退出及内存压力 | Host/cgroup内存上限或其他退出原因 | 先关联OOM事件与PID/rank，再按实测worker/预取贡献调整 |
+| 某rank退出、其他rank等待 | Kill记录与通信等待 | OOM、人工/调度器信号、应用错误等 | 核对退出来源及首错；不能由Kill直接判额外内存或泄漏 |
 
 ### 内存优化手段速查
 
-```python
-# PyTorch + torch_npu 常用优化
+按实际占用来源选择条件修复，具体API和参数查现场框架/后端版本：
 
-# 1. 减小 batch size
-batch_size = 8  # 从 32 减小
-
-# 2. 开启梯度检查点（减少激活内存）
-from torch.utils.checkpoint import checkpoint
-output = checkpoint(model_layer, input)
-
-# 3. 开启混合精度（减少模型内存）
-from torch_npu.contrib import transfer_to_npu
-# AMP 自动处理
-
-# 4. 设置内存增长模式
-torch.npu.set_per_process_memory_fraction(0.9, device=0)
-
-# 5. 手动清理缓存
-torch.npu.empty_cache()
-
-# 6. 开启重计算（MindSpore）
-# model = mindspore.nn.Recompute(model)
-```
-
-```bash
-# 环境变量方式优化
-
-# 开启 GE 内存复用
-export GE_USE_STATIC_MEMORY=1
-
-# 设置 HCCL buffer 大小
-export HCCL_BUFFSIZE=120
-
-# 减少算子编译缓存占用
-export ASCEND_OPP_PATH=/usr/local/Ascend/ascend-toolkit/latest/opp
-```
+- batch或训练激活主导峰值时，再测试减小batch、梯度累积或检查点/重计算，核对语义与吞吐影响。
+- 参数/激活类型确实主导占用且任务支持时，评估混合精度；导入迁移工具本身不等于启用AMP。
+- 框架每进程内存比例是分配预算/上限，不能称为“内存增长模式”；提高上限需核对物理可用量与其他进程，降低上限也可能更早OOM。
+- 清理缓存只可能释放未使用的缓存块，不能释放活跃tensor，也不解决所有碎片或其他组件的资源耗尽。
+- HCCL buffer调整须先证实其实际占用和通信约束，不能一律设为固定数值。
+- `ASCEND_OPP_PATH`用于算子库路径，不是减少编译缓存的开关；修改它可能改变加载产物，不能作为通用OOM修复。
 
 ---
 
@@ -415,18 +380,18 @@ Step 1: 确认进程退出方式
     ├── 进程退出码 → echo $?
     │   139 = SIGSEGV (段错误)
     │   134 = SIGABRT (异常终止)
-    │   137 = SIGKILL (被杀，通常是 OOM Killer)
+    │   137 = 常见shell中的128+SIGKILL；结合退出记录确认信号来源，不能单凭137断定OOM
     ├── dmesg 中是否有 OOM Kill / signal 信息
     └── 是否产生 coredump 文件
 
 Step 2: 收集故障信息
-    ├── plog 日志 → 最后一条 ERROR 日志定位触发位置
-    ├── coredump 文件 → ulimit -c unlimited 开启后收集
+    ├── plog 日志 → 以末尾异常为回溯入口，核对同一任务的首错候选、传播及清理事件
+    ├── coredump 文件 → 按进程实际限制、dumpable及文件/管道处理器配置核对已有产物
     ├── Python 堆栈 → faulthandler 模块
     └── Host 侧 dmesg / syslog
 
 Step 3: 分析 coredump
-    ├── 使用 asys 工具: asys analyze -coredump core.xxx
+    ├── 使用 asys 工具: asys analyze -r=coredump --exe_file=<exe> --core_file=<core>
     ├── 或使用 gdb: gdb -c core.xxx <executable>
     └── 查看崩溃时线程堆栈
 
@@ -441,14 +406,14 @@ Step 5: 按典型场景匹配处理
 ### coredump 分析工具
 
 ```bash
-# 开启 coredump（任务启动前执行）
+# Host直接文件模式的限制设置示例；有限上限也可生成core，管道处理器另按其语义核对
 ulimit -c unlimited
 
 # 查找 coredump 文件
 find / -name "core.*" -newer /tmp/task_start_time 2>/dev/null
 
-# 使用 asys 分析（推荐）
-asys analyze -coredump core.python.12345
+# 使用匹配本次 core 的可执行文件分析
+asys analyze -r=coredump --exe_file=/usr/bin/python3 --core_file=core.python.12345 --output=./core_analysis/
 
 # 使用 gdb 分析
 gdb /usr/bin/python3 core.python.12345 -batch \
@@ -463,7 +428,9 @@ faulthandler.enable()
 
 ### 典型案例
 
-#### 调用 SetDevice 接口错误导致无可用 Context
+以下是故障机制的调查示例，不附独立现场与修复记录。现象与命令仅作入口，各候选须由本次证据确认，不能由一条通用报错直接套用根因。
+
+#### 无可用 Context
 
 **现象**：多线程/多进程场景下程序崩溃，日志出现 `context not available`
 
@@ -472,9 +439,9 @@ faulthandler.enable()
 grep -i "context.*not.*available\|SetDevice" plog-*.log
 ```
 
-**根因**：在错误线程中调用 `aclrtSetDevice`，导致其他线程的 Context 失效
+**候选与核对**：检查当前线程绑定的设备/Context、创建与销毁顺序、进程边界和实际API返回。`context not available`不能单独证明某线程的SetDevice调用使其他线程Context失效。
 
-**处理**：确保每个线程独立创建 Context，`aclrtSetDevice` 与 `aclrtCreateContext` 在同一线程中调用
+**条件处理**：按现场版本的Context/线程语义修正绑定与生命周期；用调用轨迹确认失败点获得有效Context，不假设所有场景都需每线程独立创建。
 
 #### rtMemcpyAsync 异步参数校验报错
 
@@ -485,9 +452,9 @@ grep -i "context.*not.*available\|SetDevice" plog-*.log
 grep -i "rtMemcpyAsync.*failed\|Invalid_Argument" plog-*.log
 ```
 
-**根因**：传入的 src/dst 内存地址非法（空指针或已释放内存）
+**候选与核对**：检查完整参数错误详情、src/dst分配区间、长度/目标容量、拷贝方向、stream/Context和异步内存约束。`Invalid_Argument`本身不能锁定空指针或释放后使用。
 
-**处理**：在 `rtMemcpyAsync` 调用前校验地址有效性；确认内存生命周期覆盖异步操作完成
+**条件处理**：修正已证实违反的参数约束，并确认对象生命周期覆盖异步完成；地址非空不等于有效。
 
 #### 算子执行过程中 D2D 拷贝出错
 
@@ -500,9 +467,9 @@ npu-smi info -t board -i 0
 dmesg | grep -i "pcie.*error\|sdma"
 ```
 
-**根因**：PCIe 链路异常或 Device 间通信错误
+**候选与核对**：区分同设备与跨设备拷贝，检查地址、长度、方向、生命周期、资源和Driver/SDMA详情。D2D失败本身不证明经过PCIe或发生链路故障。
 
-**处理**：检查 PCIe 链路状态（`npu-smi info -t board`）；查看 dmesg 中的 PCIe 错误
+**条件处理**：按已确认的参数/资源机制修正；只有路径和链路事件关联时才进入对应硬件/互联调查，命令参数按现场帮助核对。
 
 #### 环境变量访问冲突导致应用程序异常终止
 
@@ -514,9 +481,9 @@ gdb /usr/bin/python3 core.python.xxx -batch -ex "thread apply all bt"
 # 堆栈中出现 getenv/setenv 调用
 ```
 
-**根因**：多线程并发读写环境变量，glibc 的 `getenv` 非线程安全
+**候选与核对**：同一进程并发修改环境可能与读取竞争，但栈在`getenv/setenv`不证明发生此竞争；还需核对有效栈、线程访问、内存破坏及对应libc语义。多进程本身不等于共享一份可变环境。
 
-**处理**：在主线程初始化阶段完成所有 `setenv` 调用；业务线程只读环境变量
+**条件处理**：已证实并发环境修改问题时，将配置在启动阶段完成或按接口约束串行管理；不要将只读`getenv`一概描述为非线程安全。
 
 #### 析构函数中调用去初始化接口 aclFinalize 导致 coredump
 
@@ -528,9 +495,9 @@ gdb /usr/bin/python3 core.python.xxx -batch -ex "bt"
 # 堆栈显示在 aclFinalize 或 __gcov_exit 等 cleanup 函数中
 ```
 
-**根因**：全局/静态对象析构顺序晚于 `aclFinalize`，导致 ACL 已去初始化后仍被访问
+**候选与核对**：检查资源销毁顺序、重复去初始化、未完成任务、全局析构及更早内存破坏。崩溃栈在`aclFinalize`不单独证明全局对象析构顺序问题。
 
-**处理**：手动管理 ACL 生命周期，确保在所有 ACL 对象析构 **之后** 调用 `aclFinalize`
+**条件处理**：生命周期问题已证实时，按匹配API契约先完成任务、释放相关资源，再统一去初始化；用实际调用轨迹和复跑验证。
 
 #### Signal 11 (SIGSEGV) 段错误
 
@@ -543,7 +510,7 @@ ls -la core.*  # coredump 存在
 gdb /usr/bin/python3 core.python.xxx -batch -ex "thread apply all bt" -ex "quit"
 ```
 
-**根因**：空指针解引用 / 内存越界 / 释放后使用
+**候选与核对**：确认信号、故障地址和有效帧，再区分空指针、越界、释放后使用、权限或栈破坏等。139本身不确定哪一项，也不定位责任库。
 
 **处理**：gdb 分析 coredump 定位具体代码行；结合 asan 工具检测内存错误
 
@@ -572,7 +539,7 @@ ps aux | grep python
 ```
 Step 1: 确认卡住状态
     ├── 进程是否存在: ps aux | grep <pid>
-    ├── CPU 使用率: top -p <pid>  → ~0% 确认卡住
+    ├── CPU 使用率: top -p <pid> → 低CPU仅提示等待，结合预期耗时、业务和Device进展判断
     ├── 是否有新日志输出: tail -f $HOME/ascend/log/debug/plog/plog-*.log
     └── strace 快速查看: strace -p <pid> -c -f
         （看是否阻塞在某个系统调用）
@@ -586,7 +553,7 @@ Step 2: 判断卡住阶段
 Step 3: 导出进程堆栈
     ├── Python 进程: py-spy dump --pid <PID>
     ├── C++ 进程: gdb -p <PID> -batch -ex "thread apply all bt" -ex "quit"
-    ├── 推荐: asys stack -pid <PID> -output ./stack/
+    ├── asys collect -r=stacktrace --remote=<PID> --all --output=./stack/
     └── Python faulthandler: kill -SIGUSR1 <PID> (部分框架支持)
 
 Step 4: 多卡场景特殊排查
@@ -600,7 +567,9 @@ Step 5: 根据卡住类型针对性处理
 
 ### 典型案例
 
-#### fork 方式创建子进程导致应用卡死
+以下示例提供待核对的机制，不是仅凭现象即可确认的历史案例。
+
+#### fork 后应用卡死
 
 **现象**：训练脚本在 `DataLoader` 或 `multiprocessing.Pool` 初始化后卡死
 
@@ -609,14 +578,14 @@ Step 5: 根据卡住类型针对性处理
 # 导出卡住进程的堆栈
 py-spy dump --pid <PID>
 # 或
-asys stack -pid <PID> -output ./stack/
+asys collect -r=stacktrace --remote=<PID> --all --output=./stack/
 
 # 如果堆栈显示在 fork/waitpid 等调用，且使用了 ACL Context
 ```
 
-**根因**：`fork` 方式继承了父进程的 ACL Context/Stream 等状态，子进程操作这些资源导致死锁
+**候选与核对**：父进程已初始化运行时后fork，可能使子进程继承不适用的运行时/锁状态；但DataLoader初始化卡住或栈在waitpid不能单独证明这个机制，须核对启动方式、初始化顺序及各进程栈。
 
-**处理**：使用 `spawn` 或 `forkserver` 启动方式：
+**条件处理**：该候选有证据且框架支持时，测试`spawn`或受支持的`forkserver`路径。下例仅示意配置；核对主入口保护、对象可序列化及初始化顺序：
 ```python
 # PyTorch DataLoader
 torch.utils.data.DataLoader(
@@ -631,7 +600,7 @@ torch.multiprocessing.set_start_method('spawn')
 
 #### HCCL AllReduce 超时导致所有 rank 卡死
 
-**现象**：多卡训练，所有进程在同一步卡住，120s 后触发 `EI0002 Communication_Error_Timeout`
+**示意现象**：多卡训练在某一步等待，观测到120s后触发`EI0002 Communication_Error_Timeout`。此处120s仅为示例观测，不代表建链/执行的统一默认值。
 
 **诊断步骤**：
 ```bash
@@ -650,13 +619,12 @@ for f in plog-*.log; do echo "=== $f ==="; tail -5 "$f"; done
 grep -i "EI0002\|timeout\|AllReduce.*timeout" plog-*.log
 ```
 
-**根因**：某 rank（通常是内存耗尽或主机 OOM Killer 杀死的进程）未完成梯度同步
+**机制与候选**：对应通信阶段未在有效预算内完成，报超时rank可能是等待方。需要区分对端提前退出、collective序列/参数不一致、负载延迟和链路异常等；不能优先把超时等同OOM。
 
-**处理**：
-1. 检查各 rank 宿主机内存 `free -h`
-2. 查看是否有 `Out of memory: Kill process` in dmesg
-3. 增大超时时间辅助诊断：`export HCCL_EXEC_TIMEOUT=600`
-4. 减少 `num_workers` 或数据预取缓存
+**条件处理**：
+1. 按通信域、操作序列、rank与局部时间线核对各端进展及最早具体错误。
+2. Host OOM仅在内核/cgroup杀进程记录与任务PID/rank关联后成立；再按实际worker、预取或其他占用贡献调整。
+3. 超时配置按现场版本、实际阶段和有效值核对；只有确认任务持续进展且预算不合理时再评估调整，不能用延长超时掩盖退出、死锁或序列不一致。
 
 #### 数据加载卡死
 
@@ -669,9 +637,9 @@ py-spy dump --pid <PID>
 # 堆栈显示在 DataLoader worker 进程的 fork 相关调用
 ```
 
-**根因**：multiprocessing 方式为 fork，继承了 ACL Context
+**候选与核对**：检查worker异常/退出、队列、IO、锁与启动方式。仅有fork相关帧不能证明已继承ACL Context。
 
-**处理**：使用 spawn 方式启动 worker 进程：
+**条件处理**：fork运行时继承问题已获支持时，再验证spawn配置与数据加载语义：
 ```python
 torch.utils.data.DataLoader(
     dataset, num_workers=4,
@@ -687,10 +655,10 @@ torch.utils.data.DataLoader(
 ```bash
 # plog 显示 task_id 已 dispatch 但无 done 记录
 grep -i "dispatch.*task_id=442\|done.*task_id=442" plog-*.log
-# 只有 dispatch 没有 done → 算子挂起
+# 未观察到匹配done；先核对任务、日志级别、时间窗、轮转及执行/依赖进展
 ```
 
-**根因**：算子内部死循环或 tiling 参数导致超长执行
+**候选原因**：已确认任务执行且长时间无进展时，检查内核循环、tiling工作量及依赖等待。只有dispatch而缺少done也可能是日志覆盖不全，不能确认算子挂起、排除正常完成或锁定上述根因。
 
 **处理**：
 1. 检查算子 tiling 参数是否合理
@@ -703,7 +671,7 @@ grep -i "dispatch.*task_id=442\|done.*task_id=442" plog-*.log
 
 **诊断**：
 ```bash
-# plog 无任何 GE/HCCL 日志，说明连图编译都没开始
+# 未见 GE/HCCL 日志时先核对覆盖范围和级别，不能据此确认图编译尚未开始
 grep -c "GE\|HCCL" plog-*.log  # 输出 0
 
 # 检查网络连通性
@@ -711,7 +679,7 @@ ping <other_node_ip>
 nc -zv <other_node_ip> <port>
 ```
 
-**根因**：rank_table 配置错误/网络不通/端口占用
+**候选原因**：rank_table 配置错误/网络不通/端口占用，须由对应配置、连通性或端口记录支持。
 
 **处理**：
 1. 检查 rank_table 文件中各 rank 的 IP 和端口
@@ -722,16 +690,16 @@ nc -zv <other_node_ip> <port>
 
 ```bash
 # 实时导出卡住进程堆栈
-asys stack -pid <PID> -output ./stack_dump/
+asys collect -r=stacktrace --remote=<PID> --all --output=./stack_dump/
 
 # 健康检查（检查 Device 硬件和驱动状态）
 asys health -d 0
 
-# 综合检测（全面检测软硬件、网络、驱动状态）
-asys check -all
+# 硬件检测按待验证分支选择模式与设备，先核对芯片支持范围
+asys diagnose --help
 
 # 性能数据采集（分析是否有性能瓶颈）
-asys perf -d 0 -duration 60
+asys profiling -r=aicore -p=60 -d=0 --output=./profiling/
 ```
 
 ---
@@ -740,35 +708,27 @@ asys perf -d 0 -duration 60
 
 ### asys 工具
 
-asys 是一站式故障信息收集与分析工具，功能包括：
+asys 是一站式故障信息收集与分析工具。下列接口对应 oam-tools 的
+`src/asys/cmdline/cmd_parser.py`；先核对现场版本的子命令帮助和材料要求。
+离线诊断只引用已有产物，现场采集、复跑和检测应由获准的现场流程执行。
 
 | 功能 | 命令示例 | 说明 |
 |------|---------|------|
-| 故障信息收集 | `asys collect -o ./output/` | 一键收集日志、环境信息 |
-| 业务复跑+收集 | `asys rerun -cmd "python train.py" -o ./output/` | 复现故障同时收集信息 |
+| 故障信息收集 | `asys collect --output=./output/` | 收集日志、环境信息 |
+| 业务复跑+收集 | `asys launch --task="python3 train.py" --output=./output/` | 运行业务并收集信息 |
 | 健康检查 | `asys health -d 0` | 检查 Device 0 硬件和驱动状态 |
-| 综合检测 | `asys check -all` | 全面检测软硬件、网络、驱动状态 |
-| AI Core Error 解析 | `asys analyze -aicore -log ./output/` | 解析 AI Core Error 日志 |
-| coredump 解析 | `asys analyze -coredump core.xxx` | 解析应用 coredump 文件 |
-| trace 文件解析 | `asys analyze -trace ./trace_file` | 解析 trace 文件 |
-| stackcore 解析 | `asys analyze -stackcore ./stackcore_file` | 解析堆栈 core 文件 |
-| 实时堆栈导出 | `asys stack -pid <PID>` | 导出卡住进程的当前堆栈 |
-| 性能数据采集 | `asys perf -d 0 -duration 60` | 采集 Device 0 性能数据 |
+| 硬件检测 | `asys diagnose --help` | 按芯片和故障分支选择检测模式 |
+| AI Core Error 解析 | `asys analyze -r=aicore_error --path=./aic_err_info/` | 显式提供匹配的故障信息目录 |
+| coredump 解析 | 见 [命令手册](coredump-command-playbook.md#4-cann-asys-coredump) | 必须匹配可执行文件、core 与符号 |
+| trace 文件解析 | `asys analyze -r=trace --file=./trace_file --output=./analysis/` | 解析 trace 文件 |
+| stackcore 解析 | 见 [命令手册](coredump-command-playbook.md#7-stackcore-analysis) | 核对文件及符号路径 |
+| 实时堆栈导出 | `asys collect -r=stacktrace --remote=<PID> --all --output=./stack/` | 导出指定进程的堆栈 |
+| 性能数据采集 | `asys profiling -r=aicore -p=60 -d=0 --output=./profiling/` | 按所选指标采集 |
 
 ### msaicerr 工具
 
-专门用于解析 AI Core Error，能够将二进制错误信息还原为可读的算子错误报告：
-
-```bash
-# 基本用法
-msaicerr -i ./msnpureport_output/ -o ./analysis_result/
-
-# 指定报错的 task_id 进行精确分析
-msaicerr -i ./msnpureport_output/ -task_id 442 -o ./analysis_result/
-
-# 查看分析结果
-cat ./analysis_result/info.txt
-```
+专门用于解析 AI Core Error，输入要求与参数见上文 [msaicerr 工具使用详解](#msaicerr-工具使用详解)。
+报告生成后按 device、stream/task、kernel 和故障时间核对归属。
 
 **分析结果包含**：
 - 报错算子名称和对应源码位置
@@ -782,12 +742,13 @@ cat ./analysis_result/info.txt
 
 ### 通过 Device 日志获取故障 ID 并排查 RAS 硬件故障
 
+以下`device_syslog/`、`syslog/`代表实际导出材料目录。先按[全量采集流程](../../collect-skill/references/full-log-collection.md#3-导出-device-和综合现场)核对现场`msnpureport --help`及设备范围，保留工具生成的整个目录。参数和内部目录随Driver版本变化，不能通用使用未经核对的`-d/-output`组合。
+
 ```bash
-# 1. 导出 Device 侧系统日志
-msnpureport -d 0 -output ./device_syslog/
+# 1. 按现场工具帮助完成导出，以下检索已有材料
 
 # 2. 搜索 RAS 故障 ID
-grep -i "fault_id\|ras\|ecc\|hardware" ./device_syslog/*.log
+grep -Ri "fault_id\|ras\|ecc\|hardware" ./device_syslog/
 
 # 3. 通过 npu-smi 查看 ECC 错误计数
 npu-smi info -t ecc -i 0
@@ -796,15 +757,13 @@ npu-smi info -t ecc -i 0
 ### 通过 Device 日志查看资源占用过高的信息
 
 ```bash
-msnpureport -d 0 -output ./syslog/
-grep -E "memory|stream|event|notify" ./syslog/*.log | grep -i "high\|overflow\|exceed"
+grep -RE "memory|stream|event|notify" ./syslog/ | grep -i "high\|overflow\|exceed"
 ```
 
 ### 通过 Device 日志确认 Host 进程的拉起与结束时间
 
 ```bash
-msnpureport -d 0 -output ./syslog/
-grep -E "process_start|process_end|pid=[0-9]+" ./syslog/*.log
+grep -RE "process_start|process_end|pid=[0-9]+" ./syslog/
 ```
 
 ### 查看 Python / C++ 应用程序的堆栈
@@ -821,20 +780,20 @@ kill -SIGUSR1 <PID>   # 部分框架支持
 gdb -p <PID> -batch -ex "thread apply all bt" -ex "quit"
 
 # 使用 asys 工具（推荐）
-asys stack -pid <PID> -output ./stack_dump/
+asys collect -r=stacktrace --remote=<PID> --all --output=./stack_dump/
 ```
 
 ---
 
 ## 故障案例集索引
 
-以下典型案例已收录于 [cases.md](./cases.md)：
+以下ID指向 [cases.md](./cases.md) 的未验证机制示例，保留用于解释与检索，不能当作已验证历史修复或本次根因证据：
 
 | 案例 ID | 问题类型 | 关键现象 |
 |---------|---------|---------|
-| CASE-001 | AI Core Error / 精度 | 训练 loss 突变为 NaN（FP16 溢出） |
-| CASE-002 | 进程卡住 / HCCL 超时 | 8 卡训练全部 rank 卡死 120s 后超时 |
-| CASE-003 | TBE 编译失败 | UB memory overflow（自定义算子 tiling 过大） |
+| CASE-001 | 精度 | 训练loss出现NaN，区分输入、前向及梯度机制 |
+| CASE-002 | 进程卡住 / HCCL 超时 | 等待超时与对端进展/退出的关联 |
+| CASE-003 | 算子编译失败 | UB需求与目标容量约束 |
 | CASE-004 | HBM OOM | 大模型推理图加载失败 |
 | CASE-005 | 精度不达标 | FP16 MatMul 结果差异超阈值 |
-| CASE-006 | 日志丢失 | 长时间任务 plog 轮转覆盖早期错误 |
+| CASE-006 | 日志缺失 | 核对轮转、配置与采集覆盖 |

@@ -62,6 +62,13 @@ TRACE_CORE_DIR = SKILLS_ROOT / 'trace-skill/scripts/fault_trace_core'
 HTML_SCRIPT = SKILLS_ROOT / 'metric-skill/scripts/build_html_report.py'
 HTML_TEMPLATE = SKILLS_ROOT / 'metric-skill/template/index.html'
 HTML_RULES = SKILLS_ROOT / 'metric-skill/template/report-template-rules.md'
+STATE_FILE_NAME = 'state.json'
+TRACE_INVENTORY_FILE_NAME = 'fault-trace-inventory.json'
+TRACE_FILE_NAME = 'fault-trace.json'
+REPORT_DATA_FILE_NAME = 'report-data.json'
+CHECKS_FILE_NAME = 'checks.json'
+CONFIDENCE_FILE_NAME = 'confidence.json'
+DIAGNOSIS_FILE_NAME = 'diagnosis.md'
 
 
 def digest(value):
@@ -175,7 +182,7 @@ def load_state(path):
 
 def save_state(plan, state):
     state['updated_at'] = now_iso()
-    atomic_write(plan.state_dir / 'state.json', json.dumps(state, ensure_ascii=False, indent=2))
+    atomic_write(plan.state_dir / STATE_FILE_NAME, json.dumps(state, ensure_ascii=False, indent=2))
 
 
 def acquire_lock(directory, force=False):
@@ -299,6 +306,8 @@ def validate_business(sid, data):
                             tuple(result['route'].get('pipeline_stages', [])) != STAGE_IDS):
         raise ValueError('Classification must retain candidate list and the complete pipeline')
     if sid == 'diagnose':
+        if result.get('analysis_status', 'reviewed') not in ('reviewed', 'evidence_only'):
+            raise ValueError('A diagnostic draft must be reviewed before confidence/report generation')
         if not isinstance(result['checks'], dict) or set(result['checks']) != set(CHECK_KEYS):
             raise ValueError('Diagnosis needs an explicitly reviewed confidence checklist')
         if any(not isinstance(v, dict) or not isinstance(v.get('value'), bool) or
@@ -444,12 +453,12 @@ def _run_trace(plan, artifact, work):
                      '--output-dir', str(trace_dir)], plan.params('diagnose').get('timeout', 1800))
     except (StepError, OSError, shutil.Error) as exc:
         artifact['evidence_gaps'].append('trace-skill 未生成有效 trace：' + str(exc))
-        for path in sorted(trace_dir.glob('fault-trace-inventory.json')):
+        for path in sorted(trace_dir.glob(TRACE_INVENTORY_FILE_NAME)):
             attach(artifact, path, 'trace_inventory')
         return None, trace_dir
 
     kinds = {
-        'fault-trace.json': 'fault_trace_json',
+        TRACE_FILE_NAME: 'fault_trace_json',
         'tracing-report.html': 'trace_report_html',
         'fault-trace.html': 'fault_trace_html',
     }
@@ -457,14 +466,14 @@ def _run_trace(plan, artifact, work):
         path = trace_dir / name
         if path.is_file():
             attach(artifact, path, kind)
-    trace_path = trace_dir / 'fault-trace.json'
+    trace_path = trace_dir / TRACE_FILE_NAME
     if not trace_path.is_file():
-        artifact['evidence_gaps'].append('trace-skill 未产生 fault-trace.json。')
+        artifact['evidence_gaps'].append('trace-skill 未产生 {}。'.format(TRACE_FILE_NAME))
         return None, trace_dir
     try:
         return json.loads(trace_path.read_text(encoding='utf-8')), trace_dir
     except (OSError, ValueError) as exc:
-        artifact['evidence_gaps'].append('fault-trace.json 无法读取：' + str(exc))
+        artifact['evidence_gaps'].append('{} 无法读取：{}'.format(TRACE_FILE_NAME, exc))
         return None, trace_dir
 
 
@@ -602,11 +611,12 @@ def _auto_diagnose(plan, state, artifact, work):
         'has_first_error_line': check(bool(first_error), first_error and '{}:{}'.format(first_error['file'], first_error['line'])),
         'has_env_version': check(False, '未发现 CANN/Driver/Firmware/OS 版本证据。'),
         'has_full_timeline': check(bool(trace and trace_status == 'complete' and len(timeline) > 1), 'trace 事件数={}'.format(len(timeline))),
-        'has_crash_artifacts': check(any(materials.get(key, {}).get('present') for key in ('coredump', 'stackcore')), '材料清单中的 coredump/stackcore'),
+        'has_crash_artifacts': check(detected.get('primary') != 'crash' and 'crash' not in detected.get('secondary', []),
+                                     '非崩溃场景不适用；崩溃产物需由诊断 Agent 核对本次事件归属。'),
         'has_repro_input': check(False, '未提供复现输入。'),
-        'multi_source_agree': check(len(source_files) > 1, '错误证据来源数={}'.format(len(source_files))),
-        'timeline_consistent': check(bool(trace and trace_status == 'complete' and len(source_files) > 1), 'trace 状态与来源数'),
-        'no_contradiction': check(True, '当前输入未发现互相矛盾的明确证据。'),
+        'multi_source_agree': check(False, '文件数量不代表独立来源一致，需核对内容与实体。'),
+        'timeline_consistent': check(False, '需核对事件时钟及因果方向。'),
+        'no_contradiction': check(False, '需由诊断 Agent 检查竞争假设与反证。'),
         'root_cause_localized': check(False, '自动诊断未把观测链升级为根因。'),
         'chain_no_gap': check(bool(causal_chain and all(item['status'] == 'supported' for item in causal_chain)), 'trace component_chain proven edges'),
         'alternatives_excluded': check(False, '竞争假设未被排除。'),
@@ -614,7 +624,7 @@ def _auto_diagnose(plan, state, artifact, work):
         'fix_verified': check(False, '未提供修复后验证。'),
         'regression_checked': check(False, '未提供回归验证。'),
         'errcode_documented': check(False, '错误码定义未由当前输入确认。'),
-        'case_matched': check(lookup_result.get('status') == 'hit', 'case_lookup status={}'.format(lookup_result.get('status'))),
+        'case_matched': check(False, '检索命中只提供候选，需核对本次现场与案例的异同。'),
         'source_code_confirmed': check(False, '未提供源码定位证据。'),
     }
     root_description = ('已观察到首个错误并生成 trace，但 trace 只描述证据关系，'
@@ -623,10 +633,11 @@ def _auto_diagnose(plan, state, artifact, work):
     references = (([{'kind': 'raw_log', 'path': first_error.get('file'), 'line': first_error.get('line'),
                      'why': '最早可见错误候选'}] if first_error else []) +
                   [{'kind': 'case_lookup', 'path': str(plan.artifact('case_lookup')), 'why': '案例检索结果'}])
-    trace_path = trace_dir / 'fault-trace.json'
+    trace_path = trace_dir / TRACE_FILE_NAME
     if trace_path.is_file():
         references.append({'kind': 'trace', 'path': str(trace_path), 'why': 'trace-skill 附属证据'})
     result = {
+        'analysis_status': 'draft',
         'first_error': first_error,
         'timeline': timeline,
         'causal_chain': causal_chain,
@@ -654,9 +665,14 @@ def _auto_diagnose(plan, state, artifact, work):
         result['trace'] = {'status': trace.get('status'), 'event_count': len(trace.get('events', [])),
                            'component_chain': trace_chain or {}}
     artifact['result'] = result
-    artifact['summary'] = '自动生成诊断和 trace 附属产物；根因状态为 undetermined。'
-    artifact['next_action'] = '继续 confidence、promote 和 report 阶段。'
-    return _diagnosis_body(result)
+    artifact['summary'] = '已准备原始错误、时间线和 trace；等待诊断 Agent 分析。'
+    artifact['next_action'] = ('读取原始上下文和适用剧本，完成根因、竞争假设、建议与检查依据；'
+                               '更新本产物 result.analysis_status=reviewed 和 status=success 后 --resume。')
+    if plan.params('diagnose').get('execution') == 'evidence_only':
+        result['analysis_status'] = 'evidence_only'
+        artifact['summary'] = '仅生成证据摘要；未执行模型诊断。'
+        return _diagnosis_body(result)
+    raise Blocked(artifact['next_action'])
 
 
 def _report_component_name(node):
@@ -673,7 +689,7 @@ def _build_report_data(plan, state, diagnosis, confidence, detect, trace, work):
     report_work = work / 'report-work'
     run_command([sys.executable, str(HTML_SCRIPT), '--init', str(report_work)],
                 plan.params('report').get('timeout', 1800))
-    data_path = report_work / 'report-data.json'
+    data_path = report_work / REPORT_DATA_FILE_NAME
     data = json.loads(data_path.read_text(encoding='utf-8'))
     dresult = diagnosis.get('result', {})
     cresult = confidence.get('result', {})
@@ -803,25 +819,35 @@ def _build_report_data(plan, state, diagnosis, confidence, detect, trace, work):
     }
     model_component = '执行流'
     component_name = component_nodes[0].get('catalog_name', 'unknown')
-    remedy_component = hardware_nodes[0]['title'] if hardware_nodes else component_name
     data['remedies'] = [
-        {'name': '补齐首报证据', 'layer': '组件层', 'component': component_name,
-         'owner': '客户方', 'owner_detail': '华为方可指导执行', 'action': '补齐同一时间点日志与版本。',
-         'timing': '立即 / 取证', 'timing_detail': '先补齐证据，再判断责任边界'},
-        {'name': '核对故障实体', 'layer': '模型层', 'component': model_component,
-         'owner': '华为方为主', 'owner_detail': '客户方配合补充现场', 'action': '核对调用关系与输入条件。',
-         'timing': '补证后 / 诊断', 'timing_detail': '结论随新增证据更新'},
-        {'name': '核验执行设备', 'layer': '硬件层' if hardware_nodes else '组件层', 'component': remedy_component,
-         'owner': '华为方', 'owner_detail': '客户方配合升级验证', 'action': '核验设备日志和健康状态。',
-         'timing': '定位后 / 候选修复', 'timing_detail': '验证前不得标记为根修复'},
-        {'name': '执行回归验证', 'layer': '模型层', 'component': model_component,
-         'owner': '客户方', 'owner_detail': '华为方确认故障是否消失', 'action': '覆盖原场景及必要压力回归。',
-         'timing': '修复后 / 验证', 'timing_detail': '记录原场景与回归结果'},
+        {'name': item.get('name', '修复建议 {}'.format(index + 1)),
+         'layer': item.get('layer', '组件层'), 'component': item.get('component', component_name),
+         'owner': item.get('owner', '客户方'), 'owner_detail': item.get('precondition', '执行方；责任归属未确认，适用前提见诊断结论'),
+         'action': item.get('action', ''), 'timing': item.get('timing', '定位后 / 候选修复'),
+         'timing_detail': item.get('expected_impact', '未提供验证结果')}
+        for index, item in enumerate(dresult.get('recommendations', []))
     ]
+    # The existing HTML template has four fixed rows; do not invent remedies to fill them.
+    if len(data['remedies']) > 4:
+        data['remedies'] = data['remedies'][:4]
+    while len(data['remedies']) < 4:
+        data['remedies'].append({
+            'name': '无其他已支持方案', 'layer': '组件层', 'component': component_name,
+            'owner': '客户方', 'owner_detail': '无新增执行事项',
+            'action': '当前证据未支持额外处置措施。', 'timing': '补证后 / 诊断',
+            'timing_detail': '不据此推断需要更换硬件、升级或重启。',
+        })
+    root_status = dresult.get('root_cause', {}).get('status', 'undetermined')
+    verified = dresult.get('checks', {}).get('fix_verified', {}).get('value', False)
     data['notices'] = {
-        'caution': {'title': '风险提示', 'detail': '当前根因状态为 undetermined，不应直接据此修改硬件或算子。'},
-        'verification': {'title': '验证状态', 'meta': '未验证', 'detail': '尚未提供修复后回归证据。'},
-        'next_steps': {'title': '下一步', 'detail': '补齐 evidence gaps 后重新运行诊断。'},
+        'caution': {'title': '结论边界', 'detail': '当前根因状态为 ' + root_status + '；按诊断中的适用前提执行建议。'},
+        'verification': {'title': '验证状态', 'meta': '已验证' if verified else '未验证',
+                         'detail': str(dresult.get('checks', {}).get('fix_verified', {}).get('evidence', '尚未提供验证证据。'))},
+        'next_steps': {'title': '完整建议与验证', 'detail': '\n'.join(
+            '{}. {}；适用前提：{}；预期影响：{}；验证：{}'.format(
+                index + 1, item.get('action', ''), item.get('precondition', '见诊断证据边界'),
+                item.get('expected_impact', '未提供'), item.get('verification', item.get('status', '未验证')))
+            for index, item in enumerate(dresult.get('recommendations', []))) or '保留当前证据与结论边界。'},
     }
     atomic_write(data_path, json.dumps(data, ensure_ascii=False, indent=2) + '\n')
     return report_work, data_path, data
@@ -844,7 +870,7 @@ def _auto_report(plan, state, artifact, work):
                                                       detect, trace_data, work)
     trace_for_report = None
     if trace_json:
-        trace_for_report = report_work / 'fault-trace.json'
+        trace_for_report = report_work / TRACE_FILE_NAME
         shutil.copy2(trace_json, trace_for_report)
         attach(artifact, trace_for_report, 'fault_trace_json')
         for name, kind in (('tracing-report.html', 'trace_report_html'), ('fault-trace.html', 'fault_trace_html')):
@@ -872,10 +898,10 @@ def _auto_report(plan, state, artifact, work):
         'conclusion': data['diagnosis']['headline'],
         'confidence': cresult,
         'findings': findings,
-        'recommendations': data['remedies'],
+        'recommendations': diagnosis.get('result', {}).get('recommendations', []),
         'limitations': diagnosis.get('evidence_gaps', []),
     }
-    artifact['summary'] = '自动生成 report.md、report-data.json 和 diagnostic-report.html。'
+    artifact['summary'] = '自动生成 report.md、{} 和 diagnostic-report.html。'.format(REPORT_DATA_FILE_NAME)
     artifact['next_action'] = '流水线已完成；HTML 与 trace 附属产物已写入 report 阶段工作目录。'
     return ('# Final report\n\n## 结论\n\n' + artifact['result']['conclusion'] +
             '\n\n## 可信度\n\n综合可信度为 {}/100（{}）。\n\n## 限制\n\n'.format(
@@ -991,7 +1017,7 @@ def execute(sid, plan, state, artifact, work, inputs):
         if any(not isinstance(v if not isinstance(v, dict) else v.get('value'), bool) for v in checks.values()):
             raise StepError('Confidence check values must be Boolean, never strings or implicit truthy values')
         payload = {'meta': diagnosis['result'].get('meta', {}), 'checks': checks}
-        checks_path = work / 'checks.json'
+        checks_path = work / CHECKS_FILE_NAME
         atomic_write(checks_path, json.dumps(payload, ensure_ascii=False, indent=2))
         result = json.loads(run_command(child(sid) + ['--input', str(checks_path), '--json']))
         artifact['result'] = result
@@ -1063,7 +1089,8 @@ def promote(plan, state, artifact, work):
             source = cases_dir / name
             if source.is_file():
                 shutil.copy2(source, staging / name)
-        score_path, report_path = work / 'confidence.json', work / 'diagnosis.md'
+        score_path = work / CONFIDENCE_FILE_NAME
+        report_path = work / DIAGNOSIS_FILE_NAME
         atomic_write(score_path, json.dumps(score, ensure_ascii=False))
         # Strip only the machine contract: the legacy script expects the diagnostic Markdown body.
         atomic_write(report_path, body)
@@ -1099,6 +1126,8 @@ def promote(plan, state, artifact, work):
 
 def template_body(sid, artifact):
     if sid == 'diagnose':
+        if artifact.get('result', {}).get('analysis_status') == 'draft':
+            return _diagnosis_body(artifact['result'])
         return ('# Diagnosis\n\n## 问题摘要\n\nDescribe only facts from supplied materials.\n\n'
                 '## 关键证据链\n\nCite source path and line for each causal link.\n\n'
                 '## 根因分析\n\nState confirmed root cause, or explicit unresolved hypotheses and evidence gaps.\n\n'
@@ -1323,10 +1352,10 @@ def main(argv=None):
         raise ValueError('Retry values must be nonnegative')
     state_dir = args.state_dir.resolve()
     if args.status:
-        if not (state_dir / 'state.json').exists():
+        if not (state_dir / STATE_FILE_NAME).exists():
             print('No pipeline state exists.', file=sys.stderr)
             return 2
-        state = load_state(state_dir / 'state.json')
+        state = load_state(state_dir / STATE_FILE_NAME)
         print(json.dumps(state, ensure_ascii=False, indent=2))
         return 0
     if not args.plan:
@@ -1341,8 +1370,8 @@ def main(argv=None):
     lock = None
     try:
         lock = acquire_lock(state_dir, args.force_unlock)
-        existed = (state_dir / 'state.json').exists()
-        state = load_state(state_dir / 'state.json')
+        existed = (state_dir / STATE_FILE_NAME).exists()
+        state = load_state(state_dir / STATE_FILE_NAME)
         if existed and not (args.resume or args.restart_from or args.only):
             raise StepError('State already exists; use --resume, --restart-from or --only', 'conflict')
         selected = args.only or args.restart_from
@@ -1374,7 +1403,7 @@ def main(argv=None):
                 stopped = sid
                 break
         summary = {'ok': status in TERMINAL_OK, 'run_id': state['run_id'], 'stopped_at': stopped,
-                   'status': status, 'state_file': str(state_dir / 'state.json'),
+                   'status': status, 'state_file': str(state_dir / STATE_FILE_NAME),
                    'stages': {sid: state['stages'][sid]['status'] for sid in STAGE_IDS},
                    'artifact_index': str(plan.state_dir / 'artifacts-index.md'),
                    'next_action': ('Complete the pending Markdown artifact, then --resume.' if status == 'blocked'

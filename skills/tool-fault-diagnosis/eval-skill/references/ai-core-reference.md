@@ -34,14 +34,14 @@ fault kernel_name=<kernel>
 `serial number`、`chipId`、`core id`、`error code`、`errorStr`、
 `fault kernel_name`、`device_id`、`stream_id` 和 `task_id`。
 
-异步执行中可能连续打印多个算子错误。先按 `serial number` 和原始日志时间定位首个
-AI Core Error，再区分首错、后续上下文中止和框架层传播错误。
+异步执行中可能连续打印多个算子错误。在同一可比较记录范围内结合 `serial number`、
+任务标识和局部时间顺序选择首错候选，再区分后续上下文中止和框架层传播；不跨进程取全局最小序号。
 
 ## 关键日志字段
 
 | 字段 | 含义 | 使用方式 |
 | --- | --- | --- |
-| `serial number` | 异步错误序号 | 优先分析序号最小的首报错 |
+| `serial number` | 异步错误序号 | 仅在同一可比较记录范围内辅助选择首报错候选 |
 | `chipId` / `dieId` | 芯片和 die 标识 | 检查是否在同一物理位置重复出现 |
 | `core id` | AI Core / AIV Core 标识 | 结合 ECC、RAS 和换卡复现判断硬件可能性 |
 | `error code` | AI Core 错误寄存器解码 | 必须结合 `errorStr`、算子类型和 dump，不可只看十六进制值 |
@@ -57,7 +57,7 @@ AI Core Error，再区分首错、后续上下文中止和框架层传播错误�
 
 ## 证据收集
 
-至少收集以下材料：
+按待确认的主张核对以下已有材料：
 
 1. 故障时间窗内的完整 CANN plog，不只保留框架抛出的最后一条异常。
 2. 对应 Device 的系统 event 日志：`slog/dev-os-<id>/run/event/event_*.log`。
@@ -65,48 +65,18 @@ AI Core Error，再区分首错、后续上下文中止和框架层传播错误�
 4. `fault kernel_name` 对应的算子 `.o` 和 `.json` 文件。
 5. CANN、Driver、Firmware、芯片型号和框架版本。
 6. 多卡场景的 rank、主机、Device、PID 映射。
-7. 硬件分支需要 ECC、设备健康、`ascend-dmi` 和换 Device 复现结果。
-8. 软件分支需要 `msaicerr` 输出、输入 shape/index、tiling 和内存生命周期信息。
+7. 硬件候选可结合本次 ECC/RAS、设备健康、已有 `ascend-dmi` 或受控换 Device 对照，分别核对检测事件、业务影响和持续故障。
+8. 软件候选可结合输入 shape/index、实际访问范围、tiling、内存生命周期及匹配的既有 `msaicerr` 结果。
 
-不能获得某项材料时，在报告中明确写为"未提供"，不要用猜测填补。
+不能获得某项材料时，说明它限制的具体判断，不把整份清单齐备作为确认直接机制的门槛，不用猜测填补。
 
 ## 排查流程
 
-```mermaid
-flowchart TD
-    A[收集 CANN 日志、exception dump、算子 .o/.json] --> B[打开对应 Device 的 event 系统日志]
-    B --> C{是否存在 event_id}
-    C -- 是 --> D[按 event_id 查询健康管理故障定义并处理 RAS 故障]
-    C -- 否 --> E[打开故障时间附近的 plog]
-    E --> F{是否有 ECC 报错或同一 chipId 多次报错}
-    F -- 是 --> G[使用 ascend-dmi 压测 AI Core]
-    G --> H{压测是否正常}
-    H -- 否 --> I[已知硬件故障，联系技术支持更换硬件]
-    H -- 是 --> J{换其它 Device 后是否复现}
-    J -- 否 --> K[可能为硬件故障，联系技术支持更换硬件]
-    J -- 是 --> L[进入软件故障排查]
-    F -- 否 --> L
-    L --> M{是否为索引类算子 0x800000 报错}
-    M -- 是 --> N[检查 GatherV2、Scatter、GatherElements 等算子的输入索引]
-    N --> O{是否确认输入数据问题}
-    O -- 是 --> P[修复输入数据]
-    O -- 否 --> Q[联系技术支持并提供已收集信息]
-    M -- 否 --> R[运行 msaicerr 生成 info.txt]
-    R --> Q
-```
-
-| 顺序 | 证据 | 判断条件 | 下一步 | 中间过程记录 |
-| --- | --- | --- | --- | --- |
-| 1 | Device event 日志 | 存在 `event_id` | 先处理 RAS 硬件故障 | 记录 event_id 值、对应健康管理定义、是否与本次故障时间关联 |
-| 2 | 故障时间附近的 plog | ECC 或同一 `chipId` 多次报错 | 运行 `ascend-dmi` AI Core 压测 | 记录 chipId 值、重复次数、ECC 类型；无 ECC 则跳至软件排查 |
-| 2a | `ascend-dmi` | 压测异常 | 联系技术支持处理硬件 | 记录压测结果（`GENERAL_WARN`/`EMERGENCY_WARN`）、异常详情 |
-| 2b | 换 Device 复现 | 原 Device 异常、其它 Device 不复现 | 倾向原硬件问题 | 记录原 Device ID、换后 Device ID、复现/不复现结果 |
-| 3 | 算子类型、`error code`、输入 | 索引类算子出现 `0x800000` | 检查输入索引范围 | 记录算子名、error code、errorStr、index 值与输入维度对比 |
-| 4 | exception dump、`.o/.json` | 不是已确认的索引输入问题 | 使用 `msaicerr` 解析并保留 `info.txt` | 记录 dump 路径、算子 hash、msaicerr 根因结论、解析是否成功 |
-
-`msaicerr` 不是所有 AI Core Error 的第一步。它位于 RAS、ECC/硬件和明确的索引类
-输入检查之后。每步的中间过程记录写入 `diagnosis.md` 的 `result.steps`，包含
-step_id、检查内容、发现结果和下一步，便于追溯走到哪一步定位到问题。
+执行步骤、分支状态与判定条件统一见 [AI Core Error 处理流](fault-flows/aicore-error-flow.md#排查流程)。
+先关联本次任务并解释直接错误机制，再结合已有 RAS/ECC、输入/地址、依赖、产物及检测记录比较候选原因。
+缺少 event/ECC 或一次 DMI PASS 不能排除硬件；固定 chip/core 也不能单独确诊硬件。
+只核对已提供的 `msaicerr` 结果和匹配产物，不因缺少该工具结果停止已有证据分析。
+流水线模式把每步发现及缺口写入 `diagnosis.md.result.steps`；默认诊断答复直接在相关结论旁交付依据和限制。
 
 ## 分支说明
 
@@ -121,9 +91,8 @@ step_id、检查内容、发现结果和下一步，便于追溯走到哪一步�
 
 - ECC 记录或同一 `chipId` 重复异常是硬件候选证据，不是单独定论。
 - 流程没有给出"同一 chipId 多次"的固定次数阈值，不要擅自设置为两次。
-- 用 `ascend-dmi` 压测和换 Device 复现区分固定硬件问题与可迁移的软件问题。
-- AI Core 压测命令为 `ascend-dmi --dg -i aicore -s`；出现 `GENERAL_WARN` 或
-  `EMERGENCY_WARN` 表示可能存在 AI Core 问题。
+- 既有 `ascend-dmi` 异常与受控换 Device 对照可支持硬件候选；记录输入、产物、配置和重复次数。
+- 压测命令及参数须按现场版本的帮助核对；`GENERAL_WARN` 或 `EMERGENCY_WARN` 需结合具体异常解释，单次 PASS 不排除间歇问题。
 - 多 Device 同时出现相同 kernel 错误时，不可仅凭数量排除或确认硬件。
 
 ### 0x800000 与索引类算子
@@ -152,7 +121,7 @@ step_id、检查内容、发现结果和下一步，便于追溯走到哪一步�
 - AI Core task timeout 证明任务没有按期完成，不自动证明硬件损坏、网络故障或算子死循环。
 - Event Wait 超时必须追踪对应 Event Record 所在流；仅有 Wait 端不能闭合因果链。
 - 多通信 group 同时使用 AIV 的告警是调度/资源互锁候选，需要调用顺序或对照复现验证。
-- 没有复现、修复后复跑和回归结果时，不得声明根因或解决方案已验证。
+- 匹配源码、dump 或针对性实验可确认故障机制；修复后执行和回归记录才支持解决方案已验证。没有实际记录的修复建议保持为验证计划。
 
 ## 案例库
 
@@ -210,15 +179,15 @@ bit ECC 且地址热隔离失败。
 
 **故障根因**
 
-只有 `compare_fail_num != 0` 时，才判定存在 icache 内存跳变硬件故障。
-其含义是 icache 数据与 GM 校验不一致，候选原因包括 icache 数据跳变或 GM 数据
-被改写。
+`compare_fail_num != 0` 表示 icache 数据与 GM 校验不一致，候选原因包括 icache
+数据跳变或 GM 数据被改写。须结合产物、写入来源和已有硬件记录区分，不能仅凭
+比较失败确认 icache 硬件损坏；零值也只描述该次比较结果。
 
 **处理方法**
 
 1. 退出并重新执行训练任务，或重新发起推理请求。
 2. 重试仍异常时复位 SOC。
-3. 故障持续时按硬件故障处理并联系维修支持。
+3. 故障持续时结合已有硬件检测、RAS/ECC 和受控设备对照，区分硬件异常与 GM 被改写；相关证据支持硬件后再联系维修处理，不能仅凭持续复现定性。
 
 #### OFFICIAL-0011：AI Core 硬件故障
 
@@ -231,14 +200,16 @@ errorStr: A 2-bit ECC error occurs in the data-cache data-ram.
 
 **故障根因**
 
-已有 `ascend-dmi --dg -i aicore` 压测结果出现 `EMERGENCY_WARN` 时，才能确认
-AI Core 硬件故障。确认条件包括：同一 device 映射、压测时间与故障相关、ECC 日志
-与压测异常可关联。仅有单条 data-cache 2-bit ECC 文字时，结论只能保留为硬件故障
-候选，不能直接写成已确认根因。
+按适用型号和版本解码且与本次任务关联的 data-cache 2-bit ECC，支持确认该次
+ECC 检测事件；不要求先取得 DMI 结果才能解释已发生的错误。该事件是否解释业务
+失败、是否存在持续性器件故障及应否换件，仍需结合 RAS 处置状态、恢复结果和
+设备关联判断。已有 DMI 异常可补充硬件证据，须核对具体检测项、device 和时间；
+`EMERGENCY_WARN` 这个等级本身不等于已经定位到某个损坏部件。
 
 **处理方法**
 
-保存 plog、压测结果和设备映射，联系技术支持更换故障硬件。
+保存原始 ECC、RAS 处置、已有检测结果和设备映射，按产品恢复策略处理；持续
+故障及相关检测支持换件时，再联系技术支持更换硬件。未执行的检测或恢复保持为计划。
 
 #### OFFICIAL-0012：索引类算子索引越界
 
@@ -271,16 +242,24 @@ AI Core 硬件故障。确认条件包括：同一 device 映射、压测时间�
 Failed to execute the built-in sample operator. Check the environment.
 ```
 
-**故障根因**
+**结果解释**
 
-`msaicerr` 的内置标杆算子只覆盖 GM/UB 搬运以及基础 vector、cube 指令。该最小
-算子也无法运行，说明问题不局限于原业务算子，系统环境或硬件功能存在异常。
+这条汇总结论表示内置样例检查未通过，不能单独证明样例已在 Device 上执行或硬件
+异常。本仓 `AicoreErrorParser.run_test_env` 对子进程失败、缺少编译 JSON、样例
+执行出现 AI Core Error 都可能返回失败。先核对该版本工具的详细日志：依赖、编译、
+SoC 或工具路径失败走环境分支；明确发生 Device 执行异常时，再比较输入、产物、
+驱动及硬件证据。样例成功也只说明该次样例覆盖的功能通过。
+
+还需核对样例确已执行、产物已生成及相应日志检查已完成。`env_available` 在本仓
+初始化为 `True`，异常后的 skip 可能保留该值；无失败汇总或该布尔值为真不证明
+检查完成。汇总结论有优先级，工具返回码也是结果分类，不能代替详细检查状态或
+直接作为硬件、分配或算子逻辑根因。
 
 **处理方法**
 
-使用 MindCluster ToolBox 检查系统环境和硬件；仍不能排除时，提交 asys 收集结果、
-完整 `msaicerr` 结果和首算子信息。该结论是"环境/硬件"类别判断，不应在没有
-进一步检查时直接写成某个具体部件损坏。
+针对已识别的失败阶段修正依赖、编译目标或工具环境；已有样例 Device 异常时结合
+同设备 RAS 和检测记录分析。保留完整 `msaicerr` 日志、返回状态和算子信息，避免
+只转述汇总结论或直接建议换卡。新检查仅作为验证计划。
 
 #### OFFICIAL-0014：单算子运行报错
 
@@ -291,6 +270,11 @@ Failed to execute the single-operator test case. The operator logic may be incor
 ```
 
 `info.txt` 还会给出 Basic information、AI Core DFX Register 和可能的 CCE/源码行。
+
+不同工具版本的文案和状态不同。先区分“单算子实际执行并复现 AI Core Error”与
+“测试未成功启动/加载/完成”：本仓 `single_op_test_result=FAILED` 对应前者，
+`NOT_RUN` 不证明已经复现，也不证明原故障已消失。仅凭命令非零退出或上述旧版
+汇总文字不能判算子逻辑有错。
 
 **候选根因**
 
@@ -317,14 +301,19 @@ Note that if tasks are concurrently executed on the NPU, a false warning may be 
 
 **故障根因**
 
-极端输入在 atomic 累加时发生精度溢出，可能表现为 `0x800000`。还必须检查 Device
-slog：没有 `Vm fault failed` 时才进入 atomic 精度溢出分支；出现该关键字表示内存
-越界，不属于此案例。并发任务可能造成 `msaicerr` 误报。
+极端输入在 atomic 累加时可能发生精度溢出，`0x800000` 本身不独立证明该机制。
+核对产品适用性、输入范围及 Device slog 是否覆盖本次任务和时间窗。未见
+`Vm fault failed` 仅表示未观察到该访问信号，不能独立确诊精度溢出；出现与本次
+任务相关的该信号时优先追踪地址映射、范围和生命周期。并发任务还可能造成
+`msaicerr` 误报，须与工具提示区分。
 
 **处理方法**
 
-对输入和算子执行精度调优，并在隔离并发干扰后复测。Atlas A2 训练和
-推理系列因硬件优化不会出现该问题，因此必须先核对产品型号。
+已有证据支持该精度溢出机制时，检查输入与算子执行精度，并在隔离并发干扰后复测。
+本参考沿用 CANN 9.0.0 排查资料中 Atlas A2 训练和推理系列对本节特定问题的
+硬件优化说明；引用时须先核对现场产品、版本与机制是否相符。该说明不表示
+A2 不会出现任何 atomic 数值问题，也不能仅凭型号排除本次故障；条件无法核实时
+继续依据本次原文、输入与地址证据分析。
 
 #### OFFICIAL-0016：算子输入输出数据地址异常
 
@@ -382,17 +371,21 @@ The input/output memory address of the operator is abnormal
 Failed to get dump data of error op!
 ```
 
-**故障根因**
+**结果解释**
 
-AI Core Error 回调按输入输出地址和大小读取数据。业务执行和错误回调都无法读取
-同一地址时，通常说明输入输出地址错误；但仅有上层"没有 dump 文件"不足以匹配
-本案例，必须有 `msaicerr` 的 Dump info 解析失败证据。
+AI Core Error 回调按输入输出地址和大小读取数据。取数失败本身不确定是地址非法、
+故障后上下文不可用还是工具/材料问题。本仓 `get_conclusion` 对 `addr_valid=false`
+和 `data_dump_result=false` 使用同一汇总文字，须回查具体失败阶段、返回码、对象
+范围及生命周期。只有对应证据证明原算子实际访问违反地址约束时，才确认非法访问；
+既无 dump 文件也无具体取数记录时，只能记录材料缺失。
 
 **处理方法**
 
-检查 `info.txt` 的 `4. Operator Input/Output Memory`。若故障算子是推理首算子，
-检查用户脚本是否分配了足够且有效的地址空间；否则保留完整材料并追踪错误地址的
-上游生产者。
+先检查 `info.txt` 的 `4. Operator Input/Output Memory` 和具体取数失败记录，
+区分工具或材料缺失、D2H 取数失败、故障后上下文不可用和已证实的地址异常。
+前几类按失败阶段补齐材料或排查工具/上下文，不预设原访问地址有错。已证实地址
+异常时，再核对分配范围、映射和生命周期：推理首算子检查用户脚本的分配和传参，
+其他算子沿已关联的地址追踪上游生产者及更早写入者。
 
 #### OFFICIAL-0019：算子输入 args 错误
 

@@ -1,0 +1,49 @@
+{
+  "namespace": "public AscendCL Runtime return codes only; not all internal Runtime/Driver/HCCL states",
+  "files": [
+    {
+      "release": "v8.5.0",
+      "repository": "https://gitcode.com/cann/runtime.git",
+      "commit": "c741ed4fd53c92c455545ba8f17f45bda5440942",
+      "source_path": "include/external/acl/error_codes/rt_error_codes.h",
+      "git_blob": "ddd6d80e71e721796ad03e4038179bf06f9df94b",
+      "local_path": "runtime-v8.5.0/include/external/acl/error_codes/rt_error_codes_v8_5_0.h",
+      "bytes": 11681,
+      "sha256": "6f9fa068a293a3284342eccd7bae934d2c4de8da8093525842d5c9ef486d3516",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v8.5.0",
+      "repository": "https://gitcode.com/cann/runtime.git",
+      "commit": "c741ed4fd53c92c455545ba8f17f45bda5440942",
+      "source_path": "LICENSE",
+      "git_blob": "483b705df4566bf0e3b725a1e5f83350089284fd",
+      "local_path": "runtime-v8.5.0/LICENSE",
+      "bytes": 5278,
+      "sha256": "cb282ac2b66d7d6734c3fb354db792b28cf23ab29fbc16d5cfd8bd542bedeb1e",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v9.0.0-beta.2",
+      "repository": "https://gitcode.com/cann/runtime.git",
+      "commit": "330a3a72dd0836546e6a5d13d6ac2802f065b6ac",
+      "source_path": "include/external/acl/error_codes/rt_error_codes.h",
+      "git_blob": "eb1e54ea128b3ea1757da6bdbc6cb54c47652071",
+      "local_path": "runtime-v9.0.0-beta.2/include/external/acl/error_codes/rt_error_codes_v9_0_0_beta_2.h",
+      "bytes": 11894,
+      "sha256": "0adae28f9abc10f1d85bbb12927e9df3ae253082b7f449acff54e5db5802e1d3",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    },
+    {
+      "release": "v9.0.0-beta.2",
+      "repository": "https://gitcode.com/cann/runtime.git",
+      "commit": "330a3a72dd0836546e6a5d13d6ac2802f065b6ac",
+      "source_path": "LICENSE",
+      "git_blob": "483b705df4566bf0e3b725a1e5f83350089284fd",
+      "local_path": "runtime-v9.0.0-beta.2/LICENSE",
+      "bytes": 5278,
+      "sha256": "cb282ac2b66d7d6734c3fb354db792b28cf23ab29fbc16d5cfd8bd542bedeb1e",
+      "license": "CANN Open Software License Agreement Version 2.0"
+    }
+  ]
+}
