@@ -641,7 +641,7 @@ int HcclTest::parse_opt(int opt)
             enable_symmetric_memory = std::stoi(optarg);
             break;
         case 's':
-            nslb_flag = 1;
+            nslb_flag = strtol_alldigit(optarg);
             break;
         case 't':
             only_device_exec_time = strtol_alldigit(optarg);

@@ -173,9 +173,16 @@
   **注：该配置的优先级高于环境变量HCCL_OP_EXPANSION_MODE。**
   <!-- end id3 -->
 
+  <!-- npu="A3,910b,910,310p" id4 -->
 - **-s \<0/1\>或--nslb \<0/1\>**：可选，是否启用NSLB-DP（Network Scale Load Balance-Data Plane：数据面网络级负载均衡）功能。
   - 0（默认值）：不启用。
   - 1：启用。
+  - 该参数仅支持如下产品：
+    - Atlas A3系列产品
+    - Atlas A2系列产品
+    - Atlas训练系列产品
+    - Atlas推理系列产品
+  <!-- end id4 -->
 
 - **-n \<iters_count\>或--iters \<iters_count\>**：可选，迭代次数，默认值为20。
 
