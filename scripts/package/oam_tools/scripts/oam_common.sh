@@ -15,6 +15,9 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 
+is_for_all="${is_for_all:-n}"
+is_quiet="${is_quiet:-n}"
+
 
 if [ "$(id -u)" != "0" ]; then
     _LOG_PATH=$(echo "${HOME}")"/var/log/ascend_seclog"
@@ -68,7 +71,7 @@ change_mode() {
     local _mode=$1
     local _path=$2
     local _type=$3
-    if [ ! x"${install_for_all}" = "x" ] && [ ${install_for_all} = y ]; then
+    if [ ! x"${is_for_all}" = "x" ] && [ ${is_for_all} = y ]; then
         _mode="$(expr substr $_mode 1 2)$(expr substr $_mode 2 1)"
     fi
     if [ "${_type}" = "dir" ]; then

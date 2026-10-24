@@ -140,7 +140,7 @@ getinstalledinfo() {
             ;;
         ${upper_ops_base_platform}_INSTALL_PATH_PARAM)
             tmp_path_param="INSTALL_PATH_PARAM"
-	        res=$(cat ${_INSTALL_INFO_FILE} | grep ${param} | awk -F = '{print $2}')
+	        res=$(cat ${_INSTALL_INFO_FILE} | grep ${tmp_path_param} | awk -F = '{print $2}')
             ;;
         esac
     fi
