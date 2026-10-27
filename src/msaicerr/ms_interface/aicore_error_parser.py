@@ -48,11 +48,65 @@ from ms_interface.aic_error_info import (
     detect_core_err_type,
 )
 from ms_interface import pc_corrector
+from ms_interface import json_report_builder
 from ms_interface.dump_data_parser import DumpDataParser
 from ms_interface.single_op_test_frame.utils import shape_utils
 from ms_interface.dsmi_interface import DSMIInterface
 from ms_interface.single_op_test_frame.single_op_case import SingleOpCase
 from ms_interface.utils import screen_error
+
+
+def _load_kernel_io_counts(info: AicErrorInfo) -> None:
+    """读一次 kernel json 的输入/输出数量，缓存到 info.kernel_io_counts。
+
+    解析阶段（Step 4）调用一次；JSON 构建阶段与 normal 标记细分均只读该
+    内存字段，不再回读文件（SRS FR-AJR-001：新增小文件读取不超过 1 次）。
+    json_file 由文件名匹配得到、不校验内容结构，故对非 dict 根/非 dict
+    supportInfo 一并兜底，异常输入退化为"数量未取到"而不中断 parse()。
+    """
+    if info.kernel_io_counts != (None, None):
+        return
+    if not info.json_file or not os.path.exists(info.json_file):
+        return
+    try:
+        with open(info.json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return
+        support = data.get("supportInfo", {})
+        if not isinstance(support, dict):
+            return
+        info.kernel_io_counts = (
+            len(support.get("inputs") or []),
+            len(support.get("outputs") or []),
+        )
+    except (OSError, ValueError, AttributeError, TypeError):
+        return
+
+
+def _refine_normal_marks(info: AicErrorInfo) -> None:
+    """将 normal tensor 标记按 kernel json 的输入/输出数量细分为 input/output。
+
+    L0 日志的 normal tensor 不区分输入输出；kernel json 的 supportInfo
+    inputs/outputs 数量给出分界：inputs 数量内为 input，其后 outputs 数量内
+    为 output。json 读不到或序号超出分界时降级为 other，保证 arg_type
+    始终在六值枚举内。
+    """
+    marks = info.args_type_marks
+    if not any(mark == "normal" for mark in marks.values()):
+        return
+    num_inputs, num_outputs = info.kernel_io_counts
+    if num_inputs is None:
+        num_inputs, num_outputs = 0, 0
+    for idx in list(marks.keys()):
+        if marks[idx] != "normal":
+            continue
+        if idx < num_inputs:
+            marks[idx] = "input"
+        elif num_outputs is not None and idx < num_inputs + num_outputs:
+            marks[idx] = "output"
+        else:
+            marks[idx] = "other"
 
 
 def _find_runtime_so():
@@ -1604,6 +1658,35 @@ exit()"""
         before_key = r"\[AIC_INFO\] args before execute"
         return self._get_args_from_info(before_key)
 
+    def _get_args_type_marks(self: any) -> dict:
+        """plog IDEDD dump 标记 -> arg 序号到类型映射（info.json args 语义化用）。
+
+        日志形态 `begin to load input/output tensor|normal tensor|workspace|
+        tiling data, index:N`：normal tensor 无法区分输入输出，记为 normal，
+        交由 json_report_builder 按 kernel json 数量细分；workspace/tiling
+        直接定型。同一 index 以最后一条标记为准（与 IDEDD 顺序打印一致）。
+        """
+        plog_path = os.path.join(self.collect_path, "collection", "plog")
+        cmd = ["grep", r"\[Dump\]\[Exception\] begin to load", "-inrE", plog_path]
+        regexp = (
+            r"begin to load (input tensor|output tensor|normal tensor|workspace|tiling data)"
+            r", index:(\d+)"
+        )
+        ret = utils.get_inquire_result(cmd, regexp)
+        type_map = {"input tensor": "input", "output tensor": "output"}
+        marks = {}
+        for marker, index in ret:
+            idx = int(index)
+            if marker in type_map:
+                marks[idx] = type_map[marker]
+            elif marker == "workspace":
+                marks[idx] = "workspace"
+            elif marker == "tiling data":
+                marks[idx] = "tiling_data"
+            else:  # normal tensor：输入输出待细分
+                marks[idx] = "normal"
+        return marks
+
     @staticmethod
     def _check_file_content(kernel_name, content):
         error_strings = [
@@ -1906,6 +1989,9 @@ exit()"""
             err_i_folder = os.path.join(self.collect_path, "aicerror")
             empty_info = AicErrorInfo()
             self._write_errorinfo_file(err_i_folder, empty_info.root_cause_conclusion)
+            json_report_builder.write_json_report(
+                err_i_folder, empty_info, self.collect_path, collect_succ=False
+            )
             return Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR
         else:
             info.err_time_obj = utils.strplogtime(
@@ -1940,6 +2026,10 @@ exit()"""
         info.check_args_result = self._check_args(
             info.args_before_list, info.args_after_list
         )
+        # info.json args 语义化用的 plog 类型标记（normal 待按 kernel json 细分）
+        info.args_type_marks = self._get_args_type_marks()
+        _load_kernel_io_counts(info)
+        _refine_normal_marks(info)
 
         # 5. 反编译kernel文件
         utils.print_info_log(
@@ -2016,7 +2106,10 @@ exit()"""
             info.env_available = AicoreErrorParser.run_test_env(
                 soc_version, self.device_id
             )
+            info.env_check_attempted = True
         except (OSError, ValueError, RuntimeError, TypeError, utils.AicErrException):
+            # 环境检查未执行成功，保持 env_available 默认值但标记未采集，
+            # info.json 的 env_check.result 据此输出 not_collected
             utils.print_info_log("run golden op failed.Test env skip!")
         # write info file
         utils.print_info_log(
@@ -2024,6 +2117,10 @@ exit()"""
             f" The result file is saved in the {self.collect_path} directory."
         )
         self._write_errorinfo_file(err_i_folder, info.analyse())
+        # 与 info.txt 同源、同目录的结构化报告（旁路可失败，不影响主流程）
+        json_report_builder.write_json_report(
+            err_i_folder, info, self.collect_path, collect_succ=True
+        )
 
         summary_info_list.append(
             "%s   %s   device_id=%s   core_id=%s   task_id=%s   node=%s   "

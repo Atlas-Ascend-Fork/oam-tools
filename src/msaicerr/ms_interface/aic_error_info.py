@@ -27,6 +27,53 @@ CORRECTED_PC_NOTICE = (
     "credible than the original PC. Locate the fault by the corrected info first."
 )
 
+# 单算子执行结果文案：analyse() 的文本渲染与 info.json 的 execute_info 共用，
+# 避免两份口径。
+SINGLE_OP_RESULT_MSG = {
+    # SUCCESS表示用例执行完成但没有复现出AI Core error，不代表算子没问题
+    RetCode.SUCCESS: "The single-operator test case was executed, "
+    "but the AI Core error was not reproduced.",
+    RetCode.FAILED: "The AI Core error was reproduced by the single-operator test case.",
+    RetCode.NOT_RUN: "The single-operator test case was not executed, "
+    "so it cannot be used to confirm the AI Core error.",
+}
+
+# 结论分支键 → 结论文本。分支命中优先级在 _match_conclusion_branch 中定义，
+# info.txt 渲染与 info.json 的根因映射（json_report_builder）共用同一份判定，
+# 避免两套口径。
+CONCLUSION_TEXT = {
+    "atomic_clean_missing": "The memset or atomic_clean operator is not inserted before this operator in the graph,"
+    " while memory cleanup is required before operator execution.\n",
+    "flag_mismatch": "The set_flag and wait_flag instructions are not used together in the operator code.\n",
+    "core_num_insufficient": "The number of AI Cores in the environment is less than that required by the operator.\n",
+    "pc_zero": "The line number of the operator error instruction is 0.\n",
+    "atomic_overflow": "Atomic add has a precision overflow. Check the operator precision."
+    "Note that if tasks are concurrently executed on the NPU, a false warning may be reported.\n",
+    "data_invalid": "The maintenance and test information is insufficient or the format is "
+    "incorrect, contact technical support.\n",
+    "single_op_reproduced": "The AI Core error was reproduced by the single-operator test case. "
+    "The operator logic may be incorrect.\n",
+    "args_mismatch": "If the arguments are inconsistent before and after operator execution, "
+    "memory access may be out of bounds. You are advised to use the memory error detection model "
+    "to locate the fault.\n",
+    "addr_invalid": "The input/output memory address of the operator is abnormal "
+    "(or the original dumped data fails). Check the framework or application.\n",
+    "env_error": "Failed to execute the built-in sample operator. Check the environment.\n",
+    # 该分支文本含运行期日志路径，get_conclusion() 渲染时 format 传入
+    "single_op_not_run": "The single-operator test case was not executed successfully, so it cannot be used to "
+    "confirm the AI Core error. Check whether the *.o and *.json files of the operator are "
+    "complete and match each other, and check the single-operator log in {log_path} "
+    "for the failure cause.\n",
+    "single_op_not_reproduced": "The single-operator test case was executed, but the AI Core error was not reproduced. "
+    "In case of an unknown error mode, "
+    "you are advised to:\n"
+    "(1) check the operator again by using the msSanitizer tool.\n"
+    "(2) If out-of-bounds memory access occurs on other operators, you are advised to enable "
+    "memory error detection with op_debug_config=oom and then check the operators, "
+    "For details: https://www.hiascend.com/zh/document.\n"
+    "(3) For details about the framework, contact technical support.\n",
+}
+
 
 def detect_chip_type(error_code: str) -> ChipType:
     """Tell the two `error code = ...` dialects apart.
@@ -119,6 +166,14 @@ class AicErrorInfo:
         self.instr = ""
         self.graph_file = ""
         self.extra_info = ""
+        # info.json 元数据（json_report_builder 消费）：
+        # dump_tensor_meta：每个解析出的张量 {parse_type, index, dtype, shape, size, file}
+        # args_type_marks：plog IDEDD 标记出的 arg 序号 -> input/output/workspace/tiling_data
+        self.dump_tensor_meta = []
+        self.args_type_marks = {}
+        # kernel json 的输入/输出数量（Step 4 解析阶段读一次缓存，
+        # 构建阶段不再回读文件）；(None, None) 表示未读取
+        self.kernel_io_counts = (None, None)
         self.err_time_obj = None
         self.ifu_err_type = ""
         self.mte_err_type = ""
@@ -137,6 +192,9 @@ class AicErrorInfo:
         self.args_after_list = []
         self.addr_valid = True
         self.env_available = True
+        # 环境检查是否真正执行过（Step 10 抛异常跳过时为 False），
+        # env_check.result 据此区分 success/failed 与 not_collected
+        self.env_check_attempted = False
         self.flag_check = ""
         self.check_args_result = True
         self.debug_level = 0
@@ -174,14 +232,6 @@ class AicErrorInfo:
 
         addr_check_str = self._get_addr_check_str()
 
-        result_msg = {
-            # SUCCESS表示用例执行完成但没有复现出AI Core error，不代表算子没问题
-            RetCode.SUCCESS: "The single-operator test case was executed, "
-            "but the AI Core error was not reproduced.",
-            RetCode.FAILED: "The AI Core error was reproduced by the single-operator test case.",
-            RetCode.NOT_RUN: "The single-operator test case was not executed, "
-            "so it cannot be used to confirm the AI Core error.",
-        }
         single_op_mem_monitor = self.single_op_mem_monitor
 
         msg = f"""{self.root_cause_conclusion}
@@ -216,87 +266,69 @@ args after  execution: {self._get_args_str(self.args_after_list)}
 {self.dump_info}
 
 ********************6. Execution Result of the Single-Operator Test Case***********************
-{result_msg.get(self.single_op_test_result)}
+{SINGLE_OP_RESULT_MSG.get(self.single_op_test_result)}
 
 {single_op_mem_monitor}
 """
         return msg
 
-    def get_conclusion(self: any) -> str:
-        conclusion = ""
+    def match_conclusion_branch(self: any) -> str:
+        """结论分支判定，返回 CONCLUSION_TEXT 的分支键。
+
+        与 get_conclusion() 的 elif 优先级完全一致（先命中先得）；文本渲染与
+        info.json 根因映射共用此判定，避免两套口径。无命中返回 ""，由调用方
+        走内部错误/维测信息不足兜底。
+        """
         num_default = -1
         if not self.atomic_clean_check:
-            conclusion = (
-                "The memset or atomic_clean operator is not inserted before this operator in the graph,"
-                " while memory cleanup is required before operator execution.\n"
-            )
-        elif self.flag_check:
-            conclusion = "The set_flag and wait_flag instructions are not used together in the operator code.\n"
-        elif (
+            return "atomic_clean_missing"
+        if self.flag_check:
+            return "flag_mismatch"
+        if (
             self.rts_block_dim != num_default
             and self.driver_aicore_num != num_default
             and self.rts_block_dim > self.driver_aicore_num * 2
         ):
-            conclusion = "The number of AI Cores in the environment is less than that required by the operator.\n"
-        elif self.aic_error_info.get("current_pc", "") == "0x0":
-            conclusion = "The line number of the operator error instruction is 0.\n"
-        elif self.atomic_add_err:
-            conclusion = (
-                "Atomic add has a precision overflow. Check the operator precision."
-                "Note that if tasks are concurrently executed on the NPU, a false warning may be reported.\n"
-            )
-        elif "data invalid" in self.dump_info:
-            conclusion = (
-                "The maintenance and test information is insufficient or the format is "
-                "incorrect, contact technical support.\n"
-            )
-        elif self.single_op_test_result is RetCode.FAILED:
-            conclusion = (
-                "The AI Core error was reproduced by the single-operator test case. "
-                "The operator logic may be incorrect.\n"
-            )
-        elif not self.check_args_result:
-            conclusion = (
-                "If the arguments are inconsistent before and after operator execution, "
-                "memory access may be out of bounds. You are advised to use the memory error detection model "
-                "to locate the fault.\n"
-            )
-        elif not self.addr_valid or not self.data_dump_result:
-            conclusion = (
-                "The input/output memory address of the operator is abnormal "
-                "(or the original dumped data fails). Check the framework or application.\n"
-            )
-        elif not self.env_available:
-            conclusion = "Failed to execute the built-in sample operator. Check the environment.\n"
-        elif self.single_op_attempted and self.single_op_test_result is RetCode.NOT_RUN:
-            conclusion = (
-                f"The single-operator test case was not executed successfully, so it cannot be used to "
-                f"confirm the AI Core error. Check whether the *.o and *.json files of the operator are "
-                f"complete and match each other, and check the single-operator log in "
-                f"{self.single_op_log_path} for the failure cause.\n"
-            )
-        elif self.single_op_test_result is RetCode.SUCCESS:
-            conclusion = (
-                "The single-operator test case was executed, but the AI Core error was not reproduced. "
-                "In case of an unknown error mode, "
-                "you are advised to:\n"
-                "(1) check the operator again by using the msSanitizer tool.\n"
-                "(2) If out-of-bounds memory access occurs on other operators, you are advised to enable "
-                "memory error detection with op_debug_config=oom and then check the operators, "
-                "For details: https://www.hiascend.com/zh/document.\n"
-                "(3) For details about the framework, contact technical support.\n"
-            )
+            return "core_num_insufficient"
+        if self.aic_error_info.get("current_pc", "") == "0x0":
+            return "pc_zero"
+        if self.atomic_add_err:
+            return "atomic_overflow"
+        if "data invalid" in self.dump_info:
+            return "data_invalid"
+        if self.single_op_test_result is RetCode.FAILED:
+            return "single_op_reproduced"
+        if not self.check_args_result:
+            return "args_mismatch"
+        if not self.addr_valid or not self.data_dump_result:
+            return "addr_invalid"
+        if not self.env_available:
+            return "env_error"
+        if self.single_op_attempted and self.single_op_test_result is RetCode.NOT_RUN:
+            return "single_op_not_run"
+        if self.single_op_test_result is RetCode.SUCCESS:
+            return "single_op_not_reproduced"
+        return ""
 
-        if not conclusion:
-            if not utils.ExceptionRootCause().causes:
-                conclusion = "Internal error. Contact technical support.\n"
-            else:
-                conclusion = (
-                    "The maintenance and test information is insufficient or the format is incorrect, "
-                    "contact technical support.\n"
-                )
-            conclusion += utils.ExceptionRootCause().format_causes()
-        return conclusion
+    def get_conclusion(self: any) -> str:
+        branch = self.match_conclusion_branch()
+        if not branch:
+            return self._get_fallback_conclusion()
+        if branch == "single_op_not_run":
+            # 该分支文本含运行期日志路径，渲染时填入
+            return CONCLUSION_TEXT[branch].format(log_path=self.single_op_log_path)
+        return CONCLUSION_TEXT[branch]
+
+    @staticmethod
+    def _get_fallback_conclusion() -> str:
+        if not utils.ExceptionRootCause().causes:
+            conclusion = "Internal error. Contact technical support.\n"
+        else:
+            conclusion = (
+                "The maintenance and test information is insufficient or the format is incorrect, "
+                "contact technical support.\n"
+            )
+        return conclusion + utils.ExceptionRootCause().format_causes()
 
     @property
     def root_cause_conclusion(self):

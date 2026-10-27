@@ -450,12 +450,52 @@ class DumpDataParser:
             f"dtype: {dtype if dtype else 'unknown'}\n"
         )
 
+        # info.json 元数据：张量类型/序号/dtype/shape/size，构建阶段不再回读文件。
+        # 序号优先取 dump json 的 arg_index（与 kernel args 对齐），无该字段时退
+        # 回 dump 内部序号（多数场景两者一致）。
+        arg_index = item.get("arg_index", index)
+        try:
+            arg_index = int(arg_index)
+        except (TypeError, ValueError):
+            arg_index = index
+        if not self._custom_dump_mode:
+            try:
+                size_value = int(item.get("size", 0))
+            except (TypeError, ValueError):
+                size_value = item.get("size", 0)
+            self.info.dump_tensor_meta.append(
+                {
+                    "parse_type": parse_type,
+                    "index": arg_index,
+                    "dtype": dtype,
+                    "shape": shape,
+                    "size": size_value,
+                    "file": None,  # 落盘后由 _save_array 回填
+                }
+            )
+
         array, np_dtype = self._build_typed_array(item.get("data"), dtype, shape)
         dst_file_name = self._build_dst_file_name(
             dump_file_path, parse_type, index, dtype, np_dtype
         )
         dst_file_name = self._save_array(array, dst_file_name, parse_type, np_dtype)
+        if not self._custom_dump_mode:
+            # 回填落盘产物路径（自定义dump不记录元数据，也不得污染报错dump的元数据）
+            for meta in reversed(self.info.dump_tensor_meta):
+                if meta["parse_type"] == parse_type and meta["index"] == arg_index:
+                    if meta["file"] is None:
+                        meta["file"] = dst_file_name
+                    break
         result_info += f"{dst_file_name}\n"
+
+        # info.json 的 data_stats：dtype 确定时仅展示该 dtype 的统计；
+        # 不确定时按常见 dtype 逐一猜测（与 info.txt 的多 dtype 摘要口径一致）
+        if not self._custom_dump_mode:
+            data_stats = self._build_data_stats(dst_file_name, array, dtype, np_dtype)
+            for meta in reversed(self.info.dump_tensor_meta):
+                if meta["parse_type"] == parse_type and meta["index"] == arg_index:
+                    meta["data_stats"] = data_stats
+                    break
 
         if np_dtype is not None:
             result_info += self._check_tensor_data(parse_type, index, array, dtype)
@@ -472,6 +512,76 @@ class DumpDataParser:
             # then guess the summary by the common dtypes
             result_info += self._summary_tensor_without_dtype(dst_file_name, None)
         return result_info
+
+    @staticmethod
+    def _json_safe_stat(value):
+        """统计值 JSON 安全化：complex 与 nan/inf 无法被严格 JSON 序列化，
+        统一转字符串占位，避免 data_stats 拖垮整份 info.json 落盘。"""
+        if isinstance(value, complex):
+            return str(value)
+        if isinstance(value, float) and (np.isnan(value) or np.isinf(value)):
+            return str(value)
+        return value
+
+    @staticmethod
+    def _summary_stat_entry(dtype, arr):
+        """单 dtype 的 max/min/mean/std 统计，读取失败返回 None。"""
+        try:
+            if arr.size == 0:
+                return {
+                    "Possible_dtype": dtype,
+                    "summary": {
+                        "max": "N/A",
+                        "min": "N/A",
+                        "mean": "N/A",
+                        "std": "N/A",
+                    },
+                }
+            acc_dtype = np.complex128 if np.iscomplexobj(arr) else np.float64
+            return {
+                "Possible_dtype": dtype,
+                "summary": {
+                    key: DumpDataParser._json_safe_stat(val)
+                    for key, val in (
+                        ("max", np.max(arr).item()),
+                        ("min", np.min(arr).item()),
+                        ("mean", np.mean(arr, dtype=acc_dtype).item()),
+                        ("std", np.std(arr, dtype=acc_dtype).item()),
+                    )
+                },
+            }
+        except (ValueError, TypeError, OSError):
+            return None
+
+    def _build_data_stats(self, tensor_file, array, dtype, np_dtype):
+        """info.json 的 data_stats 列表。
+
+        dtype 确定（numpy 可读）时仅返回该 dtype 的统计；不确定时按
+        COMMON_DTYPE 逐一从落盘文件回读猜测。读取失败返回 []。
+        """
+        stats = []
+        if np_dtype is not None:
+            entry = self._summary_stat_entry(dtype, array)
+            return [entry] if entry else []
+        # dtype 未知：从文件按常见 dtype 回读（bfloat16 需按 int16 载体处理）
+        for guess in ConstManager.COMMON_DTYPE:
+            try:
+                if guess == "bfloat16":
+                    if not DumpDataParser._register_ext_dtype():
+                        continue
+                    raw_data = np.fromfile(tensor_file, dtype=np.int16)
+                    data_f32 = raw_data.astype(np.float32)
+                    bf16_limit = 3.3895e38
+                    data_f32 = np.clip(data_f32, -bf16_limit, bf16_limit)
+                    arr = data_f32.astype("bfloat16")
+                else:
+                    arr = np.fromfile(tensor_file, dtype=np.dtype(guess))
+            except (ValueError, TypeError, OSError):
+                continue
+            entry = self._summary_stat_entry(guess, arr)
+            if entry:
+                stats.append(entry)
+        return stats
 
     def _save_data_to_bin_file(self, dump_json_data, parse_type, json_dtype, dump_file):
         dump_file_path, dump_file_name = os.path.split(dump_file)
