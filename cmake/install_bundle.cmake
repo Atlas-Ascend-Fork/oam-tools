@@ -140,11 +140,10 @@ endfunction()
 # 结果写入 RESULT_VAR（PARENT_SCOPE）。注意 CMake 的 string(TIMESTAMP) 不提供星期，
 # 旧版（如 3.18）也不支持带自定义时间戳参数的四参 TIMESTAMP，故借当前 UNIX
 # 时间戳对 1970-01-01（周四）取模换算：days%7 == 0 周四、1 周五、2 周六、
-# 3 周日、4 周一、5 周二、6 周三。再以"天数差"直接在 YYYYMMDD 上做日期加减
-# （days 是 UTC 天数，换算自洽；非 UTC 时区午夜前后数小时可能与本地"今天"
-# 差一天，对选包无影响）。
+# 3 周日、4 周一、5 周二、6 周三。将日期转换为儒略日后减去天数差，再转回 YYYYMMDD。
+# 日期和 days 均使用 UTC，避免非 UTC 时区的本地日期与 UTC 星期跨日错位。
 function(oam_recent_wednesday RESULT_VAR)
-    string(TIMESTAMP _today "%Y%m%d")
+    string(TIMESTAMP _today "%Y%m%d" UTC)
     string(TIMESTAMP _epoch "%s")
     math(EXPR _days "${_epoch} / 86400")
     math(EXPR _weekday "${_days} % 7")
