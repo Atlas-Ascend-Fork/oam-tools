@@ -69,6 +69,57 @@ class PackageIngestionTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def test_cli_rejects_top_level_directory_symlink(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            actual = root / "actual"
+            actual.mkdir()
+            actual.joinpath("fault.log").write_text(cann_record("Process abort"), encoding="utf-8")
+            linked = root / "linked"
+            linked.symlink_to(actual, target_is_directory=True)
+
+            completed = self.run_cli(linked, root / "output")
+
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            self.assertIn("symbolic link", completed.stderr)
+            self.assertFalse((root / "output").exists())
+
+    def test_cli_rejects_top_level_archive_symlinks(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            payload = cann_record("Process abort").encode("utf-8")
+            zipped = root / "actual.zip"
+            zipped.write_bytes(zip_bytes({"fault.log": payload}))
+            packed = root / "actual.tar.gz"
+            with tarfile.open(packed, "w:gz") as archive:
+                member = tarfile.TarInfo("fault.log")
+                member.size = len(payload)
+                archive.addfile(member, io.BytesIO(payload))
+            for actual in (zipped, packed):
+                with self.subTest(archive=actual.name):
+                    linked = root / ("linked" + actual.name)
+                    linked.symlink_to(actual)
+                    output = root / ("output" + actual.name)
+
+                    completed = self.run_cli(linked, output)
+
+                    self.assertEqual(completed.returncode, 2, completed.stderr)
+                    self.assertIn("symbolic link", completed.stderr)
+                    self.assertFalse(output.exists())
+
+    def test_cli_rejects_dangling_input_symlink(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            linked = root / "linked"
+            linked.symlink_to(root / "missing")
+
+            completed = self.run_cli(linked, root / "output")
+
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            self.assertIn("symbolic link", completed.stderr)
+            self.assertIn(str(linked), completed.stderr)
+            self.assertFalse((root / "output").exists())
+
     def test_zip_and_depth_two_nested_archives_are_one_collection_boundary(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

@@ -134,6 +134,9 @@ def _load_redaction_config(path: Path | None) -> dict[str, str] | None:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.input.is_symlink():
+        print(f"error: top-level input cannot be a symbolic link: {args.input}", file=sys.stderr)
+        return 2
     if not args.input.exists() or not (args.input.is_dir() or args.input.is_file()):
         print(f"error: input path is not readable: {args.input}", file=sys.stderr)
         return 2
