@@ -58,13 +58,13 @@ usage() {
     echo "                   Ignored with a WARNING when --pkg or --pkg-type is specified."
     echo "Test Options:"
     echo $dotted_line
-    echo "    -u             Build and run all unit tests"
+    echo "    -u             Build and run all tests (UT + ST)"
     echo "    --noexec       Only compile ut, do not execute"
     echo "    --cov          Enable code coverage for unit tests"
     echo "    --component <name>"
     echo "                   Specify component to test:"
     echo "                   host, asys, msaicerr, msprof, install, upgrade, uninstall, all (default: all)"
-    echo "    --ut           Run UT tests only (default when -u is specified)"
+    echo "    --ut           Run UT tests only"
     echo "    --st           Run ST tests only"
     echo ""
 }
