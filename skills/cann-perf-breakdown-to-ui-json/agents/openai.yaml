@@ -1,4 +1,0 @@
-interface:
-  display_name: "CANN 拆解 UI 数据适配"
-  short_description: "将已验证的性能拆解转换为 UI 架构、性能与时间线事实"
-  default_prompt: "Use $cann-perf-breakdown-to-ui-json to convert a validated breakdown into model-independent UI facts."

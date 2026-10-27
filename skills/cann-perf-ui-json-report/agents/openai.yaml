@@ -1,4 +1,0 @@
-interface:
-  display_name: "CANN 性能 UI 报告"
-  short_description: "从结构化 UI 事实生成并验证可离线打开的交互式性能报告"
-  default_prompt: "Use $cann-perf-ui-json-report to generate and validate an offline interactive profiling report from UI facts."
