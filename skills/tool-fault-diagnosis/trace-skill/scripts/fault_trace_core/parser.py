@@ -102,16 +102,21 @@ _FAULT_RULES = tuple(
         ("uncorrectable-exception", r"\buncorrectable(?:\s+\w+){0,2}\s+exception\b"),
     )
 )
+_FAULT_NOUN = r"(?:crash|panic|abort|oom|reset|exception|termination|SIG(?:ABRT|SEGV|BUS|ILL|FPE))\b"
+_FAULT_MODIFIER = r"(?!(?:but|however|yet|or|nor|and)\b)\w+\s+"
 _NEGATED_FAULT = re.compile(
-    r"\b(?:no|not|without)\s+(?:\w+\s+){0,3}"
-    r"(?:crash|panic|abort|oom|reset|exception|termination|SIG(?:ABRT|SEGV|BUS|ILL|FPE))\b",
+    r"\b(?:no|not|without)\s+"
+    + rf"(?:{_FAULT_MODIFIER}){{0,3}}{_FAULT_NOUN}"
+    + rf"(?:(?:\s*,\s*(?:(?:or|nor|and)\s+)?|\s+(?:or|nor|and)\s+)"
+    + rf"(?:{_FAULT_MODIFIER}){{0,3}}{_FAULT_NOUN})*",
     re.IGNORECASE,
 )
 _BENIGN_FAULT_CONTEXT = re.compile(
     r"(?:\bcheck\s+oom\s+reserved\s+mem\b|"
     r"\boom\s+(?:killer\s+)?(?:disabled|initialized|enabled|configured)\b|"
     r"\boom\s+(?:monitor|threshold|handler|handling|check)\b|"
-    r"\bout of memory\s+(?:monitor|threshold|handler|handling|check)\b)",
+    r"\bout of memory\s+(?:monitor|threshold|handler|handling|check)\b|"
+    r"\breset(?:ting|ted)?\s+(?:the\s+)?(?:counter|timer|statistics)\b)",
     re.IGNORECASE,
 )
 _TID = re.compile(r"(?:\[|\()tid:(?P<tid>\d+)(?:\]|\))", re.IGNORECASE)
@@ -721,10 +726,12 @@ def _fault_rule(level: str, message: str) -> str | None:
         return None
     if level == "WARNING" and not re.search(r"SIG(?:ABRT|SEGV|BUS|ILL|FPE)", message):
         return None
-    if _NEGATED_FAULT.search(message) or _BENIGN_FAULT_CONTEXT.search(message):
-        return None
+    # Exclude only the matched benign/negated phrase, not independent faults
+    # elsewhere in the same record.
+    fault_message = _NEGATED_FAULT.sub(" ", message)
+    fault_message = _BENIGN_FAULT_CONTEXT.sub(" ", fault_message)
     for rule_id, pattern in _FAULT_RULES:
-        if pattern.search(message):
+        if pattern.search(fault_message):
             return rule_id
     return None
 
