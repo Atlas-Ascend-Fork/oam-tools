@@ -2400,8 +2400,10 @@ def render_html(trace: dict[str, Any]) -> str:
                 relative_us = _viewer_coordinate_us(event) - panel_reference[root]
                 x_px = 90 + (relative_us - panel_min) * pixel_scale
                 classes = "event event-point highlighted"
+                anchor_markup = ""
                 if event["id"] == selected_anchor_id:
                     classes += " anchor selected"
+                    anchor_markup = '<span class="anchor-label">Fault anchor</span>'
                 event_markup.append(
                     f'<button class="{classes}" data-lane-id="{lane_id}" '
                     f'data-event-id="{html.escape(event["id"])}" '
@@ -2411,7 +2413,7 @@ def render_html(trace: dict[str, Any]) -> str:
                     f'title="{html.escape(event["message"])}">'
                     f'<span class="event-glyph"></span><span class="event-label">'
                     f'<span class="event-time">{html.escape(_format_relative_us(relative_us))}</span>'
-                    f'{"<span class=\"anchor-label\">Fault anchor</span>" if event["id"] == selected_anchor_id else ""}'
+                    f'{anchor_markup}'
                     f'<span>{html.escape(event["component"])}</span></span></button>'
                 )
             domain_kind = domain_by_id[domain_id]["kind"]
