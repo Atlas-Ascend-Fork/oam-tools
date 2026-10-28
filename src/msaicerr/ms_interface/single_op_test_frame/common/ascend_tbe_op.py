@@ -509,7 +509,7 @@ class AscendOpKernelRunner:
                 kernel_param.sync_to_device(self.ascend_device, mode)
                 # 同上：只读现有指针，不触发分配
                 wksp_hbm_pointers.append(kernel_param.allocated_hbm_pointer)
-                kernel_args.append(kernel_param.origin_pointer)
+                kernel_args.append(kernel_param.allocated_hbm_pointer)
                 logger.log_info(
                     f"Fill init_value[{init_value}] to parameters[{param_index}]"
                 )
