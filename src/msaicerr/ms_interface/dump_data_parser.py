@@ -197,6 +197,8 @@ class DumpDataParser:
         np_dtype = DumpDataParser._to_numpy_dtype(dtype)
         if np_dtype is None:
             return f"Can not read with dtype {dtype}!\n"
+        if array.size == 0:
+            return ""
         # bfloat16 has no finfo, check its value range as float32
         data_dtype = np.float32 if dtype == "bfloat16" else np_dtype
         result_info = ""
