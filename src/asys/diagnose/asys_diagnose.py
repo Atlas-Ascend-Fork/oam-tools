@@ -19,6 +19,7 @@
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
@@ -26,7 +27,7 @@ from datetime import datetime, timezone
 from common import log_error, log_warning, log_info, log_debug
 from common.const import RetCode, UNKNOWN, ScreenResult
 from common.const import HBM_MIN_TIMEOUT, CPU_MIN_TIMEOUT, DETECT_MAX_TIMEOUT
-from common.cmd_run import run_linux_cmd, run_cmd_output
+from common.cmd_run import run_linux_cmd
 from common import AsysDiagnoseSupportedChip, DeviceInfo, ChipHandler
 from common.file_operate import FileOperate as f
 from params.param_dict import ParamDict
@@ -279,11 +280,25 @@ class AsysDiagnose:
 
     @staticmethod
     def run_msaicerr_cmd(msaicerr_path, device_id, res):
-        cmd = f"{sys.executable} {msaicerr_path} --env -dev={device_id}"
-        log_debug(f"Start run: {cmd}")
-        ret, output = run_cmd_output(cmd)
-        res[device_id] = ScreenResult.PASS.value if ret else ScreenResult.FAIL.value
-        return output
+        cmd = [sys.executable, str(msaicerr_path), "--env", f"-dev={device_id}"]
+        log_debug(f"Start run: {' '.join(cmd)}")
+        try:
+            ret = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                encoding="utf-8",
+                env=os.environ,
+                check=False,
+            )
+        except (OSError, ValueError) as e:
+            log_error(f"Run command: {' '.join(cmd)} failed, {e}")
+            res[device_id] = ScreenResult.FAIL.value
+            return ""
+        res[device_id] = (
+            ScreenResult.PASS.value if ret.returncode == 0 else ScreenResult.FAIL.value
+        )
+        return ret.stdout
 
     def env_detect(self, run_mode):
         device_id = ParamDict().get_arg("device_id")
@@ -301,13 +316,15 @@ class AsysDiagnose:
             )
             return False
         res = {}
-        output = ""
+        output_by_device = {}
         if device_id is False:
             for i in range(self.devices_num):
                 log_debug(f"Start run device {i}")
-                output = self.run_msaicerr_cmd(msaicerr_path, i, res)
+                output_by_device[i] = self.run_msaicerr_cmd(msaicerr_path, i, res)
         else:
-            output = self.run_msaicerr_cmd(msaicerr_path, device_id, res)
+            output_by_device[device_id] = self.run_msaicerr_cmd(
+                msaicerr_path, device_id, res
+            )
         self.print_save(device_id, res, run_mode)
         if ScreenResult.FAIL.value in res.values():
             debug_info_path = Path(os.getcwd(), "debug_info.txt")
@@ -318,9 +335,17 @@ class AsysDiagnose:
                 log_error(
                     "The current directory or debug_info.txt is immutable, Please check."
                 )
-
-            else:
+            for failed_device_id in sorted(res):
+                if res[failed_device_id] != ScreenResult.FAIL.value:
+                    continue
+                output = output_by_device.get(failed_device_id, "")
+                if not output:
+                    continue
+                if device_id is False:
+                    sys.stdout.write(f"Device ID: {failed_device_id}\n")
                 sys.stdout.write(output)
+                if not output.endswith("\n"):
+                    sys.stdout.write("\n")
             return False
         return True
 

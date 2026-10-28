@@ -1055,6 +1055,86 @@ class TestAsysDiagnose(AssertTest):
         diagnose = AsysDiagnose()
         self.assertTrue(diagnose.env_detect("component"))
 
+    def test_run_msaicerr_cmd_oserror_marks_device_failed(self, mocker, caplog):
+        mocker.patch(
+            "subprocess.run", side_effect=FileNotFoundError("msaicerr unavailable")
+        )
+        result = {}
+
+        output = AsysDiagnose.run_msaicerr_cmd("/missing/msaicerr.py", 3, result)
+
+        self.assertTrue(output == "")
+        self.assertTrue(result == {3: "Fail"})
+        self.assertTrue("Run command:" in caplog.text)
+        self.assertTrue("msaicerr unavailable" in caplog.text)
+
+    @pytest.mark.parametrize(
+        ["device_id", "return_codes", "expected_result", "debug_writable"],
+        [
+            (False, (0, 0), True, True),
+            (False, (1, 0), False, True),
+            (False, (1, 1), False, True),
+            (0, (1, 0), False, True),
+            (False, (1, 0), False, False),
+        ],
+    )
+    def test_diagnose_env_detect_preserves_per_device_output(
+        self,
+        monkeypatch,
+        tmp_path,
+        capsys,
+        device_id,
+        return_codes,
+        expected_result,
+        debug_writable,
+    ):
+        project_path = tmp_path / "project"
+        msaicerr_path = project_path / "msaicerr" / "msaicerr.py"
+        msaicerr_path.parent.mkdir(parents=True)
+        msaicerr_path.write_text(
+            "import sys\n"
+            "device_id = int(sys.argv[-1].split('=')[1])\n"
+            "print(f'device {device_id} diagnostic details')\n"
+            "print(f'device {device_id} stderr details', file=sys.stderr)\n"
+            f"sys.exit({return_codes!r}[device_id])\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(DeviceInfo, "get_device_count", lambda _self: 2)
+
+        def get_arg(_self, key, _default=False):
+            return device_id if key == "device_id" else False
+
+        monkeypatch.setattr(ParamDict, "get_arg", get_arg)
+        monkeypatch.setattr(FileOperate, "check_access", lambda *_args: debug_writable)
+        monkeypatch.setattr(
+            ParamDict,
+            "tools_path",
+            property(lambda _self: project_path / "src" / "asys"),
+        )
+
+        diagnose = AsysDiagnose()
+        self.assertTrue(diagnose.env_detect("component") is expected_result)
+        output = capsys.readouterr().out
+        if device_id is False:
+            failed_devices = {
+                i for i, return_code in enumerate(return_codes) if return_code
+            }
+        elif return_codes[device_id]:
+            failed_devices = {device_id}
+        else:
+            failed_devices = set()
+        for current_device_id in range(2):
+            should_print = current_device_id in failed_devices
+            details = f"device {current_device_id} diagnostic details"
+            stderr_details = f"device {current_device_id} stderr details"
+            device_label = f"Device ID: {current_device_id}"
+            self.assertTrue((details in output) is should_print)
+            self.assertTrue((stderr_details in output) is should_print)
+            expected_label_count = int(should_print and device_id is False)
+            if device_id is not False and device_id == current_device_id:
+                expected_label_count = 1
+            self.assertTrue(output.count(device_label) == expected_label_count)
+
     def test_diagnose_env_detect_not_have_msaicerr(self, mocker, caplog, capsys):
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=4)
         mocker.patch.object(ParamDict, "get_arg", return_value=0)
