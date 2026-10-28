@@ -171,7 +171,9 @@ class TestClassAscendOpKernelRunner(CommonAssert):
         assert len(wksp_hbm_pointers) == 1
         assert len(kernel_args) == 1
         assert wksp_hbm_pointers[0] is runner.ascend_device.malloc.return_value
-        assert kernel_args[0].value == 1
+        # kernel 参数应传入已填充 init_value 的有效数据区地址（与工作区指针一致），
+        # 不再是仅用于释放的 origin_pointer；tail 模式下有效指针含页对齐偏移
+        assert kernel_args[0] is wksp_hbm_pointers[0]
 
     @staticmethod
     def test_fill_workspace_no_parameter(mocker, mock_runner):
