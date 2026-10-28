@@ -13,30 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ----------------------------------------------------------------------------
-generate_cann_protobuf(application_utest_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 set(profilerSrcList
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/app/application.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/app/env_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/app/application_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/app/env_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/msprof/dynamic_profiling/src/dyn_prof_client.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/msprof/dynamic_profiling/src/dyn_prof_client_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
-    ${CppPath}
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
 )
 
 set(profilerSrcFile
@@ -77,7 +71,6 @@ set(libmsprofHeaderDir
 
 target_include_directories(application_utest PRIVATE
     ${libmsprofHeaderDir}
-    ${PROTOBUF_HOST_INCLUDE}
     ${TOP_DIR}/src/msprof/inc
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${TOP_DIR}/src/msprof/inc/external
@@ -131,7 +124,6 @@ target_include_directories(application_utest PRIVATE
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/inc
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform
     ${MSPROF_SOURCE_DIR}/dvvp/msprof/dynamic_profiling/include
-    ${CMAKE_BINARY_DIR}/proto/application_utest_proto/
 )
 
 
@@ -146,14 +138,12 @@ target_compile_options(application_utest PRIVATE
 
 target_compile_definitions(application_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(application_utest PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
 )
 
@@ -162,4 +152,3 @@ set_target_properties(application_utest
     OUTPUT_NAME application_utest
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-

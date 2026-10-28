@@ -21,11 +21,11 @@
 
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "errno/error_code.h"
-#include "input_parser.h"
-#include "config_manager.h"
-#include "dyn_prof_client.h"
-#include "platform/platform.h"
+#include "errno/error_code_tool.h"
+#include "input_parser_tool.h"
+#include "config_manager_tool.h"
+#include "dyn_prof_client_tool.h"
+#include "platform/platform_tool.h"
 
 using namespace analysis::dvvp::common::error;
 using namespace Analysis::Dvvp::Msprof;
@@ -1430,7 +1430,7 @@ TEST_F(INPUT_PARSER_UTEST, PreCheckSwitch310P)
 /*
  * 函数原型	MsprofArgsType, LONG_OPTIONS[]
  * 函数功能	检测参数配置是否发生错位
- * 注意事项 谨慎修改，确保63位是invalid，并且63之前参数填充满，保证63的前后参数与input_parser.h顺序一致
+ * 注意事项 谨慎修改，确保63位是invalid，并且63之前参数填充满，保证63的前后参数与input_parser_tool.h顺序一致
  */
 TEST_F(INPUT_PARSER_UTEST, PreCheckParamOffset)
 {

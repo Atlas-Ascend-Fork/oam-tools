@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #include "cloud_v2_platform.h"
-#include "cloud_v2_analyzer.h"
+#include "cloud_v2_analyzer_tool.h"
 
 namespace Dvvp {
 namespace Collect {

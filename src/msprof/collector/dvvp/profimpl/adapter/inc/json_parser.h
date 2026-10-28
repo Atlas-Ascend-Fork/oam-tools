@@ -19,9 +19,9 @@
 
 #include <map>
 #include <vector>
-#include "json/json.h"
-#include "json_api.h"
-#include "singleton/singleton.h"
+#include "json/json_tool.h"
+#include "json_api_tool.h"
+#include "singleton/singleton_tool.h"
 
 namespace Msprofiler {
 namespace Parser {

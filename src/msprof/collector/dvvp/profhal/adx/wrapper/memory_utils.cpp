@@ -15,7 +15,7 @@
  */
 #include "memory_utils.h"
 #include "securec.h"
-#include "msprof_dlog.h"
+#include "msprof_dlog_tool.h"
 
 namespace Analysis {
 namespace Dvvp {

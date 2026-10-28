@@ -15,8 +15,8 @@
  */
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
-#include "adx_prof_api.h"
-#include "errno/error_code.h"
+#include "adx_prof_api_tool.h"
+#include "errno/error_code_tool.h"
 #include "securec.h"
 
 using namespace analysis::dvvp::common::error;
@@ -33,5 +33,51 @@ TEST_F(ADX_PROF_API_STEST, AdxIdeGetVfIdBySession)
     GlobalMockObject::verify();
     HDC_SESSION session = (HDC_SESSION)0x12345678;
     int32_t vfId = 0;
-    EXPECT_EQ(IDE_DAEMON_ERROR, AdxIdeGetVfIdBySession(session, vfId));
+    EXPECT_EQ(IDE_DAEMON_OK, AdxIdeGetVfIdBySession(session, vfId));
+    EXPECT_EQ(0, vfId);
+}
+
+TEST_F(ADX_PROF_API_STEST, AdxIdeCreatePacketChecksInputs)
+{
+    IdeBuffT buffer = nullptr;
+    int32_t length = 0;
+    IdeBuffT output = nullptr;
+    int32_t outputLength = 0;
+
+    EXPECT_EQ(IDE_DAEMON_ERROR, AdxIdeCreatePacket(nullptr, length, output, outputLength));
+    EXPECT_EQ(nullptr, output);
+    EXPECT_EQ(0, outputLength);
+
+    output = reinterpret_cast<IdeBuffT>(1);
+    EXPECT_EQ(
+        IDE_DAEMON_OK, AdxIdeCreatePacket(reinterpret_cast<CONST_VOID_PTR>(&buffer), length, output, outputLength));
+    AdxIdeFreePacket(output);
+}
+
+TEST_F(ADX_PROF_API_STEST, AdxIdeCreatePacketRejectsOversizedLength)
+{
+    IdeBuffT input = nullptr;
+    IdeBuffT output = nullptr;
+    int32_t outputLength = 0;
+    const uint32_t oversizedLength = UINT32_MAX;
+
+    EXPECT_EQ(
+        IDE_DAEMON_ERROR,
+        AdxIdeCreatePacket(
+            reinterpret_cast<CONST_VOID_PTR>(&input), static_cast<int32_t>(oversizedLength), output, outputLength));
+    EXPECT_EQ(nullptr, output);
+    EXPECT_EQ(0, outputLength);
+}
+
+TEST_F(ADX_PROF_API_STEST, AdxIdeCreateAndFreePacket)
+{
+    const char input[] = "adx";
+    IdeBuffT output = nullptr;
+    int32_t outputLength = 0;
+
+    EXPECT_EQ(IDE_DAEMON_OK, AdxIdeCreatePacket(input, sizeof(input) - 1, output, outputLength));
+    EXPECT_NE(nullptr, output);
+    EXPECT_EQ(static_cast<int32_t>(sizeof(struct tlv_req) + sizeof(input) - 1), outputLength);
+    AdxIdeFreePacket(output);
+    EXPECT_EQ(nullptr, output);
 }

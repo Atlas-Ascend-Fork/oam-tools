@@ -22,9 +22,9 @@
 #include <mutex>
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "prof_channel.h"
+#include "prof_channel_tool.h"
 #include "collection_entry.h"
-#include "uploader_mgr.h"
+#include "uploader_mgr_tool.h"
 
 using namespace analysis::dvvp::common::error;
 using namespace Analysis::Dvvp::Common::Statistics;

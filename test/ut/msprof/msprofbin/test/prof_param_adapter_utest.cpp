@@ -16,11 +16,10 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "errno/error_code.h"
-#include "msprof_params_adapter.h"
-#include "message/codec.h"
+#include "errno/error_code_tool.h"
+#include "msprof_params_adapter_tool.h"
 #include "config/config.h"
-#include "config_manager.h"
+#include "config_manager_tool.h"
 
 using namespace analysis::dvvp::common::error;
 using namespace analysis::dvvp::common::config;

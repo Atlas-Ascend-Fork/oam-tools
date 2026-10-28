@@ -17,24 +17,12 @@
 # device 侧联编守卫：本目录可能被单独作为入口联编，补齐缺失的 INTERFACE 目标
 include(${CMAKE_CURRENT_LIST_DIR}/../msprof_intf_pub_cxx.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../msprof_find_target.cmake)
-generate_cann_protobuf(msprofbin_proto
-    CppPath
-    HeaderPath
-    ${CMAKE_CURRENT_SOURCE_DIR}/../proto/profiler.proto
-    TARGET
-)
-
-if(BUILD_OPEN_PROJECT)
-    add_dependencies(msprofbin_proto host_protoc ascend_protobuf_static)
-endif()
-
 set(msprofBinHeader
     ${SOURCE_DIR}/src
     ${TOP_DIR}/inc
     ${TOP_DIR}/inc/driver
     ${TOP_DIR}/inc/aicpu
     ${MSPROF_DIR}/inc/toolchain
-    ${PROTOBUF_HOST_STATIC_INCLUDE}
     include
     ../
     ../app
@@ -70,73 +58,40 @@ set(msprofBinHeader
 )
 
 set(hdcCpp
-    ../profhal/adx/stub/adx_prof_api.cpp
+    ../profhal/adx/stub/adx_prof_api_tool.cpp
     ../profhal/adx/wrapper/hdc_api.cpp
     ../profhal/adx/wrapper/memory_utils.cpp
 )
 
 set(msprofbinCpp
-    src/msprof_bin.cpp
-    src/msopprof_manager.cpp
-    src/msprof_manager.cpp
-    src/msprof_task.cpp
-    src/msprof_params_adapter.cpp
-    src/input_parser.cpp
-    src/running_mode.cpp
-    ../app/application.cpp
-    ../app/env_manager.cpp
-    ../common/cmd_log/cmd_log.cpp
-    ../common/utils/utils.cpp
-    ../common/json/json.cpp
+    src/msprof_bin_tool.cpp
+    src/msopprof_manager_tool.cpp
+    src/msprof_manager_tool.cpp
+    src/msprof_params_adapter_tool.cpp
+    src/input_parser_tool.cpp
+    src/running_mode_tool.cpp
+    src/prof_api_loader.cpp
+    ../app/application_tool.cpp
+    ../app/env_manager_tool.cpp
+    ../common/cmd_log/cmd_log_tool.cpp
+    ../common/utils/utils_tool.cpp
+    ../common/json/json_tool.cpp
     ../../basic/osal/osal.c
-    ../common/config/config_manager.cpp
-    ../common/memory/chunk_pool.cpp
-    ../common/thread/thread.cpp
-    ../common/thread/thread_pool.cpp
-    ../common/socket/local_socket.cpp
-    ../common/statistics/perf_count.cpp
-    ../common/validation/param_validation.cpp
+    ../common/config/config_manager_tool.cpp
+    ../common/memory/chunk_pool_tool.cpp
+    ../common/thread/thread_tool.cpp
+    ../common/thread/thread_pool_tool.cpp
+    ../common/socket/local_socket_tool.cpp
+    ../common/statistics/perf_count_tool.cpp
+    ../common/validation/param_validation_tool.cpp
     ../common/platform/platform.cpp
-    ../common/json/json.cpp
-    ../depend/stub/error_manager/msprof_error_manager_stub.cpp
     ../driver/devmgmt/ai_drv_dev_api.cpp
-    ../driver/devmgmt/ai_drv_dsmi_api.cpp
-    ../driver/channel/ai_drv_prof_api.cpp
-    ../profimpl/collect/job_wrapper/src/collection_job.cpp
-    ../profimpl/collect/job_wrapper/src/collection_register.cpp
-    ../profimpl/collect/job_wrapper/src/job_factory.cpp
-    ../profimpl/collect/job_wrapper/src/job_device_rpc.cpp
-    ../profimpl/collect/job_wrapper/src/prof_comm_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_soc_pmu_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_l2cache_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_ts_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_stars_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_ccu_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_hwts_log_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_instr_perf_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_biu_perf_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_aicore_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_aicpu_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_sys_info_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_hardware_mem_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_dvpp_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_lpm_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_inter_connection_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_io_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_timer.cpp
-    ../profimpl/collect/job_wrapper/src/prof_perf_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_host_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_diagnostic_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_aicpu_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_channel_manager.cpp
-    ../profimpl/collect/job_wrapper/src/prof_adprof_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_drv_event.cpp
-    ../profimpl/collect/job_wrapper/src/job_device_soc.cpp
-    ../profimpl/collect/job_wrapper/src/adprof_collector_proxy.cpp
-    ../msprof/dynamic_profiling/src/dyn_prof_client.cpp
+    ../depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
+    ../driver/devmgmt/ai_drv_dsmi_api_tool.cpp
+    ../driver/channel/ai_drv_prof_api_tool.cpp
     ../profimpl/adapter/src/json_parser.cpp
     ../profimpl/platform/platform_interface.cpp
-    ../profimpl/platform/base_analyzer.cpp
+    ../profimpl/platform/base_analyzer_tool.cpp
     ../profimpl/platform/modena_platform.cpp
     ../profimpl/platform/mini_platform.cpp
     ../profimpl/platform/cloud_v2_platform.cpp
@@ -146,24 +101,9 @@ set(msprofbinCpp
     ../profimpl/platform/cloud_platform.cpp
     ../profimpl/platform/dc_platform.cpp
     ../profimpl/platform/mini_v3_platform.cpp
-    ../message/codec.cpp
-    ../transport/file_transport.cpp
-    ../transport/pipe_transport.cpp
-    ../transport/prof_channel.cpp
-    ../transport/uploader_mgr.cpp
-    ../transport/hash_data.cpp
-    ../transport/uploader.cpp
-    ../transport/file_ageing.cpp
-    ../transport/file_slice.cpp
-    ../task_handle/src/info_json.cpp
-    ../task_handle/src/task_relationship_mgr.cpp
-    ../transport/hdc/data_handle.cpp
-    ../transport/hdc/hdc_transport.cpp
-    ../transport/hdc/helper_transport.cpp
-    ../transport/hdc/device_transport.cpp
-    ../transport/hdc/platform/rpc/dev_mgr_api.cpp
+    ../msprof/dynamic_profiling/src/dyn_prof_client_tool.cpp
+    ../transport/pipe_transport_tool.cpp
     ${hdcCpp}
-    ${CppPath}
 )
 
 # 扩展平台（module ext）源文件隔离：仅MODULE_EXT使能时编入
@@ -186,7 +126,7 @@ endif()
 
 if(${TARGET_SYSTEM_NAME} STREQUAL "Windows")
 set(msprofbinCpp
-    src/win/msprof_bin.cpp
+    src/win/msprof_bin_tool.cpp
 )
 endif()
 add_executable(msprofbin
@@ -201,7 +141,6 @@ target_include_directories(msprofbin PRIVATE
     $<$<BOOL:${ENABLE_MODULE_EXT}>:${MSPROF_MODULE_EXT_PLATFORM_INC}>
     ${msprofBinHeader}
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/proto/msprofbin_proto
 )
 
 
@@ -225,7 +164,6 @@ target_compile_options(msprofbin PRIVATE
 
 target_compile_definitions(msprofbin PRIVATE
     SECUREC_USING_STD_SECURE_LIB=0
-    google=ascend_private
     $<$<STREQUAL:${TARGET_SYSTEM_NAME},Windows>:NOMINMAX>
     $<$<BOOL:${ENABLE_MODULE_EXT}>:${MSPROF_MODULE_EXT_COMPILE_DEFINITIONS}>
 )
@@ -285,12 +223,10 @@ target_link_libraries(msprofbinOnetrack_pub INTERFACE
     alog
     mmpa
     ascend_hal
-    ascend_protobuf_static
     -lpthread
     -ldl
 )
 
-add_dependencies(msprofbin msprofbin_proto)
 
 # CMake 不感知 whl 来源，在当前目录中匹配唯一 msprof-*-py3-none-any.whl 并安装/打包。
 # build.sh 负责确保该路径下的 whl 已替换为产品每日构建产物（版本字段可变，故用 glob）。

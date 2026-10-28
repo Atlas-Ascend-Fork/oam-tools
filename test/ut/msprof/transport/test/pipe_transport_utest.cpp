@@ -17,8 +17,8 @@
 #include "mockcpp/mockcpp.hpp"
 #include <memory>
 #include <string>
-#include "pipe_transport.h"
-#include "errno/error_code.h"
+#include "pipe_transport_tool.h"
+#include "errno/error_code_tool.h"
 
 using namespace analysis::dvvp::transport;
 using namespace analysis::dvvp::common::error;

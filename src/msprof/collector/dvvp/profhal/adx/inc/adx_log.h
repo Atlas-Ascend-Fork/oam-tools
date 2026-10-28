@@ -16,7 +16,7 @@
 
 #ifndef ADX_LOG_H
 #define ADX_LOG_H
-#include "msprof_dlog.h"
+#include "msprof_dlog_tool.h"
 #define IDE_CTRL_VALUE_FAILED(err, action, logText, ...) \
     do {                                                 \
         if (!(err)) {                                    \

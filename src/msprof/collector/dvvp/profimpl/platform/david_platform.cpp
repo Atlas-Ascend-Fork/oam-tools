@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #include "david_platform.h"
-#include "david_analyzer.h"
+#include "david_analyzer_tool.h"
 
 namespace Dvvp {
 namespace Collect {

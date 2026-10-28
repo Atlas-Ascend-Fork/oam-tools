@@ -16,7 +16,7 @@
 #include "json_parser.h"
 #include <vector>
 #include "ai_drv_prof_api.h"
-#include "msprof_dlog.h"
+#include "msprof_dlog_tool.h"
 #include "prof_api.h"
 
 using namespace analysis::dvvp::driver;

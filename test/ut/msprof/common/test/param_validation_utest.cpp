@@ -18,14 +18,12 @@
 #include <string>
 #include <memory>
 #include "message/prof_params.h"
-#include "proto/profiler.pb.h"
-#include "message/codec.h"
-#include "param_validation.h"
-#include "platform/platform.h"
+#include "param_validation_tool.h"
+#include "platform/platform_tool.h"
 #include "devdrv_runtime_api_stub.h"
-#include "errno/error_code.h"
+#include "errno/error_code_tool.h"
 #include "ai_drv_dev_api.h"
-#include "config_manager.h"
+#include "config_manager_tool.h"
 #include "platform_interface.h"
 using namespace analysis::dvvp::common::error;
 using namespace Analysis::Dvvp::Common::Platform;
@@ -402,7 +400,6 @@ TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckAppNameIsValid)
 TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckProfilingParams1)
 {
     std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams());
-    std::shared_ptr<analysis::dvvp::proto::JobStartReq> start(new analysis::dvvp::proto::JobStartReq);
     auto entry = analysis::dvvp::common::validation::ParamValidation::instance();
     // profiling_mode is illegal
     std::string sampleConfig =

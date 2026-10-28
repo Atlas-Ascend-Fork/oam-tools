@@ -15,10 +15,10 @@
  */
 #include "ai_drv_dev_api.h"
 #include <set>
-#include "errno/error_code.h"
-#include "msprof_dlog.h"
+#include "errno/error_code_tool.h"
+#include "msprof_dlog_tool.h"
 #include "ascend_hal.h"
-#include "config_manager.h"
+#include "config_manager_tool.h"
 
 namespace analysis {
 namespace dvvp {

@@ -20,7 +20,7 @@
 #include "adx_config.h"
 #include "adx_log.h"
 #include "memory_utils.h"
-#include "utils/utils.h"
+#include "utils/utils_tool.h"
 
 #define IDE_FREE_HDC_MSG_AND_SET_NULL(ptr) \
     do {                                   \

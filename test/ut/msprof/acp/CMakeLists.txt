@@ -15,11 +15,6 @@
 # ----------------------------------------------------------------------------
 set(MSPROF_SOURCE_DIR ${TOP_DIR}/src/msprof/collector)
 
-generate_cann_protobuf(acp_utest_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 
 set(testSrc
@@ -29,6 +24,7 @@ set(testSrc
     testcase/op_data_manager_utest.cpp
     testcase/op_analyzer_biu_utest.cpp
     testcase/op_analyzer_pmu_utest.cpp
+    testcase/job_wrapper_utest.cpp
 )
 
 set(src_file
@@ -37,61 +33,59 @@ set(src_file
     ../stub/hdc-log-stub.cpp
     ../stub/devdrv_runtime_api_stub.cpp
     ../stub/profile_drv_user_stub.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_bin.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_bin_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_command.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_pipe_transfer.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_manager.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_pipe_transfer_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_api_plugin.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_runtime_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_compute_device_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_base.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pmu.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_biu.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pc_sampling.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_data_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_transport.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/app/application.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/app/env_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/argparse/argparser.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_pool.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_runtime_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_compute_device_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_base_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pmu_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_biu_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pc_sampling_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_data_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_transport_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/app/application_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/app/env_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/argparse/argparser_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_pool_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dsmi_api.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dsmi_api_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/msprof/dynamic_profiling/src/dyn_prof_client.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/task_handle/src/task_relationship_mgr.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/msprof/dynamic_profiling/src/dyn_prof_client_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/task_handle/src/task_relationship_mgr_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/cloud_v2_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_lite_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_v121_platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
 )
 
 list(APPEND src_file
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_register.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_comm_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_channel_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_stars_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_ccu_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_biu_perf_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/prof_channel.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_mgr.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_register_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_comm_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_channel_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_stars_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_biu_perf_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/prof_channel_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_mgr_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_tool.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
-    ${CppPath}
 )
 
 add_executable(acp_utest
@@ -100,7 +94,6 @@ add_executable(acp_utest
 )
 
 set(libmsprofHeaderDir
-    ${PROTOBUF_HOST_INCLUDE}
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${LLT_EXTEND_INCLUDE_DIR}
     ${TOP_DIR}/third_party/libc_sec/include
@@ -157,7 +150,6 @@ target_include_directories(acp_utest PRIVATE
     ${ASCEND_CANN_PACKAGE_PATH}/include/acl
     ${ASCEND_CANN_PACKAGE_PATH}/pkg_inc/runtime
     ${ASCEND_CANN_PACKAGE_PATH}/pkg_inc/runtime/runtime
-    ${CMAKE_BINARY_DIR}/proto/acp_utest_proto
 )
 
 target_compile_options(acp_utest PRIVATE
@@ -167,7 +159,6 @@ target_compile_options(acp_utest PRIVATE
 
 target_compile_definitions(acp_utest PRIVATE
     __PROF_LLT
-    google=ascend_private
 )
 
 target_link_options(acp_utest PRIVATE
@@ -181,7 +172,6 @@ target_link_libraries(acp_utest PRIVATE
     GTestShared::gtest
     mockcpp
     alog
-    ascend_protobuf_static
     c_sec
     dl
 )

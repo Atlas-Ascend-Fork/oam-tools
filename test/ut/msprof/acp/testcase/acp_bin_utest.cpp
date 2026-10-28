@@ -15,10 +15,10 @@
  */
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
-#include "error_code.h"
-#include "config_manager.h"
-#include "acp_pipe_transfer.h"
-#include "platform/platform.h"
+#include "error_code_tool.h"
+#include "config_manager_tool.h"
+#include "acp_pipe_transfer_tool.h"
+#include "platform/platform_tool.h"
 #define private public
 #include "acp_command.h"
 

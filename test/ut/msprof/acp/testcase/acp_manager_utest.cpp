@@ -15,17 +15,17 @@
  */
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
-#include "error_code.h"
+#include "error_code_tool.h"
 #include "acp_runtime_stub.h"
 #include "acp_api_plugin.h"
-#include "msprof_dlog.h"
-#include "prof_utils.h"
-#include "platform/platform.h"
+#include "msprof_dlog_tool.h"
+#include "prof_utils_tool.h"
+#include "platform/platform_tool.h"
 #include "prof_params.h"
-#include "acp_pipe_transfer.h"
-#include "op_transport.h"
-#include "acp_manager.h"
-#include "config_manager.h"
+#include "acp_pipe_transfer_tool.h"
+#include "op_transport_tool.h"
+#include "acp_manager_tool.h"
+#include "config_manager_tool.h"
 
 using namespace analysis::dvvp::common::error;
 using namespace Collector::Dvvp::Acp;

@@ -16,11 +16,11 @@
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
 
-#include "dyn_prof_client.h"
-#include "errno/error_code.h"
+#include "dyn_prof_client_tool.h"
+#include "errno/error_code_tool.h"
 #include "osal.h"
-#include "socket/local_socket.h"
-#include "utils/utils.h"
+#include "socket/local_socket_tool.h"
+#include "utils/utils_tool.h"
 
 using namespace Collector::Dvvp::DynProf;
 using namespace analysis::dvvp::common::error;

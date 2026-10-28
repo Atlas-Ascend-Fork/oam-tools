@@ -75,7 +75,6 @@ target_compile_options(hdc_api_utest PRIVATE
 
 target_compile_definitions(hdc_api_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(hdc_api_utest PRIVATE

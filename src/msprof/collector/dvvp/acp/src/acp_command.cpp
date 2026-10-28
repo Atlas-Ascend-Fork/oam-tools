@@ -16,16 +16,16 @@
 #include "acp_command.h"
 #include <unistd.h>
 #include <algorithm>
-#include "argparser.h"
-#include "acp_pipe_transfer.h"
-#include "app/application.h"
-#include "app/env_manager.h"
-#include "utils/utils.h"
-#include "cmd_log/cmd_log.h"
-#include "platform/platform.h"
+#include "argparser_tool.h"
+#include "acp_pipe_transfer_tool.h"
+#include "app/application_tool.h"
+#include "app/env_manager_tool.h"
+#include "utils/utils_tool.h"
+#include "cmd_log/cmd_log_tool.h"
+#include "platform/platform_tool.h"
 #include "ascend_hal.h"
 #include "config/config.h"
-#include "param_validation.h"
+#include "param_validation_tool.h"
 
 namespace Collector {
 namespace Dvvp {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #include "mini_v3_platform.h"
-#include "platform/platform.h"
+#include "platform/platform_tool.h"
 
 namespace Dvvp {
 namespace Collect {

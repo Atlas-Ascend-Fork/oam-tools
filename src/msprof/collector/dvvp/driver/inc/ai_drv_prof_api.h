@@ -21,8 +21,8 @@
 #include <string>
 #include "message/prof_params.h"
 #include "ascend_hal.h"
-#include "utils/utils.h"
-#include "singleton/singleton.h"
+#include "utils/utils_tool.h"
+#include "singleton/singleton_tool.h"
 
 namespace analysis {
 namespace dvvp {

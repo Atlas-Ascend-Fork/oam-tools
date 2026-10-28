@@ -16,11 +16,11 @@
 
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "msopprof_manager.h"
-#include "errno/error_code.h"
-#include "utils/utils.h"
-#include "cmd_log/cmd_log.h"
-#include "env_manager.h"
+#include "msopprof_manager_tool.h"
+#include "errno/error_code_tool.h"
+#include "utils/utils_tool.h"
+#include "cmd_log/cmd_log_tool.h"
+#include "env_manager_tool.h"
 
 using namespace analysis::dvvp::common::cmdlog;
 using namespace analysis::dvvp::common::error;

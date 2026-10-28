@@ -17,18 +17,18 @@ set(MSPROF_SOURCE_DIR ${TOP_DIR}/src/msprof/collector)
 
 set(profilerSrcFiles
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
 )
 
 set(localSrcFiles
@@ -108,14 +108,12 @@ target_compile_options(driver_utest PRIVATE
 
 target_compile_definitions(driver_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(driver_utest PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
 )
 

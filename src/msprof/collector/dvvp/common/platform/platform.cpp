@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "platform.h"
-#include "errno/error_code.h"
+#include "platform_tool.h"
+#include "errno/error_code_tool.h"
 #include "ai_drv_dev_api.h"
-#include "platform/platform.h"
-#include "logger/msprof_dlog.h"
-#include "config_manager.h"
+#include "platform/platform_tool.h"
+#include "logger/msprof_dlog_tool.h"
+#include "config_manager_tool.h"
 
 namespace Analysis {
 namespace Dvvp {

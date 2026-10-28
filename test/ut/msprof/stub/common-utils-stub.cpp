@@ -15,7 +15,7 @@
  */
 #include <libgen.h>
 #include "common-utils-stub.h"
-#include "errno/error_code.h"
+#include "errno/error_code_tool.h"
 
 #include "securec.h"
 

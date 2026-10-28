@@ -15,20 +15,20 @@
  */
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
-#include "error_code.h"
-#include "msprof_dlog.h"
-#include "prof_utils.h"
+#include "error_code_tool.h"
+#include "msprof_dlog_tool.h"
+#include "prof_utils_tool.h"
 #define private public
 #define protected public
-#include "op_analyzer.h"
-#include "op_analyzer_pc_sampling.h"
-#include "op_data_manager.h"
+#include "op_analyzer_tool.h"
+#include "op_analyzer_pc_sampling_tool.h"
+#include "op_data_manager_tool.h"
 #undef protected
 #undef private
-#include "platform/platform.h"
-#include "david_analyzer.h"
+#include "platform/platform_tool.h"
+#include "david_analyzer_tool.h"
 #include "david_platform.h"
-#include "config_manager.h"
+#include "config_manager_tool.h"
 #include "ascend_hal.h"
 
 using namespace Analysis::Dvvp::Common::Config;

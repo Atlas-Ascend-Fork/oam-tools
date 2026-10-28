@@ -17,8 +17,8 @@
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
 
-#include "errno/error_code.h"
-#include "memory/chunk_pool.h"
+#include "errno/error_code_tool.h"
+#include "memory/chunk_pool_tool.h"
 
 using namespace analysis::dvvp::common::memory;
 

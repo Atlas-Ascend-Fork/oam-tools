@@ -15,73 +15,57 @@
 # ----------------------------------------------------------------------------
 set(MSPROF_SOURCE_DIR ${TOP_DIR}/src/msprof/collector)
 
-generate_cann_protobuf(transport_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 set(profilerSrcFiles
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/file_transport.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/message/codec.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_mgr.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/prof_channel.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_pool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/uploader_mgr_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/prof_channel_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/thread/thread_pool_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dsmi_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/file_slice.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/file_ageing.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/hash_data.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/hdc/hdc_transport.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/hdc/helper_transport.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dsmi_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/cloud_v2_platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_manager.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profhal/adx/wrapper/memory_utils.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_api_plugin.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_transport.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_data_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_base.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pmu.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_biu.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pc_sampling.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_register.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_comm_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_channel_manager.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_stars_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_biu_perf_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_compute_device_job.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_pipe_transfer.cpp
-    ${CppPath}
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_transport_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_data_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_base_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pmu_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_biu_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pc_sampling_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/collection_register_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_comm_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_channel_manager_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_stars_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/collect/job_wrapper/src/prof_biu_perf_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_compute_device_job_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_pipe_transfer_tool.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
     ${MSPROF_SOURCE_DIR}/basic/osal/osal_linux.c
     ${MSPROF_SOURCE_DIR}/basic/osal/osal_linux_mem.c
-    ${MSPROF_SOURCE_DIR}/dvvp/profhal/adx/wrapper/adx_prof_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/transport/pipe_transport.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profhal/adx/stub/adx_prof_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/transport/pipe_transport_tool.cpp
 )
 
 set(localSrcFiles
     test/main.cpp
-    test/transport_utest.cpp
     test/uploader_utest.cpp
     test/prof_channel_utest.cpp
-    test/hash_data_test.cpp
-    test/file_ageing_test.cpp
-    test/file_slice_test.cpp
     test/pipe_transport_utest.cpp
     ../stub/hdc-api-stub.cpp
     ../stub/hdc-log-stub.cpp
@@ -112,7 +96,6 @@ set(libmsprofHeaderDir
 
 target_include_directories(transport PRIVATE
     ${libmsprofHeaderDir}
-    ${PROTOBUF_HOST_INCLUDE}
     ${TOP_DIR}/src/msprof/inc
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${TOP_DIR}/src/msprof/inc/external
@@ -162,7 +145,6 @@ target_include_directories(transport PRIVATE
     ${MSPROF_SOURCE_DIR}/dvvp/task_handle/include
     ${MSPROF_SOURCE_DIR}/dvvp/aging
     ${MSPROF_SOURCE_DIR}/dvvp/streamio/common/include
-    ${CMAKE_BINARY_DIR}/proto/transport_proto/
     ${MSPROF_SOURCE_DIR}/dvvp/depend/include/stub
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform
     ${MSPROF_SOURCE_DIR}/avp/
@@ -183,14 +165,12 @@ target_compile_definitions(transport PRIVATE
     DLOG_EVENT=4
     OSAL
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(transport PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
     rt
     dl

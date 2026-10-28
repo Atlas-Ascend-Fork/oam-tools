@@ -68,8 +68,6 @@ set(MSPROF_UT_SUBDIRS
     common
     driver
     hdc_api
-    job_wrapper
-    message
     msprofbin
     platform
     transport

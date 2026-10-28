@@ -15,28 +15,22 @@
 # ----------------------------------------------------------------------------
 set(MSPROF_SOURCE_DIR ${TOP_DIR}/src/msprof/collector)
 
-generate_cann_protobuf(platform_utest_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 add_executable(platform_utest
     test/main.cpp
     test/platform_utest.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/message/codec.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_lite_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_v121_platform.cpp
@@ -49,13 +43,12 @@ add_executable(platform_utest
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/mini_v3_platform.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/modena_platform.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ../stub/drv_stub.cpp
     ../stub/hdc-log-stub.cpp
     ../stub/mmpa_stub.cpp
     ../stub/devdrv_runtime_api_stub.cpp
     ../stub/profile_drv_user_stub.cpp
-    ${CppPath}
 )
 
 set(libmsprofHeaderDir
@@ -68,7 +61,6 @@ set(libmsprofHeaderDir
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${TOP_DIR}/src/msprof/inc/external
     ${TOP_DIR}/src/msprof/inc/external/acl
-    ${PROTOBUF_HOST_INCLUDE}
     ${ASCEND_CANN_PACKAGE_PATH}/include
     ${ASCEND_CANN_PACKAGE_PATH}/include/acl
     ${ASCEND_CANN_PACKAGE_PATH}/include/driver
@@ -107,7 +99,6 @@ target_include_directories(platform_utest PRIVATE
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform
     ${MSPROF_SOURCE_DIR}/dvvp/profapi/inc
     ${MSPROF_SOURCE_DIR}/dvvp/depend/include/stub
-    ${CMAKE_BINARY_DIR}/proto/platform_utest_proto/
     ../stub/
 )
 
@@ -122,14 +113,12 @@ target_compile_options(platform_utest PRIVATE
 
 target_compile_definitions(platform_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(platform_utest PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
 )
 

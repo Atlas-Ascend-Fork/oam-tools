@@ -23,10 +23,10 @@
 #include <set>
 #include <vector>
 #include <functional>
-#include "errno/error_code.h"
-#include "logger/msprof_dlog.h"
+#include "errno/error_code_tool.h"
+#include "logger/msprof_dlog_tool.h"
 #include "prof_acl_api.h"
-#include "base_analyzer.h"
+#include "base_analyzer_tool.h"
 
 namespace Dvvp {
 namespace Collect {

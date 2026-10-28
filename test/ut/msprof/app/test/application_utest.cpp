@@ -17,17 +17,16 @@
 #include "mockcpp/mockcpp.hpp"
 #include <fstream>
 #include <iostream>
-#include "utils/utils.h"
-#include "platform/platform.h"
-#include "errno/error_code.h"
-#include "app/application.h"
-#include "app/env_manager.h"
+#include "utils/utils_tool.h"
+#include "platform/platform_tool.h"
+#include "errno/error_code_tool.h"
+#include "app/application_tool.h"
+#include "app/env_manager_tool.h"
 #include "message/prof_params.h"
-#include "config_manager.h"
-#include "message/codec.h"
-#include "uploader_mgr.h"
-#include "transport.h"
-#include "dyn_prof_client.h"
+#include "config_manager_tool.h"
+#include "uploader_mgr_tool.h"
+#include "transport_tool.h"
+#include "dyn_prof_client_tool.h"
 using namespace analysis::dvvp::common::error;
 using namespace analysis::dvvp::message;
 using namespace Collector::Dvvp::DynProf;

@@ -30,7 +30,7 @@
 #include "rc_v2_platform_stub.h"
 #include "mini_v3_platform.h"
 #include "modena_platform.h"
-#include "platform/platform.h"
+#include "platform/platform_tool.h"
 
 using namespace Dvvp::Collect::Platform;
 using namespace analysis::dvvp::common::config;

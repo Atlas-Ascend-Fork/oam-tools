@@ -16,9 +16,9 @@
 #include "acp_api_plugin.h"
 #include <set>
 #include <dlfcn.h>
-#include "msprof_dlog.h"
+#include "msprof_dlog_tool.h"
 #include "error_codes/rt_error_codes.h"
-#include "utils/utils.h"
+#include "utils/utils_tool.h"
 
 namespace Collector {
 namespace Dvvp {

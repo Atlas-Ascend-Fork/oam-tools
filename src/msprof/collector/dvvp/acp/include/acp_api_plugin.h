@@ -18,12 +18,12 @@
 #include <cstdint>
 #include <map>
 #include <string>
-#include "singleton/singleton.h"
+#include "singleton/singleton_tool.h"
 #include "runtime/base.h"
 #include "runtime/kernel.h"
 #include "runtime/rts/rts_kernel.h"
 #include "runtime/mem.h"
-#include "prof_utils.h"
+#include "prof_utils_tool.h"
 
 namespace Collector {
 namespace Dvvp {

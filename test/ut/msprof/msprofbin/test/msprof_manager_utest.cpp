@@ -16,29 +16,25 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "errno/error_code.h"
-#include "msprof_manager.h"
-#include "message/codec.h"
+#include "errno/error_code_tool.h"
+#include "msprof_manager_tool.h"
 #include "config/config.h"
-#include "config_manager.h"
-#include "param_validation.h"
-#include "running_mode.h"
-#include "input_parser.h"
-#include "platform/platform.h"
-#include "info_json.h"
+#include "config_manager_tool.h"
+#include "param_validation_tool.h"
+#include "running_mode_tool.h"
+#include "input_parser_tool.h"
+#include "platform/platform_tool.h"
 #include "msprofbin_test_helper.h"
 #include "securec.h"
-#include "utils/utils.h"
+#include "utils/utils_tool.h"
 
 using namespace analysis::dvvp::common::error;
 using namespace analysis::dvvp::common::config;
 using namespace Analysis::Dvvp::Msprof;
 using namespace Analysis::Dvvp::Common::Platform;
-using namespace analysis::dvvp::host;
 using namespace analysis::dvvp::common::utils;
 
 namespace {
-constexpr int32_t VALID_RANK_ID = 100;
 constexpr uint16_t QOS_MODE_MPAM_LIST = 0;
 constexpr uint16_t QOS_MODE_STREAM_NAME = 1;
 constexpr uint16_t QOS_MODE_STREAM_MPAM = 2;
@@ -148,20 +144,6 @@ TEST_F(MSPROF_MANAGER_UTEST, MsProcessCmd)
     EXPECT_EQ(PROFILING_SUCCESS, msprofManager->MsProcessCmd());
 }
 
-TEST_F(MSPROF_MANAGER_UTEST, GetTask)
-{
-    GlobalMockObject::verify();
-    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
-    std::shared_ptr<Collector::Dvvp::Msprofbin::AppMode> rMode(new Collector::Dvvp::Msprofbin::AppMode("app", params));
-    auto msprofManager = MsprofManager::instance();
-    msprofManager->UnInit();
-    EXPECT_EQ(nullptr, msprofManager->GetTask("1"));
-    msprofManager->rMode_ = rMode;
-    auto info = std::make_shared<Analysis::Dvvp::Msprof::ProfSocTask>(1, params);
-    rMode->taskMap_["1"] = info;
-    EXPECT_EQ(info, msprofManager->GetTask("1"));
-}
-
 TEST_F(MSPROF_MANAGER_UTEST, GenerateRunningMode)
 {
     auto msprofManager = MsprofManager::instance();
@@ -244,19 +226,6 @@ TEST_F(MSPROF_MANAGER_UTEST, ParamsCheck)
     rMode->modeResults_ = {PROFILING_FAILED, PROFILING_SUCCESS};
     EXPECT_EQ(PROFILING_FAILED, msprofManager->ParamsCheck());
     EXPECT_EQ(PROFILING_SUCCESS, msprofManager->ParamsCheck());
-}
-
-TEST_F(MSPROF_MANAGER_UTEST, GetRankId)
-{
-    GlobalMockObject::verify();
-    std::string start_time = "1539226807454372";
-    std::string end_time = "1539226807454380";
-    InfoJson infoJson(start_time, end_time, 1);
-    setenv("RANK_ID", "rank", 1);
-    EXPECT_EQ(-1, infoJson.GetRankId());
-    setenv("RANK_ID", "100", 1);
-    EXPECT_EQ(VALID_RANK_ID, infoJson.GetRankId());
-    unsetenv("RANK_ID");
 }
 
 drvError_t g_error = static_cast<drvError_t>(0);

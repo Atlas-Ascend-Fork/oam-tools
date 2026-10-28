@@ -16,15 +16,15 @@
 #include <cstring>
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
-#include "error_code.h"
-#include "msprof_dlog.h"
-#include "prof_utils.h"
+#include "error_code_tool.h"
+#include "msprof_dlog_tool.h"
+#include "prof_utils_tool.h"
 #define private public
 #define protected public
-#include "op_analyzer_pmu.h"
+#include "op_analyzer_pmu_tool.h"
 #undef protected
 #undef private
-#include "data_struct.h"
+#include "data_struct_tool.h"
 
 using namespace Dvvp::Acp::Analyze;
 using namespace Analysis::Dvvp::Analyze;

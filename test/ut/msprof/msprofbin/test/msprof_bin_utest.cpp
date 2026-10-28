@@ -18,13 +18,13 @@
 
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "errno/error_code.h"
-#include "running_mode.h"
-#include "msprof_manager.h"
-#include "config_manager.h"
-#include "platform/platform.h"
+#include "errno/error_code_tool.h"
+#include "running_mode_tool.h"
+#include "msprof_manager_tool.h"
+#include "config_manager_tool.h"
+#include "platform/platform_tool.h"
 
-#include "../../../../../src/msprof/collector/dvvp/msprofbin/src/msprof_bin.cpp"
+#include "../../../../../src/msprof/collector/dvvp/msprofbin/src/msprof_bin_tool.cpp"
 
 using namespace analysis::dvvp::common::error;
 using namespace Analysis::Dvvp::Msprof;

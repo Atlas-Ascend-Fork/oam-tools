@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "errno/error_code.h"
+#include "errno/error_code_tool.h"
 
 namespace Analysis {
 namespace Dvvp {

@@ -18,10 +18,10 @@
 #include <set>
 #include <vector>
 #include <sstream>
-#include "msprof_dlog.h"
+#include "msprof_dlog_tool.h"
 #include "config/config.h"
-#include "utils/utils.h"
-#include "message.h"
+#include "utils/utils_tool.h"
+#include "message_tool.h"
 
 namespace analysis {
 namespace dvvp {

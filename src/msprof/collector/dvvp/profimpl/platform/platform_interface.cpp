@@ -15,8 +15,8 @@
  */
 #include "platform_interface.h"
 #include <algorithm>
-#include "msprof_dlog.h"
-#include "validation/param_validation.h"
+#include "msprof_dlog_tool.h"
+#include "validation/param_validation_tool.h"
 
 namespace Dvvp {
 namespace Collect {

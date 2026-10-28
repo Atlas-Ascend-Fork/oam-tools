@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #include "gtest/gtest.h"
-#include "task_relationship_mgr.h"
+#include "task_relationship_mgr_tool.h"
 
 using Analysis::Dvvp::TaskHandle::TaskRelationshipMgr;
 

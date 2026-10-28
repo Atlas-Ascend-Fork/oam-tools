@@ -18,15 +18,6 @@
 include(${CMAKE_CURRENT_LIST_DIR}/../msprof_intf_pub_cxx.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../msprof_find_target.cmake)
 
-generate_cann_protobuf(profiler_proto_oam
-    CppPath
-    HeaderPath
-    ${CMAKE_CURRENT_SOURCE_DIR}/../proto/profiler.proto
-    TARGET
-)
-
-add_dependencies(profiler_proto_oam host_protoc ascend_protobuf_static)
-
 ####################### acp #######################
 set(acpBinHeader
     ${MSPROF_DIR}/inc/toolchain
@@ -43,7 +34,6 @@ set(acpBinHeader
     ../common/singleton
     ../common/platform
     ../common/validation
-    ../msprofbin/include
     ../profimpl/platform
     ../profimpl/adapter/inc
     ../profimpl/collect/job_wrapper/include
@@ -52,46 +42,47 @@ set(acpBinHeader
     ../driver/inc
     ../transport
     ../task_handle/include
+    ../profapi/inc
     ${PROF_BASIC_DIR}/osal
 )
 
 set(acpBinCpp
-    src/acp_bin.cpp
+    src/acp_bin_tool.cpp
     src/acp_command.cpp
-    src/acp_pipe_transfer.cpp
-    ../app/application.cpp
-    ../app/env_manager.cpp
-    ../common/argparse/argparser.cpp
-    ../common/utils/utils.cpp
-    ../common/cmd_log/cmd_log.cpp
-    ../common/config/config_manager.cpp
-    ../common/validation/param_validation.cpp
-    ../common/thread/thread.cpp
-    ../common/thread/thread_pool.cpp
-    ../common/socket/local_socket.cpp
-    ../common/json/json.cpp
+    src/acp_pipe_transfer_tool.cpp
+    ../app/application_tool.cpp
+    ../app/env_manager_tool.cpp
+    ../common/argparse/argparser_tool.cpp
+    ../common/utils/utils_tool.cpp
+    ../common/cmd_log/cmd_log_tool.cpp
+    ../common/config/config_manager_tool.cpp
+    ../common/validation/param_validation_tool.cpp
+    ../common/thread/thread_tool.cpp
+    ../common/thread/thread_pool_tool.cpp
+    ../common/socket/local_socket_tool.cpp
+    ../common/json/json_tool.cpp
     ../common/platform/platform.cpp
-    ../common/statistics/perf_count.cpp
+    ../common/statistics/perf_count_tool.cpp
     ../driver/devmgmt/ai_drv_dev_api.cpp
-    ../driver/channel/ai_drv_prof_api.cpp
-    ../depend/stub/error_manager/msprof_error_manager_stub.cpp
-    ../msprof/dynamic_profiling/src/dyn_prof_client.cpp
-    ../task_handle/src/task_relationship_mgr.cpp
+    ../driver/channel/ai_drv_prof_api_tool.cpp
+    ../depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
+    ../msprof/dynamic_profiling/src/dyn_prof_client_tool.cpp
+    ../task_handle/src/task_relationship_mgr_tool.cpp
     ../profimpl/adapter/src/json_parser.cpp
     ../profimpl/platform/platform_interface.cpp
     ../profimpl/platform/cloud_v2_platform.cpp
         ../profimpl/platform/david_platform.cpp
         ../profimpl/platform/david_lite_platform.cpp
         ../profimpl/platform/david_v121_platform.cpp
-    ../profimpl/platform/base_analyzer.cpp
-    ../profimpl/collect/job_wrapper/src/collection_job.cpp
-    ../profimpl/collect/job_wrapper/src/collection_register.cpp
-    ../profimpl/collect/job_wrapper/src/prof_comm_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_channel_manager.cpp
-    ../profimpl/collect/job_wrapper/src/prof_stars_job.cpp
-    ../transport/prof_channel.cpp
-    ../transport/uploader_mgr.cpp
-    ../transport/uploader.cpp
+    ../profimpl/platform/base_analyzer_tool.cpp
+    ../profimpl/collect/job_wrapper/src/collection_job_tool.cpp
+    ../profimpl/collect/job_wrapper/src/collection_register_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_comm_job_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_channel_manager_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_stars_job_tool.cpp
+    ../transport/prof_channel_tool.cpp
+    ../transport/uploader_mgr_tool.cpp
+    ../transport/uploader_tool.cpp
     ${PROF_BASIC_DIR}/osal/osal.c
 )
 
@@ -166,53 +157,53 @@ install(TARGETS acp ${INSTALL_OPTIONAL}
 set(profinjCpp
     ${PROF_BASIC_DIR}/osal/osal.c
     src/acp_command.cpp
-    src/acp_pipe_transfer.cpp
-    src/acp_runtime_api.cpp
-    src/acp_manager.cpp
+    src/acp_pipe_transfer_tool.cpp
+    src/acp_runtime_api_tool.cpp
+    src/acp_manager_tool.cpp
     src/acp_api_plugin.cpp
-    src/acp_compute_device_job.cpp
-    src/op_transport.cpp
-    src/op_data_manager.cpp
-    src/op_analyzer.cpp
-    src/op_analyzer_base.cpp
-    src/op_analyzer_pmu.cpp
-    src/op_analyzer_biu.cpp
-    src/op_analyzer_pc_sampling.cpp
-    ../transport/uploader.cpp
-    ../transport/uploader_mgr.cpp
-    ../transport/prof_channel.cpp
+    src/acp_compute_device_job_tool.cpp
+    src/op_transport_tool.cpp
+    src/op_data_manager_tool.cpp
+    src/op_analyzer_tool.cpp
+    src/op_analyzer_base_tool.cpp
+    src/op_analyzer_pmu_tool.cpp
+    src/op_analyzer_biu_tool.cpp
+    src/op_analyzer_pc_sampling_tool.cpp
+    ../transport/uploader_tool.cpp
+    ../transport/uploader_mgr_tool.cpp
+    ../transport/prof_channel_tool.cpp
     ../profimpl/platform/platform_interface.cpp
     ../profimpl/platform/cloud_v2_platform.cpp
         ../profimpl/platform/david_platform.cpp
         ../profimpl/platform/david_lite_platform.cpp
         ../profimpl/platform/david_v121_platform.cpp
-    ../profimpl/platform/base_analyzer.cpp
+    ../profimpl/platform/base_analyzer_tool.cpp
     ../profimpl/adapter/src/json_parser.cpp
-    ../profimpl/collect/job_wrapper/src/collection_job.cpp
-    ../profimpl/collect/job_wrapper/src/collection_register.cpp
-    ../profimpl/collect/job_wrapper/src/prof_comm_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_channel_manager.cpp
-    ../profimpl/collect/job_wrapper/src/prof_stars_job.cpp
-    ../profimpl/collect/job_wrapper/src/prof_biu_perf_job.cpp
+    ../profimpl/collect/job_wrapper/src/collection_job_tool.cpp
+    ../profimpl/collect/job_wrapper/src/collection_register_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_comm_job_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_channel_manager_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_stars_job_tool.cpp
+    ../profimpl/collect/job_wrapper/src/prof_biu_perf_job_tool.cpp
     ../common/platform/platform.cpp
-    ../common/utils/utils.cpp
-    ../common/config/config_manager.cpp
-    ../common/statistics/perf_count.cpp
-    ../common/json/json.cpp
-    ../common/cmd_log/cmd_log.cpp
-    ../common/validation/param_validation.cpp
-    ../common/thread/thread.cpp
-    ../common/thread/thread_pool.cpp
-    ../common/socket/local_socket.cpp
-    ../common/argparse/argparser.cpp
+    ../common/utils/utils_tool.cpp
+    ../common/config/config_manager_tool.cpp
+    ../common/statistics/perf_count_tool.cpp
+    ../common/json/json_tool.cpp
+    ../common/cmd_log/cmd_log_tool.cpp
+    ../common/validation/param_validation_tool.cpp
+    ../common/thread/thread_tool.cpp
+    ../common/thread/thread_pool_tool.cpp
+    ../common/socket/local_socket_tool.cpp
+    ../common/argparse/argparser_tool.cpp
     ../driver/devmgmt/ai_drv_dev_api.cpp
-    ../driver/channel/ai_drv_prof_api.cpp
-    ../driver/devmgmt/ai_drv_dsmi_api.cpp
-    ../app/application.cpp
-    ../app/env_manager.cpp
-    ../depend/stub/error_manager/msprof_error_manager_stub.cpp
-    ../msprof/dynamic_profiling/src/dyn_prof_client.cpp
-    ../task_handle/src/task_relationship_mgr.cpp
+    ../driver/channel/ai_drv_prof_api_tool.cpp
+    ../driver/devmgmt/ai_drv_dsmi_api_tool.cpp
+    ../app/application_tool.cpp
+    ../app/env_manager_tool.cpp
+    ../depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
+    ../msprof/dynamic_profiling/src/dyn_prof_client_tool.cpp
+    ../task_handle/src/task_relationship_mgr_tool.cpp
 )
 
 add_library(profinj SHARED
@@ -225,7 +216,6 @@ target_include_directories(profinj PRIVATE
     ${ASCEND_CANN_PACKAGE_PATH}/pkg_inc/runtime/runtime
     ${MSPROF_DIR}/inc/toolchain
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/proto/profiler_proto_oam/
     ${PROF_BASIC_DIR}/osal
     include/
     ../
@@ -309,5 +299,4 @@ install(TARGETS profinj ${INSTALL_OPTIONAL}
     COMPONENT oam-tools
 )
 
-add_dependencies(profinj profiler_proto_oam)
 ####################### libascend_profinj.so ###########################

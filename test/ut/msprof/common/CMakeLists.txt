@@ -66,7 +66,6 @@ target_compile_options(osal_linux_utest PRIVATE
 
 target_compile_definitions(osal_linux_utest PRIVATE
     OSAL
-    google=ascend_private
 )
 
 target_link_options(osal_linux_utest PRIVATE
@@ -123,7 +122,6 @@ target_compile_options(osal_utest PRIVATE
 
 target_compile_definitions(osal_utest PRIVATE
     OSAL
-    google=ascend_private
 )
 
 target_link_options(osal_utest PRIVATE
@@ -147,7 +145,7 @@ set_target_properties(osal_utest
 add_executable(local_socket_utest
     test/main.cpp
     test/local_socket_utest.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/socket/local_socket_tool.cpp
     ../stub/hdc-log-stub.cpp
 )
 
@@ -188,7 +186,6 @@ target_compile_options(local_socket_utest PRIVATE
 
 target_compile_definitions(local_socket_utest PRIVATE
     OSAL
-    google=ascend_private
 )
 
 target_link_libraries(local_socket_utest PRIVATE
@@ -207,7 +204,7 @@ set_target_properties(local_socket_utest
 add_executable(chunk_pool_utest
     test/main.cpp
     test/chunk_pool_utest.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/memory/chunk_pool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/memory/chunk_pool_tool.cpp
     ../stub/hdc-log-stub.cpp
 )
 
@@ -248,7 +245,6 @@ target_compile_options(chunk_pool_utest PRIVATE
 
 target_compile_definitions(chunk_pool_utest PRIVATE
     OSAL
-    google=ascend_private
 )
 
 target_link_libraries(chunk_pool_utest PRIVATE
@@ -264,25 +260,19 @@ set_target_properties(chunk_pool_utest
 )
 
 ###################### param_validation_utest ###########################
-generate_cann_protobuf(param_validation_utest_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 add_executable(param_validation_utest
     test/main.cpp
     test/param_validation_utest.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/message/codec.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/mini_platform.cpp
@@ -291,15 +281,14 @@ add_executable(param_validation_utest
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_lite_platform.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../platform/stub/rc_v2_platform_stub.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/modena_platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ../stub/drv_stub.cpp
     ../stub/hdc-log-stub.cpp
     ../stub/mmpa_stub.cpp
     ../stub/devdrv_runtime_api_stub.cpp
     ../stub/profile_drv_user_stub.cpp
-    ${CppPath}
 )
 
 target_include_directories(param_validation_utest PRIVATE
@@ -311,7 +300,6 @@ target_include_directories(param_validation_utest PRIVATE
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${TOP_DIR}/src/msprof/inc/external
     ${TOP_DIR}/src/msprof/inc/external/acl
-    ${PROTOBUF_HOST_INCLUDE}
     ${ASCEND_CANN_PACKAGE_PATH}/include
     ${ASCEND_CANN_PACKAGE_PATH}/include/acl
     ${ASCEND_CANN_PACKAGE_PATH}/include/driver
@@ -344,7 +332,6 @@ target_include_directories(param_validation_utest PRIVATE
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform
     ${MSPROF_SOURCE_DIR}/dvvp/profapi/inc
     ${MSPROF_SOURCE_DIR}/dvvp/depend/include/stub
-    ${CMAKE_BINARY_DIR}/proto/param_validation_utest_proto/
     ../stub/
     ${CMAKE_CURRENT_SOURCE_DIR}/../platform/stub
 )
@@ -360,14 +347,12 @@ target_compile_options(param_validation_utest PRIVATE
 
 target_compile_definitions(param_validation_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(param_validation_utest PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
 )
 
@@ -378,25 +363,20 @@ set_target_properties(param_validation_utest
 )
 
 ###################### utils_utest ###########################
-generate_cann_protobuf(utils_utest_proto
-    CppPath
-    HeaderPath
-    ${MSPROF_SOURCE_DIR}/dvvp/proto/profiler.proto
-)
 
 add_executable(utils_utest
     test/main.cpp
     test/utils_utest.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager.cpp
+    test/json_utest.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/utils/utils_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/validation/param_validation_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/cmd_log/cmd_log_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/json/json_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/config/config_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/common/platform/platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/message/codec.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/common/statistics/perf_count_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/driver/devmgmt/ai_drv_dev_api.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/driver/channel/ai_drv_prof_api_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/adapter/src/json_parser.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/platform_interface.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/mini_platform.cpp
@@ -405,15 +385,14 @@ add_executable(utils_utest
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/david_lite_platform.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../platform/stub/rc_v2_platform_stub.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/modena_platform.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform/base_analyzer_tool.cpp
     ${MSPROF_SOURCE_DIR}/basic/osal/osal.c
-    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/depend/stub/error_manager/msprof_error_manager_stub_tool.cpp
     ../stub/drv_stub.cpp
     ../stub/hdc-log-stub.cpp
     ../stub/mmpa_stub.cpp
     ../stub/devdrv_runtime_api_stub.cpp
     ../stub/profile_drv_user_stub.cpp
-    ${CppPath}
 )
 
 target_include_directories(utils_utest PRIVATE
@@ -425,7 +404,6 @@ target_include_directories(utils_utest PRIVATE
     ${TOP_DIR}/src/msprof/inc/toolchain
     ${TOP_DIR}/src/msprof/inc/external
     ${TOP_DIR}/src/msprof/inc/external/acl
-    ${PROTOBUF_HOST_INCLUDE}
     ${ASCEND_CANN_PACKAGE_PATH}/include
     ${ASCEND_CANN_PACKAGE_PATH}/include/acl
     ${ASCEND_CANN_PACKAGE_PATH}/include/driver
@@ -458,7 +436,6 @@ target_include_directories(utils_utest PRIVATE
     ${MSPROF_SOURCE_DIR}/dvvp/profimpl/platform
     ${MSPROF_SOURCE_DIR}/dvvp/profapi/inc
     ${MSPROF_SOURCE_DIR}/dvvp/depend/include/stub
-    ${CMAKE_BINARY_DIR}/proto/utils_utest_proto/
     ../stub/
 )
 
@@ -473,14 +450,12 @@ target_compile_options(utils_utest PRIVATE
 
 target_compile_definitions(utils_utest PRIVATE
     MSPROF_DEBUG
-    google=ascend_private
 )
 
 target_link_libraries(utils_utest PRIVATE
     error_manager_headers
     $<BUILD_INTERFACE:intf_llt_pub>
     alog
-    ascend_protobuf_static
     c_sec
 )
 

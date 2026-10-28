@@ -20,13 +20,13 @@
 #include <stdexcept>
 #include "gtest/gtest.h"
 #include "mockcpp/mockcpp.hpp"
-#include "errno/error_code.h"
+#include "errno/error_code_tool.h"
 #include "ai_drv_dev_api.h"
 #include "ai_drv_prof_api.h"
-#include "config_manager.h"
-#include "validation/param_validation.h"
-#include "utils.h"
-#include "platform/platform.h"
+#include "config_manager_tool.h"
+#include "validation/param_validation_tool.h"
+#include "utils_tool.h"
+#include "platform/platform_tool.h"
 #include "../../stub/hdc-log-stub.h"
 
 using namespace analysis::dvvp::common::error;

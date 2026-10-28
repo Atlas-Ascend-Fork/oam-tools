@@ -16,7 +16,7 @@
 
 #ifndef COLLECTOR_DVVP_ACP_COMMAND_H
 #define COLLECTOR_DVVP_ACP_COMMAND_H
-#include "argparser.h"
+#include "argparser_tool.h"
 #include "message/prof_params.h"
 
 namespace Collector {
