@@ -11,8 +11,6 @@ orchestrator-skill包含（案例检索、场景识别、流水线编排和可�
 
 ## 工作流与架构图
 
-> 完整文档见 [docs/architecture.md](docs/architecture.md)
-
 ```mermaid
 flowchart TB
     %% ===== 上层：数据流水线（主线）=====
@@ -612,7 +610,6 @@ tool-fault-diagnosis/
 │       ├── metric-results.md   # 度量结果 JSON 规范（含 diagnosis_confidence）
 │       ├── metric-analysis.md  # 深度分析框架（含 errMsg 质量 + 可信度分析）
 │       └── analysis-record.md  # 报告字段来源与证据记录
-└── docs/
-    ├── architecture.md     # 完整架构说明
-    └── architecture.drawio # 架构图源文件
+├── orchestrator-skill/    # 场景识别与诊断流水线编排
+└── trace-skill/           # 故障时间线与调用链
 ```
