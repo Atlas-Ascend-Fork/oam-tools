@@ -29,7 +29,7 @@ asys analyze -r=coretrace --path=directory --symbol_path=path1,path2 --output=pa
 ## 参数说明
 
 - **r**：必选参数，解析模式，此处设置为coretrace，用于解析coretrace格式的文件（coretrace.\*文件），供后续定位使用。
-- **file**：用于解析单个文件，此处设置为包含路径的文件名，coretrace模式必选。
+- **file**：用于解析单个文件，此处设置为包含路径的文件名，coretrace模式下选择file参数、path参数中的一个，两者不能同时存在。
 - **path**：指定目录，用于解析指定目录及其子目录下的多个文件，coretrace模式下选择path参数、file参数中的一个，两者不能同时存在。
 - **symbol\_path**：coretrace模式解析所需要的动态库目录，可传多个目录，用逗号隔开，symbol\_path只扫描当前目录下的动态库，先找路径1，再找路径2，不扫描子目录，为防止误解析建议将相关动态库放在一个路径下。coretrace模式可选，不指定symbol\_path参数时从coretrace文件中获取所需要的动态库路径，为防止找不到动态库文件，建议仅在发生coredump错误的环境上使用。
 - **output**：可选参数，其值作为asys工具的结果输出目录的路径前缀，即最终输出目录为\{output\}/asys\_output\_timestamp。命令行中不带output参数时，输出结果存放在命令行执行目录下；若output指定值为空、无效字符串、或指定路径目录无写权限、或创建目录失败，则asys工具退出执行并报错。

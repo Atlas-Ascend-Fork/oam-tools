@@ -12,10 +12,17 @@ To obtain the trace file \(**\*.bin**\), see  Viewing Trace Logs  in  [Log Refer
 asys analyze -r=trace --file=filename --output=path
 ```
 
+Or
+
+```bash
+asys analyze -r=trace --path=directory --output=path
+```
+
 ## Parameters
 
 - **r**: This parameter is mandatory. It specifies the parsing mode. The value  **trace**  indicates of parsing trace log files \(**\*.bin**  files\) into .txt files. The version of the environment where the asys tool is used must be the same as that of the environment where trace logs are generated.
-- **file**: It specifies a single file to be parsed. Set this parameter to the file name with the path. This parameter is mandatory in  **trace**  mode.
+- **file**: It specifies a single file to be parsed. Set this parameter to the file name with the path. In **trace** mode, select either **file** or **path**. The two parameters cannot coexist.
+- **path**: It specifies a directory for parsing files in that directory and its subdirectories. It is mutually exclusive with **file**.
 - **output**: This parameter is optional. Its value is used as the prefix of the result output directory of the asys tool. That is, the final output directory is  **\{_output_\}/asys\_output\__timestamp_**. If the command does not contain the  **output**  parameter, the output is stored in the command execution directory. If the value of  **output**  is empty or invalid, the specified directory does not have the write permission, or the directory fails to be created, the asys tool exits and an error is reported.
 
 ## Examples and Output Description

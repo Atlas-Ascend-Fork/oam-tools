@@ -12,10 +12,17 @@
 asys analyze -r=trace --file=filename --output=path
 ```
 
+或
+
+```bash
+asys analyze -r=trace --path=directory --output=path
+```
+
 ## 参数说明
 
 - **r**：必选参数，解析模式，此处设置为trace，用于将trace日志文件（\*.bin文件）解析为.txt格式的文件，使用asys工具的环境版本要与产生trace日志的环境版本保持一致。
-- **file**：用于解析单个文件，此处设置为包含路径的文件名，trace模式必选。
+- **file**：用于解析单个文件，此处设置为包含路径的文件名，trace模式下选择file参数、path参数中的一个，两者不能同时存在。
+- **path**：指定目录，用于解析指定目录及其子目录下的多个文件，与file参数互斥。
 - **output**：可选参数，其值作为asys工具的结果输出目录的路径前缀，即最终输出目录为\{output\}/asys\_output\_timestamp。命令行中不带output参数时，输出结果存放在命令行执行目录下；若output指定值为空、无效字符串、或指定路径目录无写权限、或创建目录失败，则asys工具退出执行并报错。
 
 ## 使用示例和输出说明
