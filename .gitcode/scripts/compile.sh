@@ -56,7 +56,7 @@ fi
 rm -rf /home/jenkins/opensource/ubuntu20/lib_cache/protobuf*
 rm -rf /home/jenkins/opensource/lib_cache/protobuf*
 
-if [[ "${task_name}" =~ Compile_Ascend_X86_ubuntu24 ]]; then
+if [[ "${task_name}" =~ Compile_Ascend_X86_ubuntu24 ]] && [ "${target_branch}" == master ]; then
     sed -i "1i set(CMAKE_EXPORT_COMPILE_COMMANDS ON)" "CMakeLists.txt"
     echo "api-check=compile" >> "${ATOMGIT_OUTPUT}"
 else
