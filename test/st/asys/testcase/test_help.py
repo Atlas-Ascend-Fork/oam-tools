@@ -351,9 +351,9 @@ options:
                         'coretrace' and 'stackcore'. Mutually exclusive with
                         '--path'.
   --path                <Positional> Specifies the path to be
-                        analyzed. This argument is valid only for 'trace',
-                        'coretrace' and 'stackcore'. Mutually exclusive with
-                        '--file'.
+                        analyzed. This argument is valid for 'trace',
+                        'coretrace', 'stackcore', 'aicore_error' and 'ub'.
+                        Mutually exclusive with '--file'.
   --exe_file            <Positional> Specifies the executable file to
                         be debugged. This argument is valid only for
                         'coredump'.
@@ -366,9 +366,9 @@ options:
                         Defaults to 0, indicating not to retain.
   --symbol_path         <Optional> Specifies the path of executable
                         files and dependent dynamic library files. Subpaths
-                        are not searched. This argument is valid only for
-                        'stackcore'. Defaults to the dynamic library path in
-                        the stackcore file.
+                        are not searched. This argument is valid for
+                        'coretrace' and 'stackcore'. Defaults to the dynamic
+                        library path in the input file.
   --reg {0,1,2}         <Optional> Specifies the mode of adding
                         register data for analysis. 0: not add; 1: add only
                         for threads; 2: add for all stack frames. Defaults to

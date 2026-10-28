@@ -204,8 +204,8 @@ class Arg(enum.Enum):
         KEY_CHECKER: ArgChecker.FILE_PATH_EXIST_R,
         KEY_REQUIRED: False,
         KEY_METAVAR: " ",
-        KEY_HELP: f"{POSITIONAL_R} Specifies the path to be analyzed. This argument is valid only for 'trace', "
-        "'coretrace' and 'stackcore'. Mutually exclusive with '--file'.",
+        KEY_HELP: f"{POSITIONAL_R} Specifies the path to be analyzed. This argument is valid for 'trace', "
+        "'coretrace', 'stackcore', 'aicore_error' and 'ub'. Mutually exclusive with '--file'.",
     }
     EXE_FILE = {
         KEY_NAME: "exe_file",
@@ -238,8 +238,8 @@ class Arg(enum.Enum):
         KEY_REQUIRED: False,
         KEY_METAVAR: " ",
         KEY_HELP: f"{OPTIONAL_Y} Specifies the path of executable files and dependent dynamic library files. "
-        "Subpaths are not searched. This argument is valid only for 'stackcore'. "
-        "Defaults to the dynamic library path in the stackcore file.",
+        "Subpaths are not searched. This argument is valid for 'coretrace' and 'stackcore'. "
+        "Defaults to the dynamic library path in the input file.",
     }
     REG = {
         KEY_NAME: "reg",
