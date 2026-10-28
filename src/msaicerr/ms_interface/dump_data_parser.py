@@ -239,25 +239,20 @@ class DumpDataParser:
             result_info += " " * 4
             result_info += f"If dtype is {dtype}, summary is: "
             try:
+                if dtype == "bfloat16" and not DumpDataParser._register_ext_dtype():
+                    result_info += "Can not read with dtype bfloat16: bfloat16ext is not installed!\n"
+                    continue
+                arr = np.fromfile(tensor_file, dtype=np.dtype(dtype))
                 if dtype == "bfloat16":
-                    # 0. astype("bfloat16") 依赖 bfloat16ext 注册该 dtype，未注册会抛 TypeError
-                    DumpDataParser._register_ext_dtype()
-                    # 1. 以int16读取，纯粹的字节拷贝，不会触发溢出异常
-                    raw_data = np.fromfile(tensor_file, dtype=np.int16)
-                    # 2. 先转为float32处理
-                    data_f32 = raw_data.astype(np.float32)
-                    # 3. 手动设置数值边界3.3895e+38，防止无法表示的值
-                    bf16_limit = 3.3895e38
-                    data_f32 = np.clip(data_f32, -bf16_limit, bf16_limit)
-                    # 4. 转回bfloat16， 因为clip过，所以不会触发bfloat16 overflow导致的段错误
-                    arr = data_f32.astype("bfloat16")
-                else:
-                    arr = np.fromfile(tensor_file, dtype=np.dtype(dtype))
+                    arr = arr.astype(np.float32)
+                    if not np.isfinite(arr).all():
+                        result_info += "NaN/INF values present. "
                 if arr.size == 0:
                     result_info += "Max: N/A, Min: N/A, Mean: N/A, Std: N/A\n"
                 else:
-                    mean_val = np.mean(arr, dtype=np.float64)
-                    std_val = np.std(arr, dtype=np.float64)
+                    with np.errstate(invalid="ignore"):
+                        mean_val = np.mean(arr, dtype=np.float64)
+                        std_val = np.std(arr, dtype=np.float64)
                     result_info += f"Max: {np.max(arr)}, Min: {np.min(arr)}, Mean: {mean_val}, Std: {std_val}\n"
             except (ValueError, TypeError, OSError):
                 result_info += f"Can not read with dtype {dtype}!\n"
@@ -660,7 +655,7 @@ class DumpDataParser:
         npy_file_path = os.path.join(output_dir, npy_file_name)
 
         if self.dest_dtype == "bfloat16" and not DumpDataParser._register_ext_dtype():
-            # astype("bfloat16") 依赖 bfloat16ext 注册该 dtype，未注册会抛 TypeError。
+            # np.dtype("bfloat16") 依赖 bfloat16ext 注册该 dtype，未注册会抛 TypeError。
             # 本路径（-d xxx.bin -dtype bfloat16）不经过 _to_numpy_dtype，须自行注册。
             utils.print_error_log(
                 "Can not convert to bfloat16: the bfloat16ext module is not installed."
@@ -668,14 +663,7 @@ class DumpDataParser:
             raise utils.AicErrException(Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR)
 
         try:
-            if self.dest_dtype == "bfloat16":
-                raw_data = np.fromfile(self.dump_path, dtype=np.int16)
-                data_f32 = raw_data.astype(np.float32)
-                bf16_limit = 3.3895e38
-                data_f32 = np.clip(data_f32, -bf16_limit, bf16_limit)
-                array = data_f32.astype("bfloat16")
-            else:
-                array = np.fromfile(self.dump_path, dtype=np.dtype(self.dest_dtype))
+            array = np.fromfile(self.dump_path, dtype=np.dtype(self.dest_dtype))
 
             np.save(npy_file_path, array)
             utils.print_info_log(

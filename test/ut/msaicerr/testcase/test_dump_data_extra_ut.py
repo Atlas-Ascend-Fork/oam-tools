@@ -19,12 +19,14 @@
 import os
 import sys
 import tempfile
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 from conftest import MSAICERR_PATH
+from ms_interface import dump_data_parser as dump_module
 from ms_interface.aic_error_info import AicErrorInfo
 from ms_interface.dump_data_parser import DumpDataParser
 from ms_interface.utils import AicErrException
@@ -52,9 +54,11 @@ def test_invalid_dest_dtype():
 
 
 def test_convert_success(mocker, tmp_path):
-    parser = _make_parser(dest_dtype="float16",
-                          output_path=str(tmp_path),
-                          dump_path=str(tmp_path / "data.bin"))
+    parser = _make_parser(
+        dest_dtype="float16",
+        output_path=str(tmp_path),
+        dump_path=str(tmp_path / "data.bin"),
+    )
     mocker.patch("numpy.fromfile", return_value=np.ones(4, dtype=np.float16))
     saved = mocker.patch("numpy.save")
     _ = parser.convert_bin_file_to_npy()
@@ -64,9 +68,11 @@ def test_convert_success(mocker, tmp_path):
 
 def test_convert_dtype_mismatch_warning(mocker, tmp_path):
     # file name carries .int8 but dest_dtype is float16 -> warning branch
-    parser = _make_parser(dest_dtype="float16",
-                          output_path=str(tmp_path),
-                          dump_path=str(tmp_path / "data.int8.bin"))
+    parser = _make_parser(
+        dest_dtype="float16",
+        output_path=str(tmp_path),
+        dump_path=str(tmp_path / "data.int8.bin"),
+    )
     mocker.patch("numpy.fromfile", return_value=np.ones(4, dtype=np.float16))
     mocker.patch("numpy.save")
     result = parser.convert_bin_file_to_npy()
@@ -74,38 +80,67 @@ def test_convert_dtype_mismatch_warning(mocker, tmp_path):
 
 
 def test_convert_failure_raises(mocker, tmp_path):
-    parser = _make_parser(dest_dtype="float16",
-                          output_path=str(tmp_path),
-                          dump_path=str(tmp_path / "data.bin"))
+    parser = _make_parser(
+        dest_dtype="float16",
+        output_path=str(tmp_path),
+        dump_path=str(tmp_path / "data.bin"),
+    )
     mocker.patch("numpy.fromfile", side_effect=RuntimeError("boom"))
     with pytest.raises(AicErrException):
         parser.convert_bin_file_to_npy()
 
 
 def test_convert_bfloat16_registers_ext_dtype(mocker, tmp_path):
-    # -d xxx.bin -dtype bfloat16 这条路径不经过 _to_numpy_dtype，必须自行触发
-    # bfloat16ext 注册，否则 astype("bfloat16") 抛 TypeError: data type not understood。
-    parser = _make_parser(dest_dtype="bfloat16",
-                          output_path=str(tmp_path),
-                          dump_path=str(tmp_path / "data.bin"))
-    register = mocker.patch.object(DumpDataParser, "_register_ext_dtype", return_value=True)
-    # 注册由桩接管，故 astype("bfloat16") 也要绕开：用假数组顶掉 fromfile 的返回值，
-    # 这样用例在未装 bfloat16ext 的环境里也能跑（否则真 astype 会抛 TypeError）。
+    parser = _make_parser(
+        dest_dtype="bfloat16",
+        output_path=str(tmp_path),
+        dump_path=str(tmp_path / "data.bin"),
+    )
+    events = []
+    dtype = mocker.sentinel.registered_bfloat16_dtype
     fake = Mock()
-    fake.astype.return_value = fake
-    mocker.patch("numpy.fromfile", return_value=fake)
-    mocker.patch("numpy.clip", return_value=fake)
-    mocker.patch("numpy.save")
+    original_numpy_dtype = np.dtype
+
+    def register():
+        events.append("register")
+        return True
+
+    def resolve_dtype(value):
+        assert value == "bfloat16"
+        events.append("dtype")
+        return dtype
+
+    def read_file(filename, dtype):
+        assert filename == parser.dump_path
+        assert dtype is mocker.sentinel.registered_bfloat16_dtype
+        events.append("read")
+        return fake
+
+    register_mock = mocker.patch.object(
+        DumpDataParser, "_register_ext_dtype", side_effect=register
+    )
+    saved = Mock()
+    # Patch only this module's NumPy binding; the global NumPy module is untouched.
+    mocker.patch.object(
+        dump_module,
+        "np",
+        SimpleNamespace(dtype=resolve_dtype, fromfile=read_file, save=saved),
+    )
     parser.convert_bin_file_to_npy()
-    assert register.called
-    fake.astype.assert_any_call("bfloat16")
+    register_mock.assert_called_once_with()
+    assert events == ["register", "dtype", "read"]
+    assert np.dtype is original_numpy_dtype
+    fake.astype.assert_not_called()
+    saved.assert_called_once_with(parser.bin_data_list[0], fake)
 
 
 def test_convert_bfloat16_without_ext_raises(mocker, tmp_path):
     # bfloat16ext 未安装时给出明确报错，而不是让 astype 抛出难懂的 TypeError
-    parser = _make_parser(dest_dtype="bfloat16",
-                          output_path=str(tmp_path),
-                          dump_path=str(tmp_path / "data.bin"))
+    parser = _make_parser(
+        dest_dtype="bfloat16",
+        output_path=str(tmp_path),
+        dump_path=str(tmp_path / "data.bin"),
+    )
     mocker.patch.object(DumpDataParser, "_register_ext_dtype", return_value=False)
     with pytest.raises(AicErrException):
         parser.convert_bin_file_to_npy()
