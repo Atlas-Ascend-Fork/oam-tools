@@ -519,7 +519,7 @@ class AscendOpKernelRunner:
         output_info, kernel_args, shape = data_info
         dtype = output_info.get("dtype")
         param_index = len(kernel_args)
-        if param_index > len(kernel.parameters) or not kernel.parameters[param_index]:
+        if param_index >= len(kernel.parameters) or not kernel.parameters[param_index]:
             logger.log_info(f"Fill random data to parameters[{param_index}]")
             kernel_param = AscendOpKernelParam(
                 shape=shape,

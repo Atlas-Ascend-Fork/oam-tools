@@ -24,7 +24,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from conftest import MSAICERR_PATH
+from conftest import MSAICERR_PATH, make_mock_device
 from ms_interface import utils
 from ms_interface.single_op_test_frame.common import ascend_tbe_op
 from ms_interface.single_op_test_frame.common.ascend_tbe_op import (
@@ -35,24 +35,6 @@ from ms_interface.single_op_test_frame.common.ascend_tbe_op import (
 )
 
 sys.path.append(MSAICERR_PATH)
-
-
-def _fake_malloc(*_args):
-    return ctypes.c_void_p(4096)
-
-
-def make_mock_device():
-    device = Mock()
-    device.malloc.side_effect = _fake_malloc
-    device.copy_bin_to_hbm.return_value = ctypes.c_void_p(8192)
-    device.memcpy.return_value = 0
-    device.free.return_value = 0
-    device.get_c2c_ctrl_addr.return_value = ctypes.c_void_p(12288)
-    device.launch_kernel.return_value = 0
-    device.synchronize_with_stream.return_value = 0
-    device.register_device_binary_kernel.return_value = Mock()
-    device.register_function.return_value = ctypes.c_void_p(16384)
-    return device
 
 
 SAMPLE_JSON = {
