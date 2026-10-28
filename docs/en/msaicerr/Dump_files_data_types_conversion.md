@@ -18,7 +18,7 @@ python3 msaicerr.py -d path1 -out path2 -dtype int8
 - **-out**  or  **--output\_path**: The parameter is optional. It specifies the path for storing the .npy result file. If the path is not specified, the result file is stored in the same path as the dump file by default.
 - **-dtype**  or  **--dest\_dtype**: This parameter is mandatory. It specifies the data type of the dump file to be converted. If the specified data type is different from that in the source dump file, a warning message is displayed when the parsing command is executed, and the data is parsed based on the user-specified data type.
 
-    Value range: float32, float16, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64, bool, bfloat16
+    Value range: float32, float16, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64, bool, complex64, complex128, bfloat16
 
 ## Command Example and Output Description
 

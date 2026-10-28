@@ -18,7 +18,7 @@ python3 msaicerr.py -d path1 -out path2 -dtype int8
 - **-out或--output\_path**：可选参数，指定.npy结果文件的存放路径，如果不指定，则结果文件默认跟Dump文件存放在同一路径下。
 - **-dtype或--dest\_dtype：**必选参数，指定待转换Dump文件中的数据类型。如果指定的数据类型与源Dump文件中的数据类型不一致，则执行解析命令时，会给出Warning提示，并按用户指定的数据类型解析。
 
-    取值范围：float32, float16, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64, bool, bfloat16
+    取值范围：float32, float16, float64, int8, int16, int32, int64, uint8, uint16, uint32, uint64, bool, complex64, complex128, bfloat16
 
 ## 使用示例和输出说明
 
