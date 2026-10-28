@@ -4,4 +4,4 @@ You have installed the toolkit software package in the CANN operating environmen
 
 After the CANN software is installed, log in to the environment as the CANN operating user and run the  **source $_\{INSTALL\_DIR\}_/set\_env.sh**  command to set environment variables.  Replace  _$\{INSTALL\_DIR\}_  with the CANN component directory. For example, if the installation is performed by the  **root**  user, the default file storage path is  **/usr/local/Ascend/cann**.
 
-Before using the msaicerr tool, go to the  **$\{install\_path\}/tools/msaicerr**  directory where the  **msaicerr.py**  script is located.
+Before using the msaicerr tool, go to the `${INSTALL_DIR}/tools/msaicerr` directory where the **msaicerr.py** script is located.
