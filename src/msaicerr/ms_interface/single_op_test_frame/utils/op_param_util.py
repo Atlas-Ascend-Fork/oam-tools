@@ -18,7 +18,9 @@
 """
 op param util module
 """
+
 import secrets
+import re
 import json
 import copy
 import numpy as np
@@ -41,7 +43,7 @@ def build_op_param(params_info):
         "shape": params_info[1],
         "format": params_info[2],
         "ori_shape": params_info[3],
-        "ori_format": params_info[4]
+        "ori_format": params_info[4],
     }
 
 
@@ -83,13 +85,30 @@ def trans_shape(shape, ori_format, cur_format):
         cur_shape = [1, (shape[0] + 15) // 16, 1, 1, 16]
 
     if cur_format == "FRACTAL_NZ":
-        cur_shape = list(shape[:-2]) + [(shape[-1] + 15) // 16, (shape[-2] + 15) // 16, 16, 16]
+        cur_shape = list(shape[:-2]) + [
+            (shape[-1] + 15) // 16,
+            (shape[-2] + 15) // 16,
+            16,
+            16,
+        ]
     if cur_format == "FRACTAL_Z":  # C1HW, N, Co, C0
         s_f = dict(zip(list(ori_format), shape))
-        cur_shape = [(s_f["C"] + 15) // 16 * s_f["H"] * s_f["W"], (s_f["N"] + 15) // 16, 16, 16]
+        cur_shape = [
+            (s_f["C"] + 15) // 16 * s_f["H"] * s_f["W"],
+            (s_f["N"] + 15) // 16,
+            16,
+            16,
+        ]
     if cur_format == "C1HWNCoC0":
         s_f = dict(zip(list(ori_format), shape))
-        cur_shape = [(s_f["C"] + 15) // 16, s_f["H"], s_f["W"], (s_f["N"] + 15) // 16, 16, 16]
+        cur_shape = [
+            (s_f["C"] + 15) // 16,
+            s_f["H"],
+            s_f["W"],
+            (s_f["N"] + 15) // 16,
+            16,
+            16,
+        ]
     if cur_format == "NC1HWC0_C04":
         s_f = dict(zip(list(ori_format), shape))
         cur_shape = [s_f["N"], (s_f["C"] + 3) // 4, s_f["H"], s_f["W"], 4]
@@ -107,12 +126,13 @@ def change_cur_format(op_params, format_list):
     """
     for idx, cur_fm in enumerate(format_list):
         op_params[idx]["format"] = cur_fm
-        op_params[idx]["shape"] = trans_shape(op_params[idx]["ori_shape"],
-                                              op_params[idx]["ori_format"], cur_fm)
+        op_params[idx]["shape"] = trans_shape(
+            op_params[idx]["ori_shape"], op_params[idx]["ori_format"], cur_fm
+        )
     return op_params
 
 
-def gen_all_format_params(format_res, op_params):  # 'pylint: disable=too-many-locals
+def gen_all_format_params(format_res, op_params):  # pylint: disable=too-many-locals
     """
     generate all format params
     :param format_res: format
@@ -123,19 +143,35 @@ def gen_all_format_params(format_res, op_params):  # 'pylint: disable=too-many-l
     input_list = []
     output_list = []
     for key in format_info.keys():
-        if str(key).startswith("input"):
+        if not key.startswith(("input", "output")):
+            continue
+        port = re.fullmatch(r"(input|output)([0-9]+)", key)
+        if port is None:
+            raise ValueError(
+                f"Invalid format port key: {key!r}; expected input<number> or output<number>"
+            )
+        if port.group(1) == "input":
             input_list.append(key)
-        if str(key).startswith("output"):
+        else:
             output_list.append(key)
+    if len(input_list) + len(output_list) != len(op_params):
+        raise ValueError("Format port count does not match op_params")
 
+    input_list.sort(key=lambda key: int(key[len("input") :]))
+    output_list.sort(key=lambda key: int(key[len("output") :]))
     input_outputs = []
-    for input_name in input_list:
-        f_l = format_info[input_name]["format"].split(",")
-        d_l = format_info[input_name]["dtype"].split(",")
-        input_outputs.append(zip(d_l, f_l))
-    for ouput_name in output_list:
-        f_l = format_info[ouput_name]["format"].split(",")
-        d_l = format_info[ouput_name]["dtype"].split(",")
+    combination_count = None
+    for port_name in input_list + output_list:
+        f_l = format_info[port_name]["format"].split(",")
+        d_l = format_info[port_name]["dtype"].split(",")
+        if len(d_l) != len(f_l):
+            raise ValueError(f"Format port {port_name}: dtype and format counts differ")
+        if combination_count is None:
+            combination_count = len(d_l)
+        elif len(d_l) != combination_count:
+            raise ValueError(
+                f"Format port {port_name}: combination count differs from other ports"
+            )
         input_outputs.append(zip(d_l, f_l))
 
     f_d_table = zip(*input_outputs)
@@ -156,7 +192,7 @@ def gen_all_format_params(format_res, op_params):  # 'pylint: disable=too-many-l
     return res
 
 
-def cartesian_set_format_dtype(name_list, dtype_list, format_list):  # 'pylint: disable=too-many-locals
+def cartesian_set_format_dtype(name_list, dtype_list, format_list):  # pylint: disable=too-many-locals
     """
     cartesian set format and dtype
     :param name_list: name list
@@ -171,7 +207,9 @@ def cartesian_set_format_dtype(name_list, dtype_list, format_list):  # 'pylint: 
     for idx, d_t in enumerate(new_dtype_list):
         new_dtype = []
         for dtype in d_t:
-            new_dtype += [dtype, ] * f_l
+            new_dtype += [
+                dtype,
+            ] * f_l
         new_dtype_list[idx] = new_dtype
 
     for idx, _ in enumerate(new_format_list):
@@ -181,14 +219,14 @@ def cartesian_set_format_dtype(name_list, dtype_list, format_list):  # 'pylint: 
         result["input{}".format(str(idx))] = {
             "name": ipt_name,
             "dtype": ",".join(new_dtype_list[idx]),
-            "format": ",".join(new_format_list[idx])
+            "format": ",".join(new_format_list[idx]),
         }
     ipt_len = len(name_list[0])
     for idx, opt_name in enumerate(name_list[1]):
         result["output{}".format(str(idx))] = {
             "name": opt_name,
             "dtype": ",".join(new_dtype_list[idx + ipt_len]),
-            "format": ",".join(new_format_list[idx + ipt_len])
+            "format": ",".join(new_format_list[idx + ipt_len]),
         }
     return result
 
@@ -205,6 +243,10 @@ def gen_shape(rank_range=None, size_range=None, dim_limit=None):
         size_range = [1, 2000 - 1]
     if rank_range is None:
         rank_range = [1, 8]
+    if rank_range[0] < 1 or size_range[0] < 1:
+        raise ValueError("rank_range and size_range must have positive lower bounds")
+    if dim_limit is not None and dim_limit < 1:
+        raise ValueError("dim_limit must be positive")
     if dim_limit is None:
         dim_range = 2000000 - 1
     else:
@@ -214,7 +256,7 @@ def gen_shape(rank_range=None, size_range=None, dim_limit=None):
     size = secret_gen.randint(*size_range)
     p_d = np.exp(np.log(size) / rank)
     dims = np.random.normal(loc=10, scale=3.0, size=(rank,))
-    dims = np.maximum(dims, 0)
+    dims = np.maximum(dims, 1)
     dim_prod = np.prod(dims)
     dim_prod_norm = np.exp(np.log(dim_prod) / rank)
     prod_dims = dims / dim_prod_norm * p_d
