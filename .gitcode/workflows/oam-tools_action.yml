@@ -155,7 +155,7 @@ stages:
               artifact-path: |
                 ${{ steps.process_checkout.outputs.path }}/build/host_ut_output.log
               object-prefix: ${{ env.obs_path }}/
-        if: "${{ default() }}"
+        if: env.TARGET_BRANCH == 'master'
         runs-on: ['self-hosted', 'arch=x64', 'spec=xlarge']
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.UT_Test }}
