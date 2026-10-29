@@ -19,14 +19,17 @@ import sys
 import numpy as np
 
 from ms_interface import utils
-from ms_interface.single_op_test_frame.common.ascend_tbe_op import (AscendOpKernel,
-                                                                    AscendOpKernelRunner,
-                                                                    AscendOpKernelRunnerParam)
+from ms_interface.constant import NOT_RUN_EXEC_FAILED, NOT_RUN_LAUNCH_FAILED
+from ms_interface.single_op_test_frame.common.ascend_tbe_op import (
+    AscendOpKernel,
+    AscendOpKernelRunner,
+    AscendOpKernelRunnerParam,
+)
 from ms_interface.dsmi_interface import DSMIInterface
 from ms_interface.compile_file import get_compile_file
 
+
 class GoldenOp:
-    
     @staticmethod
     def get_block_dim(device_id):
         # 为vector算子所以查找core_count为block dim， 如果没有表示是aicore+vector芯片,则需要查找aicore个数
@@ -44,15 +47,30 @@ class GoldenOp:
         op_kernel = AscendOpKernel(build_bin, build_json)
         input_a = np.ones((256, 32), dtype=np.float16)
         input_b = np.ones((256, 32), dtype=np.float16)
-        output_info = {"size": 16384, "dtype": "float16", "shape": (256, 32), "name": "output"}
+        output_info = {
+            "size": 16384,
+            "dtype": "float16",
+            "shape": (256, 32),
+            "name": "output",
+        }
         block_dim = self.get_block_dim(device_id)
         utils.print_debug_log("Start to run golden op. Please wait...")
         utils.print_debug_log(f"Block dim: {block_dim}")
-        ascend_op_param = AscendOpKernelRunnerParam(kernel=op_kernel, inputs=[input_a, input_b],
-                                                    actual_out_info=(output_info,), tiling_key=0, block_dim=block_dim)
+        ascend_op_param = AscendOpKernelRunnerParam(
+            kernel=op_kernel,
+            inputs=[input_a, input_b],
+            actual_out_info=(output_info,),
+            tiling_key=0,
+            block_dim=block_dim,
+        )
         with AscendOpKernelRunner(device_id=device_id) as runner:
             ret = runner.run(ascend_op_param)
-            if "Execute single op case failed" in ret:
+            if not isinstance(ret, str) or not ret:
+                utils.print_error_log(
+                    "Golden op runner returned an invalid execution report."
+                )
+                return False
+            if NOT_RUN_EXEC_FAILED in ret or NOT_RUN_LAUNCH_FAILED in ret:
                 return False
         return True
 

@@ -33,35 +33,42 @@ cur_abspath = os.path.dirname(__file__)
 
 
 class TestGoldenOp:
-
     @staticmethod
     def test_run_golden(monkeypatch, mocker):
         custom_paths = [MSAICERR_PATH, f"{RES_PATH}/package"]
         monkeypatch.setattr(sys, "path", custom_paths)
-        mocker.patch.object(AscendOpKernelRunner, 'run')
-        mocker.patch.object(AscendRTSApi, '_load_runtime_so')
-        mocker.patch.object(AscendRTSApi, 'register_kernel_launch_fill_func')
-        mocker.patch.object(AscendRTSApi, 'set_device')
-        mocker.patch.object(AscendRTSApi, 'create_stream')
-        mocker.patch.object(AscendRTSApi, 'reset')
-        mocker.patch.object(AscendRTSApi, 'destroy_stream')
+        mocker.patch.object(
+            AscendOpKernelRunner, "run", return_value="exec single op case success.\r\n"
+        )
+        mocker.patch.object(AscendRTSApi, "_load_runtime_so")
+        mocker.patch.object(AscendRTSApi, "register_kernel_launch_fill_func")
+        mocker.patch.object(AscendRTSApi, "set_device")
+        mocker.patch.object(AscendRTSApi, "create_stream")
+        mocker.patch.object(AscendRTSApi, "reset")
+        mocker.patch.object(AscendRTSApi, "destroy_stream")
         mocker.patch("ctypes.CDLL")
         temp_dir = Path(cur_abspath).joinpath("../test_run_golden")
         mocker.patch.object(Path, "exists", return_value=False)
         mocker.patch("shutil.which", return_value=True)
-        res = subprocess.run([sys.executable, '-c', ''], check=False)
+        res = subprocess.run([sys.executable, "-c", ""], check=False)
         mocker.patch("subprocess.run", return_value=res)
-        op_kernel_path = temp_dir.joinpath(
-            ModeCustom.ADD_CUSTOM.value, 'op_kernel')
+        op_kernel_path = temp_dir.joinpath(ModeCustom.ADD_CUSTOM.value, "op_kernel")
         op_kernel_path.mkdir(parents=True, exist_ok=True)
-        op_kernel_path.joinpath('add_custom.cpp').write_text("test", encoding='utf-8')
+        op_kernel_path.joinpath("add_custom.cpp").write_text("test", encoding="utf-8")
         compile_file_path = temp_dir.joinpath(
-            ModeCustom.ADD_CUSTOM.value, 'build_out', 'op_kernel')
+            ModeCustom.ADD_CUSTOM.value, "build_out", "op_kernel"
+        )
         compile_file_path.mkdir(parents=True, exist_ok=True)
         compile_file_path.joinpath(
-            f'{ModeCustom.ADD_CUSTOM.value}_add_custom.o').write_text("test", encoding='utf-8')
-        shutil.copy(Path(cur_abspath).joinpath("../res/ori_data/collect_milan/collection",
-                                               "AddCustom_ab1b6750d7f510985325b603cb06dc8b.json"), compile_file_path)
+            f"{ModeCustom.ADD_CUSTOM.value}_add_custom.o"
+        ).write_text("test", encoding="utf-8")
+        shutil.copy(
+            Path(cur_abspath).joinpath(
+                "../res/ori_data/collect_milan/collection",
+                "AddCustom_ab1b6750d7f510985325b603cb06dc8b.json",
+            ),
+            compile_file_path,
+        )
         res = GoldenOp().run_golden_op("Ascend910B4", 0, temp_dir)
         shutil.rmtree(temp_dir)
         assert res
