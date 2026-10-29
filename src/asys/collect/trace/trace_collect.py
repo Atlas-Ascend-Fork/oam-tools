@@ -108,7 +108,7 @@ class ParseTrace:
 
     @staticmethod
     def write_res_txt(msg_txt, trace_file):
-        trace_file = trace_file.replace(".bin", ".txt")
+        trace_file = os.path.splitext(trace_file)[0] + ".txt"
         with open(trace_file, "w", encoding="utf-8") as fw:
             fw.write(msg_txt.replace("\x00", ""))
 

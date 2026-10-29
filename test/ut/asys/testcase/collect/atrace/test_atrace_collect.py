@@ -44,6 +44,29 @@ class TestAtraceCollect(AssertTest):
     def teardown_method(self):
         pass
 
+    @pytest.mark.parametrize(
+        "directory, source_name, result_name",
+        [
+            ("logs", "trace.bin", "trace.txt"),
+            ("logs.bin", "trace.bin", "trace.txt"),
+            ("logs", "capture.bin.001.bin", "capture.bin.001.txt"),
+        ],
+    )
+    def test_parse_preserves_path_before_suffix(
+        self, tmp_path, directory, source_name, result_name
+    ):
+        trace_dir = tmp_path / directory
+        trace_dir.mkdir()
+        source = trace_dir / source_name
+        result = trace_dir / result_name
+        great_bin(str(source))
+
+        self.assertTrue(ParseTrace().start_parse_file(str(source), count=1, num=1))
+
+        self.assertTrue(check_atrace_file(str(result)))
+        self.assertTrue(not source.exists())
+        self.assertTrue(list(trace_dir.iterdir()) == [result])
+
     def test_atrace_collect_success(self, mocker):
         create_dir(os.path.join(ut_root_path, "data", "dfx", "atrace"))
         great_bin(os.path.join(ut_root_path, "data", "dfx", "atrace", "test.bin"))
