@@ -1,0 +1,9 @@
+{
+  "arch": "aarch64",
+  "package_payload_entries": 1446,
+  "normalization": [
+    "{{ARCH}}-linux",
+    "msprof-{{VERSION}}"
+  ],
+  "installed_tree_entries": 1459
+}
