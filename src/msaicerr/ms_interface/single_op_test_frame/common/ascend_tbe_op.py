@@ -923,12 +923,16 @@ class AscendOpKernelRunner:
         aic_info = ""
         try:
             utils.print_debug_log("Start exec_single_case with tail...")
-            _, [launch_ret, sync_ret, _] = self.exec_single_case(
+            _, [tail_launch_ret, tail_sync_ret, _] = self.exec_single_case(
                 ascend_op_param, "tail"
             )
             utils.print_debug_log("exec_single_case with tail over...")
             utils.print_debug_log("Start exec_single_case with magic...")
-            _, [_, _, magic_ret] = self.exec_single_case(ascend_op_param, "magic")
+            _, [magic_launch_ret, magic_sync_ret, magic_ret] = self.exec_single_case(
+                ascend_op_param, "magic"
+            )
+            launch_ret = tail_launch_ret if tail_launch_ret != 0 else magic_launch_ret
+            sync_ret = tail_sync_ret if tail_sync_ret != 0 else magic_sync_ret
             utils.print_debug_log("exec_single_case with magic over...")
         except (
             OSError,
@@ -944,6 +948,12 @@ class AscendOpKernelRunner:
             aic_info = f"{aic_info}launch kernel result : {launch_ret}.\r\n"
             aic_info = f"{aic_info}execute result : {sync_ret}.\r\n"
             aic_info = f"{aic_info}memory status check result : {magic_ret}.\r\n"
+            aic_info += (
+                f"tail replay: launch={tail_launch_ret}, sync={tail_sync_ret}.\r\n"
+            )
+            aic_info += (
+                f"magic replay: launch={magic_launch_ret}, sync={magic_sync_ret}.\r\n"
+            )
             utils.print_error_log(aic_info)
         else:
             aic_info = f"{aic_info}exec single op case success.\r\n"

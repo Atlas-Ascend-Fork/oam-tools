@@ -778,3 +778,44 @@ def test_run_exception(mocker):
     param = _exec_param()
     result = runner.run(param)
     assert "failed" in result
+
+
+@pytest.mark.parametrize(
+    "tail,magic,launch,sync",
+    [
+        ([0, 0, 0], [7, 0, 0], 7, 0),
+        ([0, 0, 0], [0, 8, 0], 0, 8),
+        ([3, 0, 0], [7, 8, 0], 3, 8),
+        ([0, 4, 0], [7, 8, 0], 7, 4),
+        ([3, 0, 0], [0, 0, 0], 3, 0),
+        ([0, 4, 0], [0, 0, 0], 0, 4),
+    ],
+)
+def test_magic_execution_failure_is_in_report(mocker, tail, magic, launch, sync):
+    runner, _ = make_runner(mocker)
+    params = _exec_param()
+    execute = mocker.patch.object(
+        runner, "exec_single_case", side_effect=[[None, tail], [None, magic]]
+    )
+    report = runner.run(params)
+    assert "exec single op case success" not in report
+    assert f"launch kernel result : {launch}" in report
+    assert f"execute result : {sync}" in report
+    assert f"tail replay: launch={tail[0]}, sync={tail[1]}" in report
+    assert f"magic replay: launch={magic[0]}, sync={magic[1]}" in report
+    assert [call.args[1] for call in execute.call_args_list] == ["tail", "magic"]
+
+
+@pytest.mark.parametrize("failure_mode", ["tail", "magic"])
+def test_replay_exception_returns_existing_failure_message(mocker, failure_mode):
+    runner, _ = make_runner(mocker)
+    params = _exec_param()
+    results = (
+        [OSError("runtime unavailable")]
+        if failure_mode == "tail"
+        else [[None, [0, 0, 0]], OSError("runtime unavailable")]
+    )
+    mocker.patch.object(runner, "exec_single_case", side_effect=results)
+    report = runner.run(params)
+    assert ascend_tbe_op.NOT_RUN_EXEC_FAILED in report
+    assert "exec single op case success" not in report
