@@ -20,20 +20,42 @@ from common.const import MAX_CHAR_LINE
 
 __all__ = ["generate_report"]
 
+import unicodedata
+
 VERTICAL = " | "
 ADD_SUB = " +-"
 SUB_ADD = "-+ "
 
 
+def display_width(text):
+    """Terminal columns a string occupies: CJK glyphs are two columns wide."""
+    return sum(
+        2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text
+    )
+
+
 def format_cell(cell, width, fillchar=" "):
-    return str(cell).ljust(width, fillchar)
+    text = str(cell)
+    return text + fillchar * max(0, width - display_width(text))
 
 
 def _split_cell(cell, width):
     cell = str(cell)
     if not cell:
         return [""]
-    return [cell[i : i + width] for i in range(0, len(cell), width)]
+    chunks = []
+    current = ""
+    current_width = 0
+    for char in cell:
+        char_width = 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+        if current_width + char_width > width and current:
+            chunks.append(current)
+            current = ""
+            current_width = 0
+        current += char
+        current_width += char_width
+    chunks.append(current)
+    return chunks
 
 
 def _iter_row_lines(row, column_widths):
@@ -113,7 +135,7 @@ def generate_report(table_header, table_data, split_line=False):
         table_row += data_value
     column_count = max(len(row) for row in table_row)
     column_widths = [
-        max(len(str(row[i])) if i < len(row) else 0 for row in table_row)
+        max(display_width(str(row[i])) if i < len(row) else 0 for row in table_row)
         for i in range(column_count)
     ]
     # Create the formatted table string

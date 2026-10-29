@@ -83,12 +83,15 @@ UNPACK = {
 def trace_show_mode(mode, value):
     if mode == TRACE_STRUCT_SHOW_MODE_DEC:
         return str(value)
-    elif mode == TRACE_STRUCT_SHOW_MODE_BIN:
-        return str(bin(int(value)))
-    elif mode == TRACE_STRUCT_SHOW_MODE_HEX:
-        return str(hex(int(value)))
-    else:
-        return str(value)
+    if mode in (TRACE_STRUCT_SHOW_MODE_BIN, TRACE_STRUCT_SHOW_MODE_HEX):
+        # The mode byte is read straight from the trace file, so a truncated or
+        # foreign file can pair a numeric mode with a non-numeric value.
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return str(value)
+        return str(bin(number) if mode == TRACE_STRUCT_SHOW_MODE_BIN else hex(number))
+    return str(value)
 
 
 class ParseTrace:
