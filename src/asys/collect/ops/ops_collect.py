@@ -316,7 +316,8 @@ def collect_cfg_json(output_root_path, cfg_dir, json_dir, config):
             )
             if not os.path.exists(dst_dir):
                 os.makedirs(dst_dir)
-            ret = ret and f.copy_file_to_dir(os.path.join(path, file), dst_dir)
+            file_ret = f.copy_file_to_dir(os.path.join(path, file), dst_dir)
+            ret = ret and file_ret
     return ret
 
 
@@ -347,13 +348,15 @@ def collect_opp_config(output_root_path):
         # remove front and back spaces
         _cfg_dir = cfg_dir.strip()
         json_dir = os.path.join(opp_path, "vendors", _cfg_dir)
-        ret = ret and collect_cfg_json(
+        vendor_ret = collect_cfg_json(
             output_root_path, _cfg_dir, json_dir, "vendor_config"
         )
+        ret = ret and vendor_ret
 
-    ret = ret and f.copy_file_to_dir(
+    manifest_ret = f.copy_file_to_dir(
         config_path, os.path.join(output_root_path, "dfx", "ops", "vendor_config")
     )
+    ret = ret and manifest_ret
     return ret
 
 
