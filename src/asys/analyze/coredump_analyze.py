@@ -147,9 +147,9 @@ class CoreDump:
                     [int_to_hex(data_list[0]), int_to_hex(data_list[1]), data_list[-1]]
                 )
             else:
-                if int_to_hex(data_list[0]) < self.map_info[-1][0]:
+                if int(data_list[0], 16) < int(self.map_info[-1][0], 16):
                     self.map_info[-1][0] = int_to_hex(data_list[0])
-                if int_to_hex(data_list[1]) > self.map_info[-1][1]:
+                if int(data_list[1], 16) > int(self.map_info[-1][1], 16):
                     self.map_info[-1][1] = int_to_hex(data_list[1])
             before_line = data_list[-1]
         return before_line
