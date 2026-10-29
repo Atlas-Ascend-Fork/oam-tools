@@ -42,7 +42,9 @@ set(OAM_BUNDLE_META_NAME ".bundle_branch")
 # 硬编码任一个都会让其余分支探测不到而静默回退 master。
 set(OAM_BUNDLE_RELEASE_REF_REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+(-beta\\.[0-9]+)?$")
 
-# 解析要拉取的 bundle 分支：显式指定 > git 探测(领先提交数最小) > master 兜底。
+# 解析要拉取的 bundle 分支：显式指定 > git 探测(领先提交数最小，相同取落后提交数最小) > master 兜底。
+# 提交距离不记录特性分支的来源：远端 master 推进后，旧 master 派生的特性分支仍可能
+# 选到发布线；存在此类歧义时使用 --bundle_branch / -DOAM_BUNDLE_BRANCH 显式指定。
 # 结果写入 RESULT_VAR（PARENT_SCOPE）。仅在确需从 OBS 下载时调用，
 # 避免"bundle 已就绪 / 命中本地预置包"时做无谓的 git 探测或误触白名单校验。
 function(oam_resolve_bundle_branch RESULT_VAR)
@@ -54,9 +56,10 @@ function(oam_resolve_bundle_branch RESULT_VAR)
     endif()
 
     # 2) git 探测：对每个存在的候选 ref 算 HEAD 相对其分家点的领先提交数，
-    #    取最小者（血缘最近）。git 不可用或无候选命中则回退。
+    #    取最小者，相同则取落后提交数最小者。git 不可用或无候选命中则回退。
     set(_best_branch "")
     set(_best_ahead "")
+    set(_best_behind "")
     # 自行确保 GIT_EXECUTABLE 可用，不依赖其他 cmake 文件的 include 顺序副作用
     # （当前 build_submodules.cmake 恰在本文件之前 include 并已 find_package(Git)，
     #  但那属实现细节，顺序一变本函数就会静默跳过探测）。找不到 git 时走 master 兜底。
@@ -118,15 +121,32 @@ function(oam_resolve_bundle_branch RESULT_VAR)
                     "(code ${_cnt_result}): ${_cnt_err}; skip this candidate")
                 continue()
             endif()
-            if(_best_ahead STREQUAL "" OR _ahead LESS _best_ahead)
+            # 领先提交数相同时，比较落后提交数；精确匹配的 ref 应优先于其后代。
+            execute_process(
+                COMMAND ${GIT_EXECUTABLE} rev-list --count "HEAD..${_ref}"
+                WORKING_DIRECTORY "${OAM_TOOLS_DIR}"
+                RESULT_VARIABLE _behind_result
+                OUTPUT_VARIABLE _behind
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_VARIABLE _behind_err)
+            if(NOT _behind_result EQUAL 0)
+                message(WARNING
+                    "bundle branch detect: 'git rev-list --count HEAD..${_ref}' failed: "
+                    "${_behind_err}; skip this candidate")
+                continue()
+            endif()
+            if(_best_ahead STREQUAL "" OR _ahead LESS _best_ahead OR
+               (_ahead EQUAL _best_ahead AND _behind LESS _best_behind))
                 set(_best_ahead "${_ahead}")
+                set(_best_behind "${_behind}")
                 set(_best_branch "${_mapped}")
             endif()
         endforeach()
     endif()
 
     if(NOT _best_branch STREQUAL "")
-        message(STATUS "bundle branch (git-detected): ${_best_branch} (ahead ${_best_ahead})")
+        message(STATUS
+            "bundle branch (git-detected): ${_best_branch} (ahead ${_best_ahead}, behind ${_best_behind})")
         set(${RESULT_VAR} "${_best_branch}" PARENT_SCOPE)
         return()
     endif()

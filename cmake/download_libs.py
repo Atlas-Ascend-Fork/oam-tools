@@ -56,6 +56,11 @@ def map_ref_to_obs_branch(ref):
 def detect_bundle_branch():
     """git 探测所属发布分支：枚举远端分支，取领先提交数最小者（血缘最近）。
 
+    领先提交数相同时，以落后提交数消除平局，避免将后代发布分支误选为当前分支。
+
+    这是提交距离启发式，不记录特性分支的来源；远端 master 已推进时，
+    从旧 master 派生的特性分支仍可能选到发布线。此时应显式使用 --bundle_branch。
+
     与 cmake/install_bundle.cmake 的 oam_resolve_bundle_branch 探测逻辑一致；
     git 不可用或无候选命中时返回 None，由调用方兜底 master。
     """
@@ -75,6 +80,7 @@ def detect_bundle_branch():
         return None
     best_branch = None
     best_ahead = None
+    best_behind = None
     for ref in listed.stdout.split():
         mapped = map_ref_to_obs_branch(ref)
         # 只比较 OBS 上确有包的分支，避免探测出必然触发白名单报错的发布线。
@@ -92,8 +98,22 @@ def detect_bundle_branch():
             )
             continue
         ahead = int(count.stdout.strip() or "0")
-        if best_ahead is None or ahead < best_ahead:
+        behind_count = subprocess.run(
+            [git_path, "rev-list", "--count", f"HEAD..{ref}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if behind_count.returncode != 0:
+            logging.warning(
+                "git rev-list --count HEAD..%s failed: %s",
+                ref, behind_count.stderr.strip(),
+            )
+            continue
+        behind = int(behind_count.stdout.strip() or "0")
+        if best_ahead is None or (ahead, behind) < (best_ahead, best_behind):
             best_ahead = ahead
+            best_behind = behind
             best_branch = mapped
     return best_branch
 
