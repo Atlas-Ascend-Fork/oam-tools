@@ -21,6 +21,7 @@ The file mainly involves main function of parsing input arguments.
 Copyright Information:
 Huawei Technologies Co., Ltd. All Rights Reserved © 2025
 """
+
 import argparse
 import sys
 import time
@@ -32,9 +33,16 @@ from ms_interface.constant import Constant
 
 def parse_tiling_data(plog):
     tiling_data = TilingDataParser(plog).parse()
+    if not tiling_data:
+        utils.print_warn_log("No valid tiling data was found; no binary file created.")
+        return Constant.MS_AICERR_FIND_DATA_ERROR
     tiling_data_file = f"tilingdata_{int(time.time())}.bin"
-    with open(tiling_data_file, "wb") as f:
-        f.write(tiling_data)
+    try:
+        with open(tiling_data_file, "wb") as f:
+            f.write(tiling_data)
+    except OSError as err:
+        utils.print_warn_log(f"Failed to write {tiling_data_file}: {err}")
+        return Constant.MS_AICERR_OPEN_FILE_ERROR
     utils.print_info_log(f"Tiling data saved in {tiling_data_file}")
     return Constant.MS_AICERR_NONE_ERROR
 
@@ -45,7 +53,13 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--tiling_data", dest="tiling_data", default="", help=argparse.SUPPRESS, required=False)
+        "-t",
+        "--tiling_data",
+        dest="tiling_data",
+        default="",
+        help=argparse.SUPPRESS,
+        required=False,
+    )
     args, _ = parser.parse_known_args()
 
     if args.tiling_data:
@@ -55,5 +69,5 @@ def main():
     return Constant.MS_AICERR_NONE_ERROR
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

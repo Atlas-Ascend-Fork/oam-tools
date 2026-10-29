@@ -30,13 +30,19 @@ class TilingDataParser:
     def __get_args(path):
         key_word_list = []
 
-        get_args_cmd = ['grep', 'after execute:', '-inrE', path]
-        get_args_regexp = r"(args\(0 to .*?\) after execute:.*?)after execute:args print end"
+        get_args_cmd = ["grep", "after execute:", "-inrE", path]
+        get_args_regexp = (
+            r"(args\(0 to .*?\) after execute:.*?)after execute:args print end"
+        )
         get_args_ret = utils.get_inquire_result(get_args_cmd, get_args_regexp)
         if not get_args_ret:
             utils.print_warn_log("Failed to get all args after execute.")
-            return []
+            return [], -1
 
+        # A directory input can match several logs.  Only the first "after
+        # execute:" block is parsed here, so an explicit tiling index resolved
+        # below may come from a different log than these args.  That asymmetry
+        # predates this change; pass a single log file to avoid it.
         get_args_ret = get_args_ret[0]
         get_arg_regexp = r" after execute:(.*?)$"
         get_arg_ret = re.findall(get_arg_regexp, get_args_ret, re.M | re.S)
@@ -49,23 +55,34 @@ class TilingDataParser:
             for str2 in split_tmp:
                 if str2.find("\n") != -1:
                     continue
-                str2 = str2.replace(' ', '').replace(".", '')
+                str2 = str2.replace(" ", "").replace(".", "")
                 if not str2:
                     continue
                 key_word_list.append(str2)
-        get_io_ptr_cmd = ['grep', 'exception info dump args data', '-inrE', path]
+        get_io_ptr_cmd = ["grep", "exception info dump args data", "-inrE", path]
         get_io_ptr_regexp = r"exception info dump args data, addr:(.*?);"
         get_io_ptr_ret = utils.get_inquire_result(get_io_ptr_cmd, get_io_ptr_regexp)
         if not get_io_ptr_ret:
             get_io_ptr_ret = []
 
-        get_io_cmd = ['grep', r'\[Dump\]\[Exception\]', '-inrE', path]
-        get_io_regexp = r"begin to load .*? pointer tensor.*?end to load .*? pointer tensor"
+        get_io_cmd = ["grep", r"\[Dump\]\[Exception\]", "-inrE", path]
+        get_io_regexp = (
+            r"begin to load tiling data, index:\d+"
+            r"|begin to load [^\n]*? pointer tensor.*?end to load [^\n]*? pointer tensor"
+        )
         get_io_ret = utils.get_inquire_result(get_io_cmd, get_io_regexp)
+        explicit_tiling_index = -1
+        pointer_tensors = []
+        for ret in get_io_ret or []:
+            tiling_index = re.fullmatch(r"begin to load tiling data, index:(\d+)", ret)
+            if tiling_index and explicit_tiling_index == -1:
+                explicit_tiling_index = int(tiling_index.group(1))
+            elif not tiling_index:
+                pointer_tensors.append(ret)
 
-        if get_io_ret:
+        if pointer_tensors:
             utils.print_info_log("The operator has sub_pointer tensor.")
-            for ret in get_io_ret:
+            for ret in pointer_tensors:
                 get_key_regexp = r"begin to load .*? pointer tensor.*?addr:(.*?)$"
                 get_key_ret = re.findall(get_key_regexp, ret, re.M | re.S)
 
@@ -76,32 +93,36 @@ class TilingDataParser:
                         i = get_io_ptr_ret.index(value)
                         get_io_ptr_ret[i] = get_key_ret[0]
             get_io_ptr_ret = list(set(get_io_ptr_ret))
-        guess_tiling_index = -1
-        for io_ptr in get_io_ptr_ret:
-            if io_ptr in key_word_list:
-                _cnt = key_word_list.count(io_ptr)
-                i = key_word_list.index(io_ptr, _cnt - 1)
-                if i + 1 > guess_tiling_index:
-                    guess_tiling_index = i + 1
+        guess_tiling_index = explicit_tiling_index
+        if explicit_tiling_index == -1:
+            for io_ptr in get_io_ptr_ret:
+                if io_ptr in key_word_list:
+                    i = len(key_word_list) - 1 - key_word_list[::-1].index(io_ptr)
+                    if i + 1 > guess_tiling_index:
+                        guess_tiling_index = i + 1
         if guess_tiling_index >= len(key_word_list):
-            utils.print_warn_log("Failed to get tiling_ptr after execute, maybe static shape case.")
+            utils.print_warn_log(
+                "Failed to get tiling_ptr after execute, maybe static shape case."
+            )
             return key_word_list, -1
 
-        para_base_cmd = ['grep', 'para base', '-inrE', path]
+        para_base_cmd = ["grep", "para base", "-inrE", path]
         para_base_regexp = r"para base:\s+(.*?)\."
-        parm_base_ret = utils.get_inquire_result(para_base_cmd, para_base_regexp)
-        if not parm_base_ret or not parm_base_ret[0].startswith("0x"):
+        param_base_ret = utils.get_inquire_result(para_base_cmd, para_base_regexp)
+        if not param_base_ret or not param_base_ret[0].startswith("0x"):
             utils.print_warn_log("Failed to get para_base after execute.")
             return key_word_list, -1
         _end_offset = len("0x")
-        for c in parm_base_ret[0][_end_offset:]:
+        for c in param_base_ret[0][_end_offset:]:
             if c not in "0123456789abcdefABCDEF":
                 break
             _end_offset = _end_offset + 1
-        para_base = utils.get_hexstr_value(parm_base_ret[0][:_end_offset])
+        para_base = utils.get_hexstr_value(param_base_ret[0][:_end_offset])
 
         if guess_tiling_index == -1:
-            utils.print_info_log("Unable to get L0 dump log, start to guess tilingptr index.")
+            utils.print_info_log(
+                "Unable to get L0 dump log, start to guess tilingptr index."
+            )
             for io_ptr in key_word_list:
                 guess_tiling_ptr = utils.get_hexstr_value(io_ptr)
                 offset = (guess_tiling_ptr - para_base) // 8
@@ -110,35 +131,40 @@ class TilingDataParser:
                     guess_tiling_index = key_word_list.index(io_ptr)
                     break
 
-        get_idx_cmd = ["grep", "begin to load normal tensor", "-inrE", path]
-        get_idx_regexp = r".*?index:(\d+)"
-        get_idx_ret = utils.get_inquire_result(get_idx_cmd, get_idx_regexp)
-        if not get_idx_ret:
-            utils.print_warn_log("Failed to get the begin tensor's index of args.")
-            get_idx_ret = ['0']
-        begin_idx = int(get_idx_ret[0])
-
-        tiling_ptr_idx = begin_idx + guess_tiling_index
+        # Both explicit and inferred indices refer to the complete args list.
+        tiling_ptr_idx = guess_tiling_index
         idx_is_valid = 0 <= tiling_ptr_idx < len(key_word_list)
-        tiling_ptr = utils.get_hexstr_value(key_word_list[tiling_ptr_idx]) if idx_is_valid else -1
+        tiling_ptr = (
+            utils.get_hexstr_value(key_word_list[tiling_ptr_idx])
+            if idx_is_valid
+            else -1
+        )
         offset = (tiling_ptr - para_base) // 8 if idx_is_valid else -1
-        utils.print_debug_log(f"get args: {key_word_list}, "
-                             f"tiling_ptr:{hex(tiling_ptr)}, para_base: {hex(para_base)}, offset: {offset}")
+        utils.print_debug_log(
+            f"get args: {key_word_list}, "
+            f"tiling_ptr:{hex(tiling_ptr)}, para_base: {hex(para_base)}, offset: {offset}"
+        )
+        if not 0 <= offset < len(key_word_list):
+            utils.print_warn_log(
+                f"Tiling data offset {offset} is outside the captured args "
+                f"(count={len(key_word_list)}, tiling_ptr={hex(tiling_ptr)}, "
+                f"para_base={hex(para_base)})."
+            )
+            return key_word_list, -1
         return key_word_list, offset
-
 
     @staticmethod
     def __reverse_str(sss):
         ss = ""
         for i in range(7, -1, -1):
-            ss = ss + sss[2 * i: 2 * i + 2]
+            ss = ss + sss[2 * i : 2 * i + 2]
         return ss
 
     def __gen_tiling_data(self, key_word_list, offset):
         ss_concate = ""
         for key in key_word_list[offset:]:
             # remove "0x"
-            str_tmp = key.replace("0x", '')
+            str_tmp = key.replace("0x", "")
             str_tmp = str_tmp.zfill(16)
             str_tmp = self.__reverse_str(str_tmp)
             ss_concate = ss_concate + str_tmp
@@ -153,9 +179,17 @@ class TilingDataParser:
         return file_list
 
     def parse(self):
+        """Return the tiling payload as ``bytes``, or ``b""`` when it is absent.
+
+        The failure value used to be ``""``.  Both are falsy and callers only
+        test truthiness (``aicore_error_parser`` guards the file write with
+        ``if tiling_data``; ``parse_tiling`` turns a falsy result into an
+        error code), so the change is source compatible.  ``b""`` is used
+        because the payload is binary and is written straight to a file.
+        """
         key_word_list, offset = self.__get_args(self.file_path)
         if offset == -1:
-            return ""
+            return b""
         tiling_data = self.__gen_tiling_data(key_word_list, int(offset))
-        utils.print_debug_log('Get tiling data success from the log!')
+        utils.print_debug_log("Get tiling data success from the log!")
         return tiling_data

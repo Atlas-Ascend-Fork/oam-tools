@@ -55,13 +55,13 @@ def test_get_files(mocker):
 def test_get_args_no_result(mocker):
     mocker.patch("ms_interface.utils.get_inquire_result", return_value=[])
     result = getattr(TilingDataParser, GET_ARGS)("/p")
-    assert result == []
+    assert result == ([], -1)
 
 
 def test_parse_offset_minus_one(mocker):
     mocker.patch.object(TilingDataParser, GET_ARGS, return_value=(["0x1"], -1))
     parser = TilingDataParser("/p")
-    assert parser.parse() == ""
+    assert parser.parse() == b""
 
 
 def test_parse_success(mocker):
