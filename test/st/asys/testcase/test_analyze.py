@@ -1344,7 +1344,13 @@ class TestAnalyze(AssertTest):
         )  # noqa: S607  # nosec B602  # test mock
         mocker.patch("subprocess.Popen", return_value=fake_ret)
         mocker.patch.object(AsysCollect, "run", return_value=True)
-        mocker.patch("os.path.exists", return_value=False)
+        actual_exists = os.path.exists
+        mocker.patch(
+            "os.path.exists",
+            side_effect=lambda path: False
+            if os.path.basename(path) == "msaicerr.py"
+            else actual_exists(path),
+        )
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
         sys.argv = [
             CONF_SRC_PATH,

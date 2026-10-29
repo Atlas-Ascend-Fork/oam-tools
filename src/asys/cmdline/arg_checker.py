@@ -158,8 +158,11 @@ def check_arg_create_dir(arg_name, arg_val):
         while True:
             if os.access(scan_path, os.F_OK):
                 if os.access(scan_path, os.W_OK):
-                    f.create_dir(arg_val)
-                    return RetCode.SUCCESS
+                    if f.create_dir(arg_val):
+                        return RetCode.SUCCESS
+                    if os.path.isdir(arg_val) and os.access(arg_val, os.W_OK):
+                        return RetCode.SUCCESS
+                    return RetCode.ARG_CREATE_DIR_FAILED
                 else:
                     return RetCode.ARG_CREATE_DIR_FAILED
             if scan_path == "/":
