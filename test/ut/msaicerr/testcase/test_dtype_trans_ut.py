@@ -52,40 +52,47 @@ def test_np_dtype_to_str_with_str():
     assert dtype_trans.np_dtype_to_str("float16") == "float16"
 
 
-@pytest.mark.parametrize("np_type, expected", [
-    (np.float16, "float16"),
-    (np.float32, "float32"),
-    (np.float64, "float64"),
-    (np.int8, "int8"),
-    (np.uint8, "uint8"),
-    (np.int16, "int16"),
-    (np.uint16, "uint16"),
-    (np.int32, "int32"),
-    (np.uint32, "uint32"),
-    (np.int64, "int64"),
-    (np.uint64, "uint64"),
-])
+@pytest.mark.parametrize(
+    "np_type, expected",
+    [
+        (np.float16, "float16"),
+        (np.float32, "float32"),
+        (np.float64, "float64"),
+        (np.int8, "int8"),
+        (np.uint8, "uint8"),
+        (np.int16, "int16"),
+        (np.uint16, "uint16"),
+        (np.int32, "int32"),
+        (np.uint32, "uint32"),
+        (np.int64, "int64"),
+        (np.uint64, "uint64"),
+    ],
+)
 def test_np_dtype_to_str_with_np_dtype(np_type, expected):
     assert dtype_trans.np_dtype_to_str(np.dtype(np_type)) == expected
 
 
-@pytest.mark.parametrize("dtype, size", [
-    ("bool", 1),
-    ("int8", 1),
-    ("uint8", 1),
-    ("int16", 2),
-    ("uint16", 2),
-    ("int32", 4),
-    ("uint32", 4),
-    ("int64", 8),
-    ("uint64", 8),
-    ("float16", 2),
-    ("float32", 4),
-    ("float64", 8),
-])
+@pytest.mark.parametrize(
+    "dtype, size",
+    [
+        ("bool", 1),
+        ("int8", 1),
+        ("uint8", 1),
+        ("int16", 2),
+        ("uint16", 2),
+        ("int32", 4),
+        ("uint32", 4),
+        ("int64", 8),
+        ("uint64", 8),
+        ("float16", 2),
+        ("float32", 4),
+        ("float64", 8),
+    ],
+)
 def test_get_dtype_byte(dtype, size):
     assert dtype_trans.get_dtype_byte(dtype) == size
 
 
 def test_get_dtype_byte_unknown():
-    assert dtype_trans.get_dtype_byte("not_a_dtype") is None
+    with pytest.raises(ValueError, match="unsupported dtype: not_a_dtype"):
+        dtype_trans.get_dtype_byte("not_a_dtype")

@@ -27,6 +27,7 @@ class Constant:
     """
     This class for Constant.
     """
+
     ASCEND_DTYPE_NP_DTYPE_MAP = {
         "float16": np.float16,
         "float32": np.float32,
@@ -40,9 +41,10 @@ class Constant:
         "uint32": np.uint32,
         "int64": np.int64,
         "uint64": np.uint64,
-        "bfloat16": "bfloat16"
+        # NumPy needs an extension to resolve this dtype name. Shape-only
+        # parameter sizing uses its byte width without constructing a dtype.
+        "bfloat16": "bfloat16",
     }
-
 
 
 def get_all_str_dtypes():
@@ -78,7 +80,7 @@ def np_dtype_to_str(dtype):
         np.int32.__name__: "int32",
         np.uint32.__name__: "uint32",
         np.int64.__name__: "int64",
-        np.uint64.__name__: "uint64"
+        np.uint64.__name__: "uint64",
     }
     if isinstance(dtype, str):
         return dtype
@@ -100,7 +102,11 @@ def get_dtype_byte(dtype):
         "int64": 8,
         "uint64": 8,
         "float16": 2,
+        "bfloat16": 2,
         "float32": 4,
-        "float64": 8
+        "float64": 8,
     }
-    return dtype_size_map.get(dtype)
+    size = dtype_size_map.get(dtype)
+    if size is None:
+        raise ValueError(f"unsupported dtype: {dtype}")
+    return size
