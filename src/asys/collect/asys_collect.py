@@ -50,7 +50,7 @@ class AsysCollect:
         self.finish_flag = False
 
     @staticmethod
-    @timeout_decorator(GET_DEVICES_INFO_TIMEOUT)
+    @timeout_decorator(GET_DEVICES_INFO_TIMEOUT, raise_on_error=True)
     def collect_status_info():
         """
         no redundant plog temporary directory is generated when the status and health information is collected.
@@ -62,7 +62,7 @@ class AsysCollect:
             AsysInfo().get_software_info(write_file=True)
 
     @staticmethod
-    @timeout_decorator(GET_DEVICES_INFO_TIMEOUT)
+    @timeout_decorator(GET_DEVICES_INFO_TIMEOUT, raise_on_error=True)
     def collect_health_info():
         if ParamDict().get_env_type() == "EP":
             # collect health check result
@@ -144,11 +144,15 @@ class AsysCollect:
             self.collect_status_info()
         except TimeoutError:
             log_error("Timeout in retrieving device status information.")
+        except ChildProcessError as err:
+            log_error(f"Failed to collect device status information: {err}")
 
         try:
             self.collect_health_info()
         except TimeoutError:
             log_error("Timeout in retrieving device health information.")
+        except ChildProcessError as err:
+            log_error(f"Failed to collect device health information: {err}")
 
         self.finish_flag = True
         t.join()  # wait print process_display end

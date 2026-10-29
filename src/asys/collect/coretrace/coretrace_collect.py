@@ -189,6 +189,10 @@ class ParseCoreTrace:
         results = []
         for dirs, _, files in coretrace_dirs:
             for file in files:
+                if not file.startswith("coretrace"):
+                    # Same rule as start_parse_file: coretrace artefacts carry no
+                    # .txt suffix (coretrace.log-daemon.<pid>.<n>.<ts>).
+                    continue
                 coretrace_file = os.path.join(dirs, file)
                 num += 1
                 t = Thread(

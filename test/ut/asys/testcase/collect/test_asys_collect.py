@@ -206,3 +206,51 @@ class TestAsysCollect(AssertTest):
         self.assertTrue(
             "Timeout in retrieving device health information" in caplog.text
         )
+
+    def test_collect_status_info_child_process_error(self, mocker, caplog):
+        # A worker that dies is not a timeout, so the log has to say so.
+        # Otherwise #338's failure reason is invisible in the asys log.
+        ParamDict().set_env_type("EP")
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        mocker.patch("common.FileOperate.copy_dir", return_value=True)
+        mocker.patch(
+            "common.FileOperate.list_dir", return_value=["asys_ut_test_export_tmp"]
+        )
+        mocker.patch("common.FileOperate.write_file")
+        mocker.patch("os.walk")
+        mocker.patch("collect.ops.ops_collect.collect_ops", return_value=True)
+        mocker.patch.object(
+            AsysCollect,
+            "collect_status_info",
+            side_effect=ChildProcessError("write_info failed in the timeout worker"),
+        )
+        mocker.patch.object(
+            AsysCollect,
+            "collect_health_info",
+            side_effect=ChildProcessError("health worker died"),
+        )
+
+        asys_collect = AsysCollect()
+        self.assertTrue(asys_collect.collect())
+        self.assertTrue(
+            "Failed to collect device status information: write_info failed in the timeout worker"
+            in caplog.text
+        )
+        self.assertTrue(
+            "Failed to collect device health information: health worker died"
+            in caplog.text
+        )
+        # A worker crash is not a timeout, so the timeout message must be gone.
+        self.assertTrue(
+            "Timeout in retrieving device status information" not in caplog.text
+        )
+
+    def test_collect_status_info_raises_child_process_error(self, mocker):
+        # The entry point has to carry raise_on_error=True, so a failing
+        # AsysInfo.write_info surfaces as a ChildProcessError instead of
+        # silently returning None.
+        mocker.patch("info.AsysInfo.write_info", side_effect=RuntimeError)
+        ParamDict().set_env_type("EP")
+
+        with pytest.raises(ChildProcessError):
+            AsysCollect.collect_status_info()

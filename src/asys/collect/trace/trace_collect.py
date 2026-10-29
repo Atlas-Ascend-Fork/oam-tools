@@ -365,16 +365,19 @@ class ParseTrace:
         threads = []
         for dirs, _, files in atrace_dirs:
             for file in files:
+                if not file.endswith(".bin"):
+                    # Skipped files must not advance the progress numerator,
+                    # otherwise 2 .bin + 3 others reports 200%.
+                    continue
                 trace_file = os.path.join(dirs, file)
                 num += 1
-                if file.endswith(".bin"):
-                    t = Thread(
-                        target=self.start_parse_file,
-                        args=(trace_file, count, num),
-                        daemon=True,
-                    )
-                    t.start()
-                    threads.append(t)
+                t = Thread(
+                    target=self.start_parse_file,
+                    args=(trace_file, count, num),
+                    daemon=True,
+                )
+                t.start()
+                threads.append(t)
 
         out_progress_bar(count, count)
         # wait for all threads to end.

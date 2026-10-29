@@ -99,7 +99,7 @@ def int_to_hex(value):
     return hex(int(value, 16))
 
 
-def get_target_cnt(dir_path):
+def get_target_cnt(dir_path, suffix=".bin", prefix=None):
     """
     Counts the number of bin files in the trace folder.
     """
@@ -108,8 +108,18 @@ def get_target_cnt(dir_path):
     if not atrace_dirs:
         return count
     for *_, files in atrace_dirs:
-        for _ in files:
-            count += 1
+        for name in files:
+            # Count only what the caller will actually parse: trace files are
+            # .bin, stackcore files are .txt, and coretrace artefacts keep the
+            # bare coretrace* name. Counting every artefact made the
+            # denominator too large; counting .bin unconditionally hid the bar
+            # entirely for the other two run modes.
+            if prefix is not None:
+                matched = name.startswith(prefix)
+            else:
+                matched = name.endswith(suffix)
+            if matched:
+                count += 1
     return count
 
 
@@ -143,7 +153,7 @@ def get_cann_log_path(log_type):
     ), f"${{HOME}}/ascend/{log_type}"
 
 
-def timeout_decorator(timeout):
+def timeout_decorator(timeout, raise_on_error=False):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -158,6 +168,14 @@ def timeout_decorator(timeout):
                 p.terminate()
                 p.join()
                 raise TimeoutError()
+            # The callable runs in a child process, so its exception never
+            # reaches this frame. Without this check a failure looks exactly
+            # like a silent success and the caller keeps going with None.
+            if p.exitcode and raise_on_error:
+                raise ChildProcessError(
+                    f"{getattr(func, '__name__', 'callable')} failed in the "
+                    f"timeout worker, exitcode={p.exitcode}"
+                )
 
         return wrapper
 

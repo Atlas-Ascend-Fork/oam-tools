@@ -484,7 +484,16 @@ class AsysAnalyze:
             copy_res = self.__copy_dir()
             if not copy_res:
                 return False
-            count = get_target_cnt(self.output)
+            # Each run mode names its artefacts differently: trace uses .bin,
+            # stackcore uses .txt, and coretrace keeps the bare coretrace* name,
+            # so the denominator has to follow the naming or it is 0 and the
+            # progress bar disappears.
+            if self.run_mode == "trace":
+                count = get_target_cnt(self.output, ".bin")
+            elif self.run_mode == "coretrace":
+                count = get_target_cnt(self.output, prefix="coretrace")
+            else:
+                count = get_target_cnt(self.output, ".txt")
             return parse_struct.run(self.output, count=count)
         else:
             log_error("Analyze requires either the --file or --path argument")

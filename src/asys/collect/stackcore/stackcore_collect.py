@@ -286,6 +286,10 @@ class ParseStackCore:
         results = []
         for dirs, _, files in stackcore_dirs:
             for file in files:
+                if not file.endswith(".txt"):
+                    # Same rule as the denominator: only .txt is parsed, and a
+                    # skipped file must not advance the progress numerator.
+                    continue
                 stackcore_file = os.path.join(dirs, file)
                 num += 1
                 t = Thread(
