@@ -211,8 +211,23 @@ def node_metrics(rows, peak_tflops, dtype_bytes, total_time_us, freq_mhz=None):
             continue
         inputs = row.get("input_shapes") or []
         outputs = row.get("output_shapes") or []
-        if len(inputs) >= 2 and outputs and isinstance(inputs[1], list) and inputs[1]:
-            flops += 2 * numel(outputs[0]) * inputs[1][-1]
+        if len(inputs) < 2 or not outputs:
+            continue
+        weight_shape = inputs[1]
+        output_shape = outputs[0]
+        if (not isinstance(weight_shape, list) or len(weight_shape) < 2
+                or not isinstance(output_shape, list) or not output_shape):
+            continue
+        n = output_shape[-1]
+        if weight_shape[-1] == n:
+            contraction = weight_shape[-2]
+        elif weight_shape[-2] == n:
+            contraction = weight_shape[-1]
+        else:
+            continue
+        if not isinstance(contraction, int) or contraction <= 0:
+            continue
+        flops += 2 * numel(output_shape) * contraction
 
     # AI Core counters. The keys are the CSV's own `aic_`/`aiv_` spellings, which is what
     # attribute_kernels carries through; the earlier unprefixed `mac_ratio`/`mte2_ratio`
