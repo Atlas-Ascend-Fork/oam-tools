@@ -71,10 +71,15 @@ class ParseCoreTrace:
 
     @staticmethod
     def run_addr2line(cmd):
-        ret = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
-        )
-        return ret.stdout.readlines()
+        # Only stdout is read here, so a PIPE on stderr would fill up and block
+        # addr2line once it has more than a pipe buffer of diagnostics, leaving
+        # both sides waiting. STDOUT is not an option either: it would mix the
+        # diagnostics into the parsed -Cifps result, so drop them instead. The
+        # context manager closes the pipes and reaps the child.
+        with subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, encoding="utf-8"
+        ) as proc:
+            return proc.stdout.readlines()
 
     def parse_addr_src_line(self, fp, data, shift):
         parsed_line = ""
