@@ -291,20 +291,24 @@ class FileOperate:
     def _read_config():
         """读取config配置清单并解析成字典"""
         config_table = {}
+
+        def split_values(value):
+            return [item.strip() for item in value.split(",") if item.strip()]
+
         with open(CONFIG_TABLE_FILE, newline="", encoding="utf-8") as f:
             data = csv.reader(f)
             header = next(data, None)
             if not header or len(header) < 4:
                 raise csv.Error("configuration table header is missing or incomplete")
-            _, cfg_get, cfg_set, cfg_restore = header[:4]
+            _, cfg_get, cfg_set, cfg_restore = (item.strip() for item in header[:4])
             for row_number, row in enumerate(data, start=2):
                 if len(row) < 4:
                     raise csv.Error(
                         f"configuration table row {row_number} is incomplete"
                     )
-                config_table[row[0]] = {
-                    cfg_get: row[1].split(","),
-                    cfg_set: row[2].split(","),
-                    cfg_restore: row[3].split(","),
+                config_table[row[0].strip()] = {
+                    cfg_get: split_values(row[1]),
+                    cfg_set: split_values(row[2]),
+                    cfg_restore: split_values(row[3]),
                 }
         return config_table

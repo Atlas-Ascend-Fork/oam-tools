@@ -348,6 +348,50 @@ class TestFileOperate(AssertTest):
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
+    def test_read_config_strips_csv_value_whitespace(self, mocker):
+        temp_file = os.path.join(tempfile.gettempdir(), "test_config_table_spaces.csv")
+        with open(temp_file, "w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["Key", " cfg_get ", " cfg_set ", " cfg_restore "])
+            writer.writerow(
+                [" Setting1 ", " get1, get2, ", " set1 ,set2 ", " restore1, restore2 "]
+            )
+        mocker.patch.object(file_operate, "CONFIG_TABLE_FILE", temp_file)
+        try:
+            self.assertTrue(
+                f().read_config()
+                == {
+                    "Setting1": {
+                        "cfg_get": ["get1", "get2"],
+                        "cfg_set": ["set1", "set2"],
+                        "cfg_restore": ["restore1", "restore2"],
+                    }
+                }
+            )
+        finally:
+            os.remove(temp_file)
+
+    def test_read_config_treats_empty_value_cells_as_empty_lists(self, mocker):
+        temp_file = os.path.join(tempfile.gettempdir(), "test_config_table_empty.csv")
+        with open(temp_file, "w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(["Key", "cfg_get", "cfg_set", "cfg_restore"])
+            writer.writerow(["Setting1", "", "   ", ",,"])
+        mocker.patch.object(file_operate, "CONFIG_TABLE_FILE", temp_file)
+        try:
+            self.assertTrue(
+                f().read_config()
+                == {
+                    "Setting1": {
+                        "cfg_get": [],
+                        "cfg_set": [],
+                        "cfg_restore": [],
+                    }
+                }
+            )
+        finally:
+            os.remove(temp_file)
+
     def test_append_write_file_failed(self, mocker, caplog):
         mocker.patch("os.path.exists", return_value=False)
         mocker.patch.object(f, "create_dir", return_value=False)
