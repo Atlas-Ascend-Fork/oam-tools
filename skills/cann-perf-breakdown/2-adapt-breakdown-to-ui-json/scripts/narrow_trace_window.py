@@ -24,8 +24,9 @@ The window comes from raw_ops.json (the representative step's own kernels), neve
 hardcoded constant, so this stays correct for any capture and any selected step.
 
 Kept: every metadata event (`ph: M`, the process/thread names the lanes are labelled from),
-and every timed event overlapping the window. Flow events (`s`/`f`) are kept as pairs --
-dropping one half would leave the report drawing an arrow to nothing.
+and every timed event overlapping the window. Flow events (`s`/`t`/`f`) are kept
+as complete chains, keyed by category, name and id. Events without an id are
+discarded and counted in the JSON summary.
 """
 import argparse
 import json
@@ -36,6 +37,13 @@ def event_start(event):
         return float(event.get("ts"))
     except (TypeError, ValueError):
         return None
+
+
+def flow_key(event):
+    identity = event.get("id")
+    if identity is None:
+        return None
+    return event.get("cat"), event.get("name"), identity
 
 
 def main():
@@ -56,13 +64,14 @@ def main():
     with open(args.trace, encoding="utf-8") as fh:
         events = json.load(fh)
 
-    # Pass 1: which flow ids touch the window at either endpoint.
+    # Pass 1: complete flow keys touching the window at any phase.
     live_flow_ids = set()
     for event in events:
-        if event.get("ph") in ("s", "f"):
+        if event.get("ph") in ("s", "t", "f"):
             ts = event_start(event)
-            if ts is not None and start <= ts <= end:
-                live_flow_ids.add(event.get("id"))
+            key = flow_key(event)
+            if key is not None and ts is not None and start <= ts <= end:
+                live_flow_ids.add(key)
 
     kept, meta, flows = [], 0, 0
     for event in events:
@@ -71,8 +80,8 @@ def main():
             kept.append(event)
             meta += 1
             continue
-        if phase in ("s", "f"):
-            if event.get("id") in live_flow_ids:
+        if phase in ("s", "t", "f"):
+            if flow_key(event) is not None and flow_key(event) in live_flow_ids:
                 kept.append(event)
                 flows += 1
             continue
@@ -94,6 +103,9 @@ def main():
         "events_kept": len(kept),
         "metadata_kept": meta,
         "flow_events_kept": flows,
+        "flow_events_missing_id": sum(1 for e in events
+                                      if e.get("ph") in ("s", "t", "f")
+                                      and flow_key(e) is None),
     }, indent=1))
 
 
