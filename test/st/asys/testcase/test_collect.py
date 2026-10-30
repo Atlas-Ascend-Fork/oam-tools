@@ -734,13 +734,16 @@ class TestCollect(AssertTest):
             "collect.stacktrace.interface.LoadSoType.get_ascend_trace",
             return_value=AsysTrace(),
         )
-        cmd_ret = "root       43389    3488  0 08:20 pts/2    00:00:00 python3 tools/asys/asys.py collect -r=stacktrace --remote=123456\n23456"
+        cmd_ret = (
+            "root       43389    3488  0 08:20 pts/2    00:00:00 \n"
+            "python3 tools/asys/asys.py collect -r=stacktrace --remote=123456"
+        )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.popen_run_cmd", return_value=cmd_ret
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["123456", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
@@ -767,7 +770,7 @@ class TestCollect(AssertTest):
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["12345", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
@@ -794,7 +797,11 @@ class TestCollect(AssertTest):
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["123456", "34567"],
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_all_tid_of_process",
+            return_value=["34567"],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")

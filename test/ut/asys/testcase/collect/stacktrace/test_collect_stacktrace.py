@@ -72,6 +72,18 @@ class TestCollectStackAtrace(AssertTest):
             )
         ParamDict.clear()
 
+    def test_get_all_tid_accepts_single_thread_process(self, mocker):
+        stacktrace = AsysStackTrace.__new__(AsysStackTrace)
+        stacktrace.remote_id = 12345
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.popen_run_cmd",
+            return_value="23456\n",
+        )
+
+        self.assertTrue(
+            stacktrace._get_all_tid_of_process(current_pid=99999) == ["23456"]
+        )
+
     def test_collect_stacktrace_send_signal_attr_error(self, mocker, caplog):
         class AsysTraceNoSigqueue:
             def inotify_init(self):
@@ -326,7 +338,7 @@ class TestCollectStackAtrace(AssertTest):
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["12345", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
@@ -358,7 +370,11 @@ class TestCollectStackAtrace(AssertTest):
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["123456", "34567"],
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_all_tid_of_process",
+            return_value=[],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
@@ -376,7 +392,6 @@ class TestCollectStackAtrace(AssertTest):
         ParamDict().set_args(args)
         ret = AsysStackTrace().run()
         self.assertTrue(not ret)
-        self.assertTrue("Get pid failed by remote: 23456." in caplog.text)
         self.assertTrue("Collect stacktrace not support Parallelism." in caplog.text)
 
     def test_collect_stacktrace_parallel_tid_error(self, mocker, caplog):
@@ -391,7 +406,11 @@ class TestCollectStackAtrace(AssertTest):
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_other_stacktrace_remote_id",
-            return_value=[123456, 23456],
+            return_value=["123456", "34567"],
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_all_tid_of_process",
+            return_value=["34567"],
         )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")

@@ -200,7 +200,7 @@ class AsysStackTrace(AscendTraceDll):
         )
         ret = popen_run_cmd(cmd).split("\n")
         ret = [i for i in ret if i.isdigit()]
-        if len(ret) < 2:
+        if not ret:
             log_error(f"Get pid failed by remote: {self.remote_id}.")
             return []
         return ret
