@@ -3,7 +3,8 @@ __pycache__
 build
 build_out
 bundle
-log/
+# 锚定前缀 /：仅忽略仓库根的日志产物目录，避免匹配 src/、test/ 等任意层级的同名在册目录
+/log/
 src/asys/common/chip_handler.py
 src/operator_cmp/msaccucmp
 .sisyphus/

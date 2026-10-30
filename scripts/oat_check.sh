@@ -130,14 +130,16 @@ echo "[OAT] Checking $FILE_COUNT staged file(s)..."
 
 # ---------------------------------------------------------------------------
 # 4. Ensure oat_reports/ exists and is in .gitignore
+#    条目匹配同时接受锚定写法（如 /log/），避免迫使 .gitignore 使用会误伤
+#    各层级同名在册目录（src/asys/collect/log/ 等）的未锚定 log/ 规则。
 # ---------------------------------------------------------------------------
 mkdir -p "$OAT_REPORT_DIR"
 
 _GITIGNORE="$REPO_ROOT/.gitignore"
 for _entry in "oat_reports" "log"; do
-    if ! grep -qE "^${_entry}/?$" "$_GITIGNORE" 2>/dev/null; then
-        printf "\n%s/\n" "$_entry" >> "$_GITIGNORE" 2>/dev/null || true
-        echo "[OAT] Added ${_entry}/ to .gitignore"
+    if ! grep -qE "^/?${_entry}/?$" "$_GITIGNORE" 2>/dev/null; then
+        printf "\n/%s/\n" "$_entry" >> "$_GITIGNORE" 2>/dev/null || true
+        echo "[OAT] Added /${_entry}/ to .gitignore"
     fi
 done
 
