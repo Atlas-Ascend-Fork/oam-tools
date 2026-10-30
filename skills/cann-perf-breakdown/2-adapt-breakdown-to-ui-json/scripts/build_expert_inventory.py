@@ -30,8 +30,9 @@ conflated:
    that read as measurements.
 
 So this emits an inventory, not a per-expert breakdown: each expert gets an identity and a
-`data_state` saying precisely why it carries no metrics. `measured` belongs only to the fused
-group node that actually owns a kernel. A UI can then show all 257 and be honest about which
+`data_state` saying whether its own duration is recoverable. A single shared expert can
+be `measured`; multiple shared experts covered by aggregate nodes are `fused_measured`
+with null per-expert time. Routed experts remain non-separable within their fused group. A UI can then show all 257 and be honest about which
 one figure covers which experts, instead of silently showing 1 of 257 or inventing 257.
 
 Residency is derived from the weight tensor's leading dimension in the GroupedMatmul shapes,
@@ -196,27 +197,31 @@ def build(config, performance, attribution, manifest=None, ep_rank=None):
         })
 
     # --- shared expert(s) ---------------------------------------------------------------
-    # Not sharded by EP: every rank holds its own copy, so it is genuinely measured here. It
-    # also has its own kernels rather than a fused group, which is why it is the one expert
-    # that can carry a real per-expert time.
+    # Shared experts are replicated on every rank, independent of EP rank identity.
+    # An aggregate duration identifies a per-expert time only for one declared shared expert.
+    # With multiple shared experts, preserve the measured nodes but leave individual time null.
     for index in range(int(declared_shared or 0)):
         measured = bool(shared_nodes)
+        individual = measured and int(declared_shared or 0) == 1
         experts.append({
             "expert_id": f"shared/{index}",
             "expert_index": index,
             "kind": "shared",
-            "data_state": "measured" if measured else "source_only",
+            "data_state": ("measured" if individual else "fused_measured") if measured else "source_only",
             "resident_on_profiled_rank": True,
             "measured_by_node_id": [n["node_id"] for n in shared_nodes],
             # Summed across MoE-bearing scopes, matching how each node already aggregates its
             # own invocations. Null when no kernel was attributed, never 0.0.
             "time_us": (round(sum(n["time_us"] for n in shared_nodes
                                   if n.get("time_us") is not None), 4)
-                        if measured and any(n.get("time_us") is not None for n in shared_nodes)
+                        if individual and any(n.get("time_us") is not None for n in shared_nodes)
                         else None),
             "reason": (
                 "Replicated on every rank and executed by its own kernels, so its time is "
                 "directly measured rather than fused with the routed group."
+                if individual else
+                ("The shared-expert nodes aggregate multiple declared experts. "
+                 "Their duration cannot identify an individual expert's time.")
                 if measured else
                 "Declared in the source but no kernel was attributed to it in this capture."
             ),

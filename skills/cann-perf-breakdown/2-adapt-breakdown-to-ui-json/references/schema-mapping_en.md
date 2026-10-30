@@ -145,8 +145,9 @@ experts[]           expert_id  expert_index  kind  data_state  local_slot
                     time_us  reason
 ```
 
-`data_state` is `measured` (own kernels — the shared expert), `fused_measured`
-(inside a group kernel, not separable), `remote_ep_shard` (another EP rank, time
+`data_state` is `measured` (one declared shared expert with attributed kernels),
+`fused_measured` (routed group kernels or aggregate nodes covering multiple shared
+experts; individual `time_us` is null), `remote_ep_shard` (another EP rank, time
 unknown), or `residency_unresolved` (count known, identity not).
 
 `moe_ep_size` comes from the stacked expert weight's leading dimension in the

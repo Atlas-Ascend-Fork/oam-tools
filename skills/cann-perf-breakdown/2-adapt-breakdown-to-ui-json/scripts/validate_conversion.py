@@ -360,11 +360,14 @@ def main():
         # error this guards: the count is observable from the weight shape, the identity is not.
         parallelism = inventory.get("expert_parallelism") or {}
         if parallelism.get("ep_rank") is None:
+            routed_fused = [e["expert_id"] for e in experts
+                            if e.get("kind") == "routed"
+                            and e.get("data_state") == "fused_measured"]
             check(parallelism.get("resident_expert_indices") is None
-                  and counts.get("fused_measured") == 0,
+                  and not routed_fused,
                   "without ep_rank, no expert identity is asserted as resident",
                   f"indices={parallelism.get('resident_expert_indices')}, "
-                  f"fused_measured={counts.get('fused_measured')}")
+                  f"routed_fused={routed_fused}")
 
     failures = [c for c in checks if not c["ok"]]
     for item in checks:

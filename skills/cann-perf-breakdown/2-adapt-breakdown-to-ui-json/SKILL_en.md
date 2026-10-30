@@ -292,8 +292,8 @@ measurements, and they must not be conflated:
 
 | `data_state` | Meaning |
 |---|---|
-| `measured` | own kernels, real per-expert time. The shared expert: replicated on every rank, not fused |
-| `fused_measured` | inside a measured kernel, but that kernel covers all resident experts at once — no figure is this expert's alone |
+| `measured` | one declared shared expert with attributed kernels and a separable duration |
+| `fused_measured` | routed experts in a measured group, or multiple shared experts covered by aggregate nodes; individual `time_us` is null |
 | `remote_ep_shard` | executes on another expert-parallel rank; time **unknown**, not zero |
 | `residency_unresolved` | resident count known, global identity not — see below |
 
