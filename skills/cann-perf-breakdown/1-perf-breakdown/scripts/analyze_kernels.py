@@ -279,11 +279,17 @@ def get_safe_value(row, key, default=''):
     return row.get(key, default).strip().rstrip('\t')
 
 
-def parse_float(value):
+def parse_float(value, required=False):
+    """Require valid duration values while preserving optional start timestamps."""
     try:
-        return float(value.strip().rstrip('\t'))
-    except (ValueError, AttributeError):
+        number = float(value.strip().rstrip('\t'))
+    except (ValueError, AttributeError) as error:
+        if required:
+            raise ValidationError(f'Invalid required time value: {value!r}') from error
         return 0.0
+    if required and (not math.isfinite(number) or number < 0):
+        raise ValidationError(f'Invalid required time value: {value!r}')
+    return number
 
 
 def is_finite_csv_number(value):
@@ -438,7 +444,12 @@ def analyze_kernels(csv_file, detail_step_id=None, allow_step_variation=False):
 
                     name = get_safe_value(row, 'Name')
                     kernel_type = extract_kernel_type(name)
-                    duration = parse_float(get_safe_value(row, 'Duration(us)'))
+                    try:
+                        duration = parse_float(get_safe_value(row, 'Duration(us)'), required=True)
+                    except ValidationError as error:
+                        raise ValidationError(
+                            f'错误: {csv_file} 第 {row_num} 行 Duration(us): {error}'
+                        ) from error
                     accelerator_core = (get_safe_value(row, 'Accelerator Core')
                                         if 'Accelerator Core' in row else '')
 
@@ -481,6 +492,8 @@ def analyze_kernels(csv_file, detail_step_id=None, allow_step_variation=False):
                     steps_data[step_id]['all_columns'] = all_columns
                     row_count += 1
 
+                except ValidationError:
+                    raise
                 except Exception as e:
                     sys.stderr.write(f'警告: 第 {row_num} 行数据解析失败: {e}\n')
 
