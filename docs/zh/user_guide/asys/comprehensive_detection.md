@@ -178,7 +178,7 @@ asys diagnose -r=aicore_stl_detect -d=deviceId --output=path
      +--- Hardware -----------+------------------------+
      | CPU Detect             | Pass                   |
      +------------------------+------------------------+
-    asys diagnose -r=aicore_stl_detect
+    asys diagnose -d=0 -r=aicore_stl_detect
      +------------------------+------------------------+
      | Device ID: 0           | Diagnostic Result      |
      +========================+ =======================+
