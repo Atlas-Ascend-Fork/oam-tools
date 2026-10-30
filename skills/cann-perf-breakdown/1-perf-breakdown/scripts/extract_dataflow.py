@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,6 +68,12 @@ MODE_FLAG_HINTS = ('is_prefill', 'is_decode', 'prefill', 'decode', 'use_aclgraph
 CONFIG_ATTR_HINTS = ('size', 'mode', 'enable', 'enabled', 'use_', 'is_moe', 'n_', 'num_',
                      'quant', 'dtype', 'tp', 'ep', 'pp', 'cp', 'dp', 'experts', 'offload',
                      'streams', 'eplb', 'absorb', 'fused', 'impl', 'backend', 'version')
+
+#: A literal this large is a placeholder or a mistake, not a layer count. Reporting it
+#: would hand the consumer an integer that dominates any graph built from it, and JSON
+#: readers that parse numbers as doubles lose exactness past 2**53 — so it is reported
+#: as unknown size instead.
+MAX_STATIC_MODULE_COUNT = 10 ** 6
 
 
 def _test_kind(test):
@@ -188,6 +195,23 @@ def _targets_written(target):
     return []
 
 
+def _unpacked_bindings(target, value):
+    """Pair literal tuple/list targets with name or constant values."""
+    if isinstance(target, ast.Name) and isinstance(value, (ast.Name, ast.Constant)):
+        return [(target.id, value)]
+    if (isinstance(target, (ast.Tuple, ast.List))
+            and isinstance(value, (ast.Tuple, ast.List))
+            and len(target.elts) == len(value.elts)):
+        bindings = []
+        for child_target, child_value in zip(target.elts, value.elts):
+            children = _unpacked_bindings(child_target, child_value)
+            if children is None:
+                return None
+            bindings.extend(children)
+        return bindings
+    return None
+
+
 def _call_of(value):
     """The outermost submodule call in an expression, if any."""
     if isinstance(value, ast.Call):
@@ -245,9 +269,18 @@ def _submodules(class_node):
                             size = len(iterable.elts)
                         elif (isinstance(iterable, ast.Call)
                               and _attr_path(iterable.func) == 'range'
-                              and iterable.args
-                              and isinstance(iterable.args[0], ast.Constant)):
-                            size = iterable.args[0].value
+                              and 1 <= len(iterable.args) <= 3
+                              and not iterable.keywords
+                              and len(arg.generators) == 1
+                              and not comp.ifs):
+                            try:
+                                bounds = [ast.literal_eval(bound) for bound in iterable.args]
+                                if all(isinstance(bound, int) for bound in bounds):
+                                    size = len(range(*bounds))
+                                    if size > MAX_STATIC_MODULE_COUNT:
+                                        size = None
+                            except (ValueError, TypeError, OverflowError):
+                                pass
                     elif isinstance(arg, (ast.List, ast.Tuple)):
                         size = len(arg.elts)
             declared[target.attr] = size
@@ -682,7 +715,44 @@ class ForwardGraph:
                     '不在此处展开为固定次数',
         })
 
+    def _rebind_unpacked(self, targets, value):
+        if not any(isinstance(target, (ast.Tuple, ast.List)) for target in targets):
+            return False
+        bindings = []
+        for target in targets:
+            items = _unpacked_bindings(target, value)
+            if items is None:
+                return False
+            bindings.extend(items)
+        # Evaluate every source against the old state before assigning any target,
+        # so ``left, right = right, left`` preserves both original producers.
+        states = []
+        for name, source in bindings:
+            source_name = source.id if isinstance(source, ast.Name) else None
+            writer = self.last_writer.get(source_name)
+            phis = list(self.phi_writers.get(source_name) or [])
+            if (writer is None and not phis and source_name in self.parameters
+                    and source_name not in self.known_none):
+                writer = INPUT
+            states.append((name, writer, phis,
+                           source_name in self.known_none
+                           or (isinstance(source, ast.Constant) and source.value is None)))
+        for name, writer, phis, known_none in states:
+            self.last_writer.pop(name, None)
+            self.phi_writers.pop(name, None)
+            self.known_none.discard(name)
+            if writer is not None:
+                self.last_writer[name] = writer
+            if phis:
+                self.phi_writers[name] = phis
+            if known_none:
+                self.known_none.add(name)
+        return True
+
     def _assign(self, statement):
+        # A local type annotation without a value does not change its binding.
+        if isinstance(statement, ast.AnnAssign) and statement.value is None:
+            return
         targets = (statement.targets if isinstance(statement, ast.Assign)
                    else [statement.target])
         writes = []
@@ -731,6 +801,9 @@ class ForwardGraph:
             self.known_none.difference_update(writes)
             return
 
+        if self._rebind_unpacked(targets, value):
+            return
+
         # Plain rebinding (`x = y`) — propagate provenance without inventing a node.
         names = _names_read(value)
         if len(names) == 1 and writes:
@@ -754,23 +827,26 @@ class ForwardGraph:
         writes = _targets_written(statement.target)
         if not writes or not isinstance(statement.op, ast.Add):
             return
-        target_name = writes[0]
+        target = ast.Name(id=writes[0], ctx=ast.Load())
+        # A hand-built node has no position; copy the statement's so anything
+        # that later reports an expression location has one to read.
+        ast.copy_location(target, statement)
+        operands = _merge_operands(statement.value)
+        if operands is None:
+            operands = [statement.value]
+        resolved = self._resolve_merge_operands([target, *operands], statement)
         call_id = len(self.calls)
-        resolved = []
-        for name in [target_name] + _names_read(statement.value):
-            writer = self.last_writer.get(name)
-            resolved.append({'variable': name, 'from_call': writer,
-                             'expression': name if name == target_name
-                             else ast.unparse(statement.value)})
-            if writer is not None:
-                self.reads_of.setdefault((name, writer), []).append(call_id)
+        for read in resolved:
+            if read.get('variable') is not None and read.get('from_call') is not None:
+                self.reads_of.setdefault(
+                    (read['variable'], read['from_call']), []).append(call_id)
         entry = self._add_call('<merge>', writes, None, statement, kind='merge')
         entry['reads'] = resolved
         self.merges.append({
             'call_id': entry['call_id'],
             'lineno': statement.lineno,
             'kind': 'in_place_add',
-            'operand_count': len(resolved),
+            'operand_count': 1 + len(operands),
             'operands': resolved,
             'writes': writes,
         })
