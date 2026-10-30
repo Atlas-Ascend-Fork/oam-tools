@@ -4,9 +4,10 @@ This file provides guidance for agents working in this code repository.
 
 ## Project Overview
 
-oam-tools (Operations, Administration, and Maintenance) is the operations and maintenance toolset for Huawei CANN, providing fault diagnosis tools and performance testing and tuning tools for developers.
+oam-tools (Operations, Administration, and Maintenance) is the operations and maintenance toolset for CANN, providing fault diagnosis tools and performance testing and tuning tools for developers.
 
 Main functions:
+
 - **Fault Information Collection** (asys): Fault information collection, software and hardware information display, health check, comprehensive detection, and so on
 - **AI Core Error Analysis** (msaicerr): AI Core Error problem analysis, Dump file parsing, environment checking, and so on
 - **Performance Tuning** (msprof): Collect and analyze key performance indicators of AI tasks running on Ascend AI processors at various running stages
@@ -15,6 +16,7 @@ Main functions:
 ## Build Commands
 
 ### Basic Build
+
 ```bash
 # Build the project
 bash build.sh
@@ -27,6 +29,7 @@ bash build.sh -h
 ```
 
 ### Run Tests
+
 ```bash
 # Run all test cases
 bash build.sh -u
@@ -36,6 +39,7 @@ bash build.sh -u --component msprof
 ```
 
 ### Install Dependencies
+
 ```bash
 # Install Python dependencies
 pip3 install -r requirements.txt
@@ -63,17 +67,21 @@ python3 cmake/download_libs.py
 ## Development Guidelines
 
 ### gitcode pr/issue operations
+
 @.claude/skills/default-skills/SKILL.md
 
 For SKILL content, refer to [SKILL.md](.claude/skills/default-skills/SKILL_en.md)
 
 ### Code Style
+
 - Use .clang-format to format code
 - Follow the existing code style of the project
 - Python code follows PEP 8 standards
 
 ### pre-commit
+
 - The project has configured pre-commit. Refer to the CANN community pre-commit configuration guide for installation and usage
 
 ## Language
+
 Use Chinese

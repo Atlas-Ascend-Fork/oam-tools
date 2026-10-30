@@ -4,7 +4,7 @@
 
 简体中文 | [English](./README_en.md)
 
-**华为 CANN 运维工具集（Operations, Administration, and Maintenance）**
+**CANN 运维工具集（Operations, Administration, and Maintenance）**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![CANN](https://img.shields.io/badge/CANN-%E2%89%A58.5.0-green.svg)](./docs/zh/quick_install.md)
@@ -13,9 +13,10 @@
 
 ## 📖 项目简介
 
-OAM-Tools（Operations, Administration, and Maintenance）是华为 CANN 的开源运维工具集，为昇腾 AI 处理器开发者提供**故障定位**与**性能调优**两大核心能力。工具集覆盖从故障信息采集、AI Core Error 分析到 AI 任务性能采集与分析的完整运维链路，帮助开发者快速定位软硬件问题、优化 AI 任务性能。
+OAM-Tools（Operations, Administration, and Maintenance）是CANN的开源运维工具集，为昇腾 AI 处理器开发者提供**故障定位**与**性能调优**两大核心能力。工具集覆盖从故障信息采集、AI Core Error 分析到 AI 任务性能采集与分析的完整运维链路，帮助开发者快速定位软硬件问题、优化 AI 任务性能。
 
 **适用场景**：
+
 - AI 训练/推理任务运行异常时，一键采集故障信息、分析 AI Core Error 根因
 - AI 任务性能调优，采集各运行阶段关键性能指标，定位性能瓶颈
 - 分布式训练场景下，测试集合通信（HCCL）的功能与性能

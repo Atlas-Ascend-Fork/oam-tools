@@ -4,7 +4,7 @@
 
 English | [简体中文](./README.md)
 
-**Huawei CANN Operations, Administration, and Maintenance Toolkit**
+**CANN Operations, Administration, and Maintenance Toolkit**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![CANN](https://img.shields.io/badge/CANN-%E2%89%A58.5.0-green.svg)](./docs/en/quick_install.md)
@@ -13,7 +13,7 @@ English | [简体中文](./README.md)
 
 ## 📖 Overview
 
-OAM-Tools (Operations, Administration, and Maintenance) is an open-source operations and maintenance toolkit for Huawei CANN, providing developers on Ascend AI processors with two core capabilities: **fault diagnosis** and **performance tuning**. The toolkit covers the complete O&M pipeline — from fault information collection and AI Core Error analysis to AI task performance profiling and analysis — helping developers quickly identify software/hardware issues and optimize AI task performance.
+OAM-Tools (Operations, Administration, and Maintenance) is an open-source operations and maintenance toolkit for CANN, providing developers on Ascend AI processors with two core capabilities: **fault diagnosis** and **performance tuning**. The toolkit covers the complete O&M pipeline — from fault information collection and AI Core Error analysis to AI task performance profiling and analysis — helping developers quickly identify software/hardware issues and optimize AI task performance.
 
 **Use cases**:
 - One-click fault information collection and AI Core Error root cause analysis when AI training/inference tasks encounter anomalies

@@ -4,9 +4,10 @@
 
 ## 项目概述
 
-oam-tools（Operations, Administration, and Maintenance）是华为 CANN 的运维工具集，为开发者提供故障定位工具和性能测试调优工具。
+oam-tools（Operations, Administration, and Maintenance）是CANN的运维工具集，为开发者提供故障定位工具和性能测试调优工具。
 
 主要功能：
+
 - **故障信息收集**（asys）：故障信息收集、软硬件信息展示、健康检查、综合检测等
 - **AI Core Error 分析**（msaicerr）：AI Core Error 问题分析、Dump 文件解析、环境检查等
 - **性能调优**（msprof）：采集和分析运行在昇腾 AI 处理器上的 AI 任务各个运行阶段的关键性能指标
@@ -15,6 +16,7 @@ oam-tools（Operations, Administration, and Maintenance）是华为 CANN 的运�
 ## 构建命令
 
 ### 基础构建
+
 ```bash
 # 构建项目
 bash build.sh
@@ -27,6 +29,7 @@ bash build.sh -h
 ```
 
 ### 执行测试
+
 ```bash
 # 执行所有测试用例
 bash build.sh -u
@@ -36,6 +39,7 @@ bash build.sh -u --component msprof
 ```
 
 ### 安装依赖
+
 ```bash
 # 安装 Python 依赖
 pip3 install -r requirements.txt
@@ -63,17 +67,21 @@ python3 cmake/download_libs.py
 ## 开发规范
 
 ### gitcode pr/issue 操作
+
 @.claude/skills/default-skills/SKILL.md
 
 SKILL内容可参考[SKILL.md](.claude/skills/default-skills/SKILL.md)
 
 ### 代码风格
+
 - 使用 .clang-format 格式化代码
 - 遵循项目既有的代码风格
 - Python 代码遵循 PEP 8 规范
 
 ### pre-commit
+
 - 项目已配置 pre-commit，请参考 CANN 社区的 pre-commit 配置指导书安装和使用
 
 ## 短语
+
 使用中文

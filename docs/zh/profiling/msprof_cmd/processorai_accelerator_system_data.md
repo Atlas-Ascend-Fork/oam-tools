@@ -31,6 +31,7 @@ msprof [options] <app>
    <!-- npu="950" id3 -->
   - Ascend 950PR&950DT系列产品
    <!-- end id3 -->
+<!-- end id2 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00001 -->
 
