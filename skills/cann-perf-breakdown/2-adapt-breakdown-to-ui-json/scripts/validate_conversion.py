@@ -76,6 +76,7 @@ def collect(node, out, key="node_id"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True, help="conversion output directory")
+    parser.add_argument("--graph", help="architecture graph path; defaults to <out>/outputs/model_architecture_graph.json")
     parser.add_argument("--breakdown", help="cross-check kernel conservation")
     parser.add_argument("--attribution", help="kernel_attribution.json")
     args = parser.parse_args()
@@ -83,13 +84,15 @@ def main():
     analysis = jload(find_one(args.out, "_analysis_config.json"))
     performance = jload(find_one(args.out, "_perf_data.json"))
     timeline = jload(find_one(args.out, "_timeline.json"))
-    graph_path = os.path.join(args.out, "outputs/model_architecture_graph.json")
+    graph_path = args.graph or os.path.join(args.out, "outputs/model_architecture_graph.json")
     graph = jload(graph_path) if os.path.exists(graph_path) else None
 
     checks = []
 
     def check(ok, label, detail=""):
         checks.append({"ok": bool(ok), "check": label, "detail": detail})
+
+    check(graph is not None, "architecture graph exists", graph_path)
 
     # --- identity ---
     for field in ("model_id", "report_id", "representative_step"):

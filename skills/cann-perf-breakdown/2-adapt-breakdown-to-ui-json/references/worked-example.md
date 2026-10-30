@@ -124,16 +124,25 @@ dropped or double-counted.
 
 ## Step 5 — validate
 
+First complete the UI Skill architecture graph and save it as
+`out/outputs/model_architecture_graph.json`. The graph must satisfy the
+`model_architecture_graph.v1` contract; validation does not invent a graph or
+accept a missing one. If the UI Skill writes another path, pass that path with
+`--graph`.
+
 ```bash
-python scripts/validate_conversion.py --out out/ --attribution work/kernel_attribution.json
+python scripts/validate_conversion.py --out out/ --attribution work/kernel_attribution.json \
+  --graph out/outputs/model_architecture_graph.json
 ```
 
 ```
-15 passed / 0 failed
 Conversion is self-consistent.
 ```
 
-With a graph present the same validator runs 21 checks. Injecting six defects —
+The example output shows the conclusion only. Read the validator's full output
+for actual passed and failed counts on the supplied artifacts; additional metadata
+can enable further checks. Success
+requires zero failures, including the graph-presence check. Injecting six defects —
 a mismatched `report_id`, a source-only entry keyed by `node_id`, an empty
 `reason`, a dropped `hbm_mb`, a sampler window reporting `time_us`, and an
 unresolvable owner — produces six named failures, each pointing at the specific

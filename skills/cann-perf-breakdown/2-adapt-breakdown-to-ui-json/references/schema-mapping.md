@@ -268,6 +268,8 @@ metric-free node into that index and fail the backend-count check.
 
 ## Cross-file invariants
 
+- The architecture graph must exist and declare the `model_architecture_graph.v1` contract before validation.
+
 Verified by `validate_conversion.py` before handing off:
 
 - `model_id`, `report_id`, `representative_step` identical in all three files.

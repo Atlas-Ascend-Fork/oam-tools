@@ -272,7 +272,7 @@ def main():
     stages["graph_consistency"] = "passed"
 
     r = run([sys.executable, os.path.join(S2, "validate_conversion.py"),
-             "--out", facts, "--attribution", attribution])
+             "--out", facts, "--graph", graph, "--attribution", attribution])
     stages["conversion_validation"] = "passed" if r.returncode == 0 else "failed"
     if r.returncode:
         die("failed", "conversion_validation", r.stdout[-1200:], stages=stages)
