@@ -20,6 +20,7 @@
 
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
+import logging
 import os
 import sys
 import pytest
@@ -69,19 +70,27 @@ class TestHelp(AssertTest):
         self.assertTrue(captured.out.count(usage_message) == 1)
 
     @pytest.mark.parametrize(
-        ["command", "args"],
+        ["command", "args", "expected"],
         [
-            ("collect", ["--output"]),
-            ("collect", ["--output="]),
-            ("collect", ["--task_dir"]),
-            ("collect", ["--task_dir="]),
+            ("collect", ["--output"], "missing"),
+            ("collect", ["--output="], "empty"),
+            ("collect", ["--task_dir"], "missing"),
+            ("collect", ["--task_dir="], "empty"),
             (
                 "launch",
-                ["--task", "--output={}/data/asys_test_dir/out".format(st_root_path)],
+                [
+                    "--task",
+                    "--output={}/data/asys_test_dir/out".format(st_root_path),
+                ],
+                "missing",
             ),
             (
                 "launch",
-                ["--task=", "--output={}/data/asys_test_dir/out".format(st_root_path)],
+                [
+                    "--task=",
+                    "--output={}/data/asys_test_dir/out".format(st_root_path),
+                ],
+                "empty",
             ),
             (
                 "launch",
@@ -91,6 +100,7 @@ class TestHelp(AssertTest):
                     ),
                     "--output",
                 ],
+                "missing",
             ),
             (
                 "launch",
@@ -100,23 +110,38 @@ class TestHelp(AssertTest):
                     ),
                     "--output=",
                 ],
+                "empty",
             ),
         ],
     )
-    def test_args_invalid_print_help(self, capsys, command, args):
+    def test_args_invalid_print_help(self, capsys, caplog, command, args, expected):
         """
         @描述:执行asys, 任务为 collect, launch, 指定参数(task, task_dir, output)但未赋值
-        @类型: EXCEPTION
-        @输入: asys [collect|launch] --arg
-        @步骤: 校验是否打屏help信息
-        @预期结果: main函数抛中断退出, 打屏help信息
+        @类型: FUNCTION
+        @输入: asys [collect|launch] --arg (缺值: --arg; 空值: --arg=)
+        @步骤: 校验main函数返回值是否为False; 校验是否打屏参数错误信息
+        @预期结果: main函数返回False; 缺值打屏expected one argument, 空值打屏can not be empty string
         """
+        # 两类错误路径 main() 均返回 False：缺值由 argparse 抛 SystemExit(2)，
+        # 经 asys.py main() 的 except SystemExit 捕获；空值由 arg_checker.py
+        # empty_str_check 返回 ARG_EMPTY_STRING、参数解析失败。空值错误提示由
+        # log_error 输出，pytest 下 root logger 的 handler 被接管、stderr 捕获
+        # 不到，故以 caplog 校验消息与 ERROR 级别。
         sys.argv = [ASYS_MAIN_PATH, command]
         sys.argv.extend(args)
-        try:
-            asys.main()
-        except Exception:
-            captured = capsys.readouterr()
+        caplog.set_level(logging.ERROR)
+        self.assertTrue(asys.main() is False)
+        captured = capsys.readouterr()
+        if expected == "empty":
+            self.assertTrue("can not be empty string" in caplog.text)
+            self.assertTrue(
+                any(
+                    record.levelname == "ERROR"
+                    and "can not be empty string" in record.getMessage()
+                    for record in caplog.records
+                )
+            )
+        else:
             self.assertTrue(captured.err.count("expected one argument") == 1)
 
     @pytest.mark.skip(reason="temporarily skipped due to test failure")

@@ -21,6 +21,7 @@
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
 import os
+import re
 import struct
 import sys
 from queue import Queue
@@ -828,12 +829,12 @@ class TestAnalyze(AssertTest):
             "--core_file=%s" % core_file,
             "--symbol=3",
         ]
-        try:
-            ParamDict().set_env_type("EP")
-            asys.main()
-        except Exception:
-            captured = capsys.readouterr()
-            self.assertTrue("invalid choice: 3 (choose from 0, 1)" in captured.err)
+        ParamDict().set_env_type("EP")
+        self.assertTrue(asys.main() is False)
+        captured = capsys.readouterr()
+        self.assertTrue(
+            re.search(r"invalid choice: '?3'?\s*\(choose from", captured.err)
+        )
 
     def test_asys_analyze_stackcore_file(self):
         stackcore_txt = os.path.join(
@@ -1011,12 +1012,10 @@ class TestAnalyze(AssertTest):
             "--file=test.txt",
             f"--symbol_path={st_root_path}",
         ]
-        try:
-            ParamDict().set_env_type("EP")
-            asys.main()
-        except Exception:
-            captured = capsys.readouterr()
-            self.assertTrue("invalid choice: 'stackcore1'" in captured.err)
+        ParamDict().set_env_type("EP")
+        self.assertTrue(asys.main() is False)
+        captured = capsys.readouterr()
+        self.assertTrue("invalid choice: 'stackcore1'" in captured.err)
 
     def test_asys_analyze_not_input(self, caplog):
         sys.argv = [
