@@ -121,6 +121,12 @@ def main():
     check(not orphan_perf, "every performance node exists in analysis",
           f"missing from analysis: {orphan_perf}" if orphan_perf else "")
 
+    required = {node.get("node_id") for node in collect(analysis, [])
+                if node.get("mapped_kernels", 0) > 0}
+    missing = sorted(required - perf_set)
+    check(not missing, "every mapped analysis node has a performance record",
+          f"missing from performance: {missing}" if missing else "")
+
     # --- source-only nodes must stay metric-free and out of the backend index ---
     source_only = [entry.get("structure_node_id")
                    for entry in (analysis.get("source_only_structure") or [])]
