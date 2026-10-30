@@ -62,7 +62,7 @@ msprof [options] <app>
 
 ### aic-metrics
 
-aic-metrics=<aic-metrics-value\>：可选，AI Core性能指标采集项。该参数配置前提是--ai-core参数设置为on。取值包括：
+--aic-metrics=<aic-metrics-value\>：可选，AI Core性能指标采集项。该参数配置前提是--ai-core参数设置为on。取值包括：
 
 - ArithmeticUtilization：计算类指令耗时占比
 - PipeUtilization：计算类和搬运类指令耗时和占比，统计`*_icache_miss_rate`时，需要使用该取值。
