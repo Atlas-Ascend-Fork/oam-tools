@@ -51,7 +51,7 @@ agent 必须完成下面 4 件事：
 
 模板文件固定放在：
 
-`./analysis-template.md`
+`./report-template.md`
 
 agent 输出时必须：
 
@@ -78,17 +78,17 @@ agent 要先回答这 3 个问题：
 
 一级模块必须同时满足下面 4 条：
 
-1. 语义完整  
-   例如 `Embedding`、`Attention Main Path`、`Router Path`、`Shared Expert`、`Dispatch`、`Expert Compute`、`Combine`、`KVCache Offload`、`LM Head`
+1. 语义完整
+   - 例如 `Embedding`、`Attention Main Path`、`Router Path`、`Shared Expert`、`Dispatch`、`Expert Compute`、`Combine`、`KVCache Offload`、`LM Head`
 
-2. 输入输出明确  
-   能说清该模块吃什么、产什么、是否写共享状态
+2. 输入输出明确
+   - 能说清该模块吃什么、产什么、是否写共享状态
 
-3. 可独立讨论调度  
-   可以单独判断“是否可能和别的模块并行”
+3. 可独立讨论调度
+   - 可以单独判断“是否可能和别的模块并行”
 
-4. 足够大  
-   不能只是局部 reshape、cast、view 或某个融合算子内部的小步骤
+4. 足够大
+   - 不能只是局部 reshape、cast、view 或某个融合算子内部的小步骤
 
 ### 3. 一级模块优先沿这些边界拆
 
@@ -297,7 +297,7 @@ flowchart LR
   - `Stream1`：`shared_expert_gate -> shared_expert_down_proj`
   - `Stream2`：`router_topk -> dispatch`
 
-实际写文件时，必须按 `./analysis-template.md` 的结构落盘。
+实际写文件时，必须按 `./report-template.md` 的结构落盘。
 
 ## 六、最小示例
 
