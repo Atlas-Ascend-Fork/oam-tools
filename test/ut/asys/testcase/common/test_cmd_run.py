@@ -62,6 +62,42 @@ class TestCmdRun(AssertTest):
         mocker.patch("subprocess.run", return_value=fake_ret)
         self.assertTrue(run_command(cmd) == "NONE")
 
+    def test_run_command_success_with_warning_on_stderr(self, mocker):
+        # rc==0 with valid stdout: stderr warnings must not discard it (#205).
+        fake_ret = subprocess.CompletedProcess(
+            args="query", returncode=0, stdout="value\n", stderr="warning\n"
+        )
+        mocker.patch("subprocess.run", return_value=fake_ret)
+        self.assertTrue(run_command("query") == "value")
+
+    def test_run_command_success_with_empty_stdout(self, mocker):
+        # rc==0, stdout empty, stderr non-empty: upstream pipeline failure
+        # (cat reports the missing file while awk still exits 0) keeps the
+        # NONE sentinel for failure visibility.
+        fake_ret = subprocess.CompletedProcess(
+            args="query", returncode=0, stdout="", stderr="cat: no such file\n"
+        )
+        mocker.patch("subprocess.run", return_value=fake_ret)
+        self.assertTrue(run_command("query") == "NONE")
+
+    def test_run_command_success_without_any_output(self, mocker):
+        # rc==0 with both streams empty: historical empty-string contract.
+        fake_ret = subprocess.CompletedProcess(
+            args="query", returncode=0, stdout="", stderr=""
+        )
+        mocker.patch("subprocess.run", return_value=fake_ret)
+        self.assertTrue(run_command("query") == "")
+
+    def test_run_command_success_with_blank_stderr(self, mocker):
+        # rc==0, stdout empty, whitespace-only stderr: the emptiness criterion
+        # is stripped for both streams, so a blank stderr must not trigger the
+        # NONE sentinel.
+        fake_ret = subprocess.CompletedProcess(
+            args="query", returncode=0, stdout="", stderr="  \n\t"
+        )
+        mocker.patch("subprocess.run", return_value=fake_ret)
+        self.assertTrue(run_command("query") == "")
+
     def test_run_msnpureport_success(self, mocker):
         cmd = "ls"
         fake_ret = subprocess.run(

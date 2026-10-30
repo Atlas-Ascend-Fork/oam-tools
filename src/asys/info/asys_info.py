@@ -101,7 +101,7 @@ class AsysInfo:
             "Cpu Physical Count": "lscpu | grep 'Socket(s):' | cut -f2 -d: | uniq",  # arm cpuinfo no 'physical id'
             "Cpu Logical Count": "cat /proc/cpuinfo| grep 'processor' | wc -l",
             "Memory Total Size": "cat /proc/meminfo | sed -n '1p' | awk 'NR=2{print $2, $3}'",
-            "Disk Total Size": """df -k / |sed -n '2p' | awk 'NR=2{printf $2}END{print " kB"}'""",
+            "Disk Total Size": """df -k / |sed -n '2p' | awk '{printf $2; print " kB"}'""",
         }
         for query_name, query_cmds in host_info_query_cmds.items():
             host_info = run_command(query_cmds)

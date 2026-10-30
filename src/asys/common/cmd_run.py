@@ -73,9 +73,17 @@ def run_command(command) -> str:
         log_debug("Run command: {0} failed, {1}".format(command, error))
         return "NONE"
     if ret.returncode == 0:
-        if ret.stderr != "":
-            return "NONE"
-        return ret.stdout.strip()
+        output = ret.stdout.strip()
+        if output:
+            # The exit status alone decides success: warnings on stderr
+            # must not discard valid stdout (#205).
+            return output
+        # rc==0 with no stdout: keep the "NONE" sentinel only when stderr
+        # is non-empty (an upstream failure in a ``cat | grep | awk``
+        # pipeline, where the tail decides the exit status); a completely
+        # quiet command keeps the historical empty-string contract.
+        # Whitespace-only stderr counts as quiet (stripped criterion).
+        return "NONE" if ret.stderr.strip() else ""
     else:
         ret_err = ret.stderr
         log_debug(
