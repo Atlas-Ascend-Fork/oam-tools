@@ -25,7 +25,7 @@ from common import get_project_conf, get_ascend_home
 from common import get_device
 from common import FileOperate as f
 from common import timeout_decorator
-from common import log_error
+from common import log_error, log_warning
 from common.const import (
     UNKNOWN,
     NONE,
@@ -184,6 +184,11 @@ class AsysInfo:
             os.path.join(get_project_conf(), "dependent_package.csv")
         )
         for item in dep_info:
+            # Same predicate as ParamDict.set_deps, so both readers of
+            # dependent_package.csv agree on what a usable row is.
+            if not f.is_dep_row(item):
+                log_warning(f"Skip unusable dependency row: {item}")
+                continue
             info = run_command(item[1])
             if info == "NONE":
                 continue

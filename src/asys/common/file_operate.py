@@ -140,6 +140,18 @@ class FileOperate:
             f.write(info)
 
     @staticmethod
+    def is_dep_row(row):
+        """Whether a dependent_package.csv row can be used at all.
+
+        csv.reader keeps a blank line as [] and a comment or half-written line
+        as a single-column row; both used to raise IndexError on row[1].
+        """
+        if not isinstance(row, (list, tuple)) or len(row) < 2:
+            return False
+        name = row[0]
+        return bool(name.strip()) and not name.lstrip().startswith("#")
+
+    @staticmethod
     def read_file(file_path):
         if file_path.endswith(".ini"):
             cf = configparser.ConfigParser()

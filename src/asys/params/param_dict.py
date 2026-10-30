@@ -19,7 +19,8 @@
 import os
 from pathlib import Path
 
-from common import log_debug
+from common import log_debug, log_warning
+from common.file_operate import FileOperate
 from common import consts
 from common import Singleton
 from drv import LoadSoType
@@ -173,7 +174,16 @@ class ParamDict(metaclass=Singleton):
         self._set_arg_common(args, "output")
 
     def set_deps(self, deps):
+        # main() reaches this before any command runs, so an unusable row in
+        # dependent_package.csv used to abort the whole invocation here.
         for item in deps:
+            if not FileOperate.is_dep_row(item):
+                # A missing comma silently removes a package from the report;
+                # say so, the way config_parser does for unusable ini entries.
+                log_warning(
+                    f"Skip unusable dependency row in dependent_package.csv: {item}"
+                )
+                continue
             self.__add_dep(item[0], item[1])
 
     def __add_arg(self, key, value):
