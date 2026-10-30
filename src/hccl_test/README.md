@@ -320,6 +320,8 @@ Ascend 950/960支持通过`-a`参数指定加速器配置：
 | aiv_only | AIV Only模式 |
 | ccu_ms | CCU MS模式 |
 | ccu_sched | CCU调度模式 |
+| ccu_ms_only | CCU MS Only模式 |
+| ccu_sched_only | CCU调度Only模式 |
 | aicpu | AI CPU模式 |
 
 加速器配置通过`HcclCommConfig.hcclOpExpansionMode`在通信域初始化时传入HCCL。

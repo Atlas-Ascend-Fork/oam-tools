@@ -29,13 +29,17 @@
 #include <thread>
 constexpr s32 HCCL_TEST_REDUCE_RESERVED = 4;
 constexpr s32 HCCL_TEST_DATA_TYPE_RESERVED = 17;
-constexpr s32 HCCL_TEST_ACCELERATOR_CONFIG_RESERVED = 8;
+constexpr s32 HCCL_TEST_ACCELERATOR_CONFIG_RESERVED = 10;
 constexpr u32 HCCL_TEST_DATATYPE_BF16_SAT = 13;
 HcclReduceOp test_ops[HCCL_TEST_REDUCE_RESERVED]
     = {HCCL_REDUCE_SUM, HCCL_REDUCE_PROD, HCCL_REDUCE_MAX, HCCL_REDUCE_MIN};
 const char* test_opnames[HCCL_TEST_REDUCE_RESERVED] = {"sum", "prod", "max", "min"};
 const char* test_accelerator_config[HCCL_TEST_ACCELERATOR_CONFIG_RESERVED]
-    = {"default", "host_ts", "aicpu_ts", "aiv", "aiv_only", "ccu_ms", "ccu_sched", "aicpu"};
+    = {"default", "host_ts",   "aicpu_ts", "aiv",         "aiv_only",
+       "ccu_ms",  "ccu_sched", "aicpu",    "ccu_ms_only", "ccu_sched_only"};
+constexpr s32 HCCL_TEST_ACCELERATOR_CONFIG_AICPU_TS = 2;
+constexpr s32 HCCL_TEST_ACCELERATOR_CONFIG_CCU_SCHED = 6;
+constexpr s32 HCCL_TEST_ACCELERATOR_CONFIG_CCU_SCHED_ONLY = 9;
 
 HcclDataType test_types[HCCL_TEST_DATA_TYPE_RESERVED] = {
     HCCL_DATA_TYPE_INT8,    /**< int8 */
@@ -297,7 +301,7 @@ void HcclTest::print_help()
 {
     printf("USAGE: ./test \n\t");
     if (IsNewGenSoc()) {
-        printf("[-a --accelerator <default/aicpu_ts/aiv/aiv_only/ccu_ms/ccu_sched>] \n\t");
+        printf("[-a --accelerator <default/aicpu_ts/aiv/aiv_only/ccu_ms/ccu_sched/ccu_ms_only/ccu_sched_only>] \n\t");
     }
     printf("[-b,--minbytes <min size in bytes>] \n\t");
     printf("[-e,--maxbytes <max size in bytes>] \n\t");
@@ -418,7 +422,7 @@ int HcclTest::check_only_device_exec_time()
         return -1;
     }
 
-    if (only_device_exec_time == 1 && accelerator_config == 2) {
+    if (only_device_exec_time == 1 && accelerator_config == HCCL_TEST_ACCELERATOR_CONFIG_AICPU_TS) {
         printf(
             "Error: [-a,--accelerator_config] is invalid, onlydevicetime is 1, but accelerator_config is aicpu_ts\n");
         return -1;
@@ -668,8 +672,8 @@ int HcclTest::parse_cmd_line(int argc, char* argv[])
     std::vector<struct option> longopts = build_longopts(isNewGenSoc);
 
     const char* opModeEnv = getenv("HCCL_OP_EXPANSION_MODE");
-    if (isNewGenSoc && opModeEnv == nullptr) { // 需要确保环境变量未配置
-        accelerator_config = 6;                // 修改默认加速器模式为CCU_SCHED
+    if (isNewGenSoc && opModeEnv == nullptr) {                       // 需要确保环境变量未配置
+        accelerator_config = HCCL_TEST_ACCELERATOR_CONFIG_CCU_SCHED; // 修改默认加速器模式为CCU_SCHED
     }
     while (-1 != (opt = getopt_long(argc, argv, shortopts.c_str(), longopts.data(), &longindex))) {
         ret = parse_opt(opt);
@@ -768,6 +772,13 @@ bool HcclTest::IsNewGenSoc()
         return true;
     }
     return false;
+}
+
+bool HcclTest::IsCcuSchedMode()
+{
+    return (accelerator_config == HCCL_TEST_ACCELERATOR_CONFIG_CCU_SCHED
+            || accelerator_config == HCCL_TEST_ACCELERATOR_CONFIG_CCU_SCHED_ONLY)
+           && IsNewGenSoc();
 }
 
 int HcclTest::set_device_sat_mode()
@@ -1262,8 +1273,7 @@ int HcclTest::deregister_symmetric_memory(HcclCommSymWindow& sym_win)
 // -t参数对于ccu alltoallvc 算子数据量大于等于 128MB的场景 -t不生效
 aclError HcclTest::start_profile_device_time_if_needed(size_t data_size)
 {
-    bool isCcuSched = accelerator_config == 6 && IsNewGenSoc();
-    if (only_device_exec_time && !(isCcuSched && data->data_size >= data_size)) {
+    if (only_device_exec_time && !(IsCcuSchedMode() && data->data_size >= data_size)) {
         ACLCHECK(aclrtStreamWaitEvent(stream, sync_event));
         ACLCHECK(aclrtResetEvent(sync_event, stream));
     }
@@ -1272,8 +1282,7 @@ aclError HcclTest::start_profile_device_time_if_needed(size_t data_size)
 
 aclError HcclTest::end_profile_device_time_if_needed(size_t data_size)
 {
-    bool isCcuSched = accelerator_config == 6 && IsNewGenSoc();
-    if (only_device_exec_time && !(isCcuSched && data->data_size >= data_size)) {
+    if (only_device_exec_time && !(IsCcuSchedMode() && data->data_size >= data_size)) {
         int sleepTime = 50 + warmup_iters * 2 + iters * 2;
         std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
         ACLCHECK(aclrtRecordEvent(sync_event, sync_stream));

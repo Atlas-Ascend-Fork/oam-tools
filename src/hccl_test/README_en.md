@@ -320,6 +320,8 @@ Ascend 950/960 supports specifying accelerator configuration through the `-a` pa
 | aiv_only | AIV Only mode |
 | ccu_ms | CCU MS mode |
 | ccu_sched | CCU scheduling mode |
+| ccu_ms_only | CCU MS Only mode |
+| ccu_sched_only | CCU scheduling Only mode |
 | aicpu | AI CPU mode |
 
 The accelerator configuration is passed to HCCL through `HcclCommConfig.hcclOpExpansionMode` during communication domain initialization.

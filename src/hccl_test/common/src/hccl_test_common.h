@@ -176,6 +176,7 @@ protected:
 private:
     int set_device_sat_mode();
     bool IsNewGenSoc();
+    bool IsCcuSchedMode();
 
 public:
     DataSize* data{nullptr};

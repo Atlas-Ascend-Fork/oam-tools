@@ -166,7 +166,9 @@
   - aicpu_ts：使用Device侧的AI CPU计算单元加速。
   - aiv：使用Device侧的Vector Core计算单元加速，大数据量情况下可能会回退到其他加速模式。
   - ccu_ms：使用CCU MS（Memory Slice）模式加速。Ascend 950PR不支持此配置。
+  - ccu_ms_only：使用CCU MS（Memory Slice）模式加速，相较于ccu_ms加速模式，不会发生回退情况。Ascend 950PR不支持此配置。
   - ccu_sched：使用CCU调度模式加速。
+  - ccu_sched_only：使用CCU调度模式加速，相较于ccu_sched加速模式，不会发生回退情况。
   - host_ts：不支持此配置。
   - aiv_only：使用Device侧的AI Core计算单元加速，相较于aiv加速模式，不会发生回退情况。
 
