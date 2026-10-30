@@ -25,6 +25,7 @@ matches no raw event, or matches ambiguously, is an error rather than a silent d
 """
 import argparse
 import json
+import math
 import os
 from collections import defaultdict
 
@@ -32,6 +33,16 @@ from collections import defaultdict
 def load(path):
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def required_time(value, label):
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Missing or invalid {label}: {value!r}") from error
+    if not math.isfinite(result) or (label == "duration" and result < 0):
+        raise ValueError(f"Invalid {label}: {value!r}")
+    return result
 
 
 def main():
@@ -71,13 +82,29 @@ def main():
         if row is None:
             unresolved.append((op_index, "no attribution row"))
             continue
-        candidates = [i for i in by_name.get(row.get("op_name"), []) if i not in used]
-        if not candidates:
-            unresolved.append((op_index, f"no free raw X event named {row.get('op_name')!r}"))
+        # This adapter matches nearest duration; do not require unused timestamps.
+        try:
+            duration = required_time(row.get("duration_us"), "duration")
+        except ValueError as error:
+            unresolved.append((op_index, str(error)))
             continue
-        duration = float(row.get("duration_us") or 0.0)
-        pick = min(candidates,
-                   key=lambda i: abs(float(raw_events[i].get("dur") or 0.0) - duration))
+        candidates = []
+        rejected = []
+        for raw_index in by_name.get(row.get("op_name"), []):
+            if raw_index in used:
+                continue
+            try:
+                raw_duration = required_time(raw_events[raw_index].get("dur"), "duration")
+            except ValueError as error:
+                rejected.append(str(error))
+                continue
+            candidates.append((raw_index, raw_duration))
+        if not candidates:
+            reason = ("invalid raw matching fields: " + "; ".join(rejected)) if rejected else (
+                f"no free raw X event named {row.get('op_name')!r}")
+            unresolved.append((op_index, reason))
+            continue
+        pick = min(candidates, key=lambda candidate: abs(candidate[1] - duration))[0]
         used.add(pick)
         enrich_by_raw_index[pick] = {
             "layer_index": event.get("layer_index"),
