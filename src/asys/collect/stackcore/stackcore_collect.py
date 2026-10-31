@@ -303,6 +303,4 @@ class ParseStackCore:
         for t in threads:
             t.join()
         out_progress_bar(count, count)
-        if not self.symbol_path:
-            return any(results)
-        return True
+        return any(results)
