@@ -25,6 +25,9 @@ namespace Collector {
 namespace Dvvp {
 namespace Msprofbin {
 
+bool IsAppProcessUsage(const std::string& processUsage);
+bool IsSignalTerminationStatus(int32_t waitStatus);
+
 class RunningMode {
 public:
     // check params dependence in specific mode

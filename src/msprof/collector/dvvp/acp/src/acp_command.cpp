@@ -16,6 +16,7 @@
 #include "acp_command.h"
 #include <unistd.h>
 #include <algorithm>
+#include <sys/wait.h>
 #include "argparser_tool.h"
 #include "acp_pipe_transfer_tool.h"
 #include "app/application_tool.h"
@@ -264,7 +265,6 @@ int32_t WaitRunningProcess(std::string processUsage, int32_t& taskPid)
     int32_t exitCode = 0;
     int32_t ret = PROFILING_SUCCESS;
     static const int32_t SLEEP_INTERVAL_US = 100000; // 0.1s
-    static const int32_t APP_FAIL_EXIT_CODE = 256;
 
     for (;;) {
         ret = analysis::dvvp::common::utils::Utils::WaitProcess(taskPid, isExited, exitCode, false);
@@ -273,16 +273,30 @@ int32_t WaitRunningProcess(std::string processUsage, int32_t& taskPid)
             return ret;
         }
         if (isExited) {
-            MSPROF_EVENT("%s process %d exited, exit code:%d", processUsage.c_str(), taskPid, exitCode);
-            if (exitCode != 0) {
-                MSPROF_LOGW(
-                    "An exception has occurred in process %s, code info: %s.", processUsage.c_str(),
-                    strerror(exitCode));
-                CmdLog::CmdWarningLog(
-                    "An exception has occurred in process %s, code info: %s.", processUsage.c_str(),
-                    strerror(exitCode));
+            const int32_t waitStatus = exitCode;
+            const bool terminatedBySignal = WIFSIGNALED(waitStatus);
+            if (WIFEXITED(waitStatus)) {
+                exitCode = WEXITSTATUS(waitStatus);
+            } else if (terminatedBySignal) {
+                exitCode = WTERMSIG(waitStatus);
             }
-            if (exitCode == APP_FAIL_EXIT_CODE) {
+            MSPROF_EVENT(
+                "%s process %d exited, wait status:%d, exit code:%d", processUsage.c_str(), taskPid, waitStatus,
+                exitCode);
+            if (exitCode != 0) {
+                if (terminatedBySignal) {
+                    MSPROF_LOGW(
+                        "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
+                        exitCode);
+                    CmdLog::CmdWarningLog(
+                        "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
+                        exitCode);
+                } else {
+                    MSPROF_LOGW(
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                    CmdLog::CmdWarningLog(
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                }
                 return PROFILING_FAILED;
             }
             return PROFILING_SUCCESS;

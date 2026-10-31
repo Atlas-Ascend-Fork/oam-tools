@@ -16,6 +16,7 @@
 #include "running_mode_tool.h"
 #include <algorithm>
 #include <chrono>
+#include <sys/wait.h>
 #include "errno/error_code_tool.h"
 #include "input_parser_tool.h"
 #include "cmd_log/cmd_log_tool.h"
@@ -56,6 +57,10 @@ using namespace Analysis::Dvvp::Common::Config;
 using namespace Analysis::Dvvp::Common::Platform;
 using namespace analysis::dvvp::common::utils;
 using namespace Collector::Dvvp::DynProf;
+
+bool IsAppProcessUsage(const std::string& processUsage) { return processUsage == "App" || processUsage == "app"; }
+
+bool IsSignalTerminationStatus(int32_t waitStatus) { return WIFSIGNALED(waitStatus); }
 
 RunningMode::RunningMode(std::string preCheckParams, std::string modeName, SHARED_PTR_ALIA<ProfileParams> params)
     : isQuit_(false),
@@ -510,7 +515,6 @@ int32_t RunningMode::WaitRunningProcess(std::string processUsage)
     int32_t exitCode = 0;
     int32_t ret = PROFILING_SUCCESS;
     static const int32_t SLEEP_INTEVAL_US = 1000000;
-    const int32_t lltExitCode = 256;
 
     for (;;) {
         ret = analysis::dvvp::common::utils::Utils::WaitProcess(taskPid_, isExited, exitCode, false);
@@ -521,17 +525,37 @@ int32_t RunningMode::WaitRunningProcess(std::string processUsage)
             return ret;
         }
         if (isExited) {
-            MSPROF_EVENT(
-                "%s process %d exited, exit code:%d", processUsage.c_str(), static_cast<int32_t>(taskPid_), exitCode);
-            if (exitCode != 0 && !isQuit_) {
-                MSPROF_LOGW(
-                    "An exception has occurred in process %s, return code: %s.", processUsage.c_str(),
-                    strerror(exitCode));
-                CmdLog::CmdWarningLog(
-                    "An exception has occurred in process %s, return code: %s.", processUsage.c_str(),
-                    strerror(exitCode));
+            const int32_t waitStatus = exitCode;
+            const bool terminatedBySignal = IsSignalTerminationStatus(waitStatus);
+            if (WIFEXITED(waitStatus)) {
+                exitCode = WEXITSTATUS(waitStatus);
+            } else if (terminatedBySignal) {
+                exitCode = WTERMSIG(waitStatus);
             }
-            if (exitCode == lltExitCode) {
+            MSPROF_EVENT(
+                "%s process %d exited, wait status:%d, exit code:%d", processUsage.c_str(),
+                static_cast<int32_t>(taskPid_), waitStatus, exitCode);
+            if (!isQuit_ && exitCode != 0) {
+                if (terminatedBySignal) {
+                    MSPROF_LOGW(
+                        "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
+                        exitCode);
+                    CmdLog::CmdWarningLog(
+                        "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
+                        exitCode);
+                } else {
+                    MSPROF_LOGW(
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                    CmdLog::CmdWarningLog(
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                }
+                if (IsAppProcessUsage(processUsage)) {
+                    CmdLog::CmdWarningLog(
+                        "The application exited before profiling completed. If it calls aclprofInit or aclprofStart, "
+                        "remove these APIs or stop msprof tool-based profiling because only one profiling "
+                        "configuration can exist at a time. Check the application output and logs under "
+                        "PROF_*/mindstudio_profiler_log/ for details.");
+                }
                 return PROFILING_FAILED;
             }
             return PROFILING_SUCCESS;
@@ -754,8 +778,14 @@ int32_t AppMode::RunModeTasks()
     for (iter = jobResultDirList_.begin(); iter != jobResultDirList_.end(); ++iter) {
         jobResultDir_ = *iter;
         if (StartExportTask() != PROFILING_SUCCESS) {
-            MSPROF_LOGW("[App Mode] The export task did not complete successfully.");
-            return PROFILING_SUCCESS;
+            if (isQuit_) {
+                MSPROF_LOGI("[App Mode] Export skipped because msprofbin received a stop signal.");
+                return PROFILING_SUCCESS;
+            }
+            MSPROF_LOGE("[App Mode] The export task did not complete successfully.");
+            CmdLog::CmdErrorLog(
+                "Export profiling data failed. Check the logs under PROF_*/mindstudio_profiler_log/ for details.");
+            return PROFILING_FAILED;
         }
         if (StartQueryTask() != PROFILING_SUCCESS) {
             MSPROF_LOGW("[App Mode] The query task did not complete successfully.");
@@ -1078,8 +1108,12 @@ int32_t SystemMode::RunModeTasks()
     for (iter = jobResultDirList_.begin(); iter != jobResultDirList_.end(); ++iter) {
         jobResultDir_ = *iter;
         if (StartExportTask() != PROFILING_SUCCESS) {
+            if (isQuit_) {
+                MSPROF_LOGI("[System Mode] Export skipped because msprofbin received a stop signal.");
+                return PROFILING_SUCCESS;
+            }
             MSPROF_LOGW("[System Mode] The export task did not complete successfully.");
-            return PROFILING_SUCCESS;
+            return PROFILING_FAILED;
         }
         if (StartQueryTask() != PROFILING_SUCCESS) {
             MSPROF_LOGW("[System Mode] The query task did not complete successfully.");

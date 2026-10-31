@@ -2741,7 +2741,10 @@ ArgsManager::ArgsManager()
          "Specify application path, considering the risk of privilege escalation, please pay attention to\n"
          "\t\t\t\t\t\t   the group of the application and confirm whether it is the same as the user currently.\n"
          "\t\t\t\t\t\t   [Note] This option will be discarded in later versions.\n"
-         "\t\t\t\t\t\t   you can try to use: msprof [msprof arguments] <app> [app arguments]"},
+         "\t\t\t\t\t\t   you can try to use: msprof [msprof arguments] <app> [app arguments].\n"
+         "\t\t\t\t\t\t   [Note] Do not run an application that configures Profiling by calling aclprofInit or\n"
+         "\t\t\t\t\t\t   aclprofStart in tool-based profiling. Only one Profiling configuration can exist at\n"
+         "\t\t\t\t\t\t   a time; otherwise the application may fail with error 100042."},
         {"ascendcl", "Show acl profiling data, the default value is on.", ON},
         {"ge-api",
          "Specify if report GE event, the default value is off. "

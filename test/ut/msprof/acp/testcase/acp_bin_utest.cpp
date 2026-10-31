@@ -23,6 +23,7 @@
 #include "acp_command.h"
 
 using namespace analysis::dvvp::common::error;
+using namespace analysis::dvvp::common::utils;
 using namespace Analysis::Dvvp::Common::Platform;
 using namespace Collector::Dvvp::Acp;
 
@@ -35,6 +36,13 @@ protected:
 
 extern int LltAcpMain(int argc, const char* argv[], const char** envp);
 extern int32_t PreCheckPlatform();
+
+static int _acp_wait_process_exit_8(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = 8 << 8;
+    return PROFILING_SUCCESS;
+}
 
 TEST_F(ACP_BIN_UTEST, AcpCommandBuildTest)
 {
@@ -57,6 +65,15 @@ TEST_F(ACP_BIN_UTEST, AcpPipeReadWriteTest)
     auto paramsRead = Collector::Dvvp::Acp::AcpPipeRead();
     EXPECT_EQ("Memory", paramsRead->ai_core_metrics);
     EXPECT_EQ("./aaa/bbb/ccc/ddd/eee", paramsRead->result_dir);
+}
+
+TEST_F(ACP_BIN_UTEST, AcpWaitRunningProcessPropagatesNonZeroExitCode)
+{
+    GlobalMockObject::verify();
+    int32_t taskPid = 11111;
+    MOCKER(analysis::dvvp::common::utils::Utils::WaitProcess).stubs().will(invoke(_acp_wait_process_exit_8));
+    EXPECT_EQ(PROFILING_FAILED, WaitRunningProcess("App", taskPid));
+    GlobalMockObject::verify();
 }
 
 void EXPECT_TestAcp(std::vector<std::string> args, const int expectedRet, std::vector<std::string> expectedList)

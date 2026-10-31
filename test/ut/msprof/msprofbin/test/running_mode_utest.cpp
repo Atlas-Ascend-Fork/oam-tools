@@ -29,6 +29,7 @@
 #include "application_tool.h"
 #include "platform/platform_tool.h"
 #include <fstream>
+#include <sys/wait.h>
 #include <memory>
 #include "dyn_prof_client_tool.h"
 
@@ -423,6 +424,50 @@ static int _wait_process(int taskPid_, bool& isExited, int& exitCode, bool s)
     }
 }
 
+static int _wait_process_exit_8(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = 8 << 8;
+    return PROFILING_SUCCESS;
+}
+
+static int _wait_process_exit_255(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = 255 << 8;
+    return PROFILING_SUCCESS;
+}
+
+static int _wait_process_exit_status(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = 255 << 8;
+    return PROFILING_SUCCESS;
+}
+
+static int _wait_process_signal_status(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = SIGTERM;
+    return PROFILING_SUCCESS;
+}
+
+static AppMode* _app_mode_for_quit = nullptr;
+
+static int _set_quit_and_return_failed()
+{
+    _app_mode_for_quit->isQuit_ = true;
+    return PROFILING_FAILED;
+}
+
+static SystemMode* _system_mode_for_quit = nullptr;
+
+static int _set_system_quit_and_return_failed()
+{
+    _system_mode_for_quit->isQuit_ = true;
+    return PROFILING_FAILED;
+}
+
 TEST_F(RUNNING_MODE_UTEST, WaitRunningProcess)
 {
     GlobalMockObject::verify();
@@ -435,9 +480,102 @@ TEST_F(RUNNING_MODE_UTEST, WaitRunningProcess)
     MOCKER_CPP(&AppMode::StopNoWait).stubs();
     EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("a"));
     EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("a"));
-    EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("a"));
+    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("a"));
     rMode.isQuit_ = true;
     EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("a"));
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessPropagatesNonZeroExitCode)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    rMode.taskPid_ = 11111;
+    rMode.isQuit_ = false;
+
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_8));
+    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("Export timeline"));
+    GlobalMockObject::verify();
+
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_255));
+    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("App"));
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessReportsDecodedExitCode)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    rMode.taskPid_ = 11111;
+    rMode.isQuit_ = false;
+
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_status));
+    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("app"));
+    GlobalMockObject::verify();
+
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_signal_status));
+    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("app"));
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessDistinguishesSignalTermination)
+{
+    EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(SIGTERM));
+    EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(SIGSEGV));
+    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(0));
+    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(255 << 8));
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessShowsAppConflictHintForDynamicProfiling)
+{
+    EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsAppProcessUsage("app"));
+    EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsAppProcessUsage("App"));
+    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsAppProcessUsage("app timeline"));
+    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsAppProcessUsage("Export timeline"));
+}
+
+TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasksTreatsUserQuitDuringExportAsSuccess)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    _app_mode_for_quit = &rMode;
+    rMode.jobResultDirList_.insert("PROF");
+    MOCKER_CPP(&AppMode::StartAppTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::StartExportTask).stubs().will(invoke(_set_quit_and_return_failed));
+
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
+    _app_mode_for_quit = nullptr;
+}
+
+TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasksPropagatesExportFailure)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::SystemMode rMode("system", params);
+    rMode.jobResultDirList_.insert("PROF");
+    MOCKER_CPP(&SystemMode::StartSysTaskByProfApi).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::StartExportTask).stubs().will(returnValue(PROFILING_FAILED));
+
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
+}
+
+TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasksTreatsUserQuitDuringExportAsSuccess)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::SystemMode rMode("system", params);
+    _system_mode_for_quit = &rMode;
+    rMode.jobResultDirList_.insert("PROF");
+    MOCKER_CPP(&SystemMode::StartSysTaskByProfApi).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::StartExportTask).stubs().will(invoke(_set_system_quit_and_return_failed));
+
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
+    _system_mode_for_quit = nullptr;
 }
 
 static int _get_cmd_print_info(
@@ -533,10 +671,23 @@ TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasks)
         .then(returnValue(PROFILING_SUCCESS));
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
-    EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     rMode.jobResultDirList_.clear();
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
+}
+
+TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasksPropagatesExportFailure)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    rMode.jobResultDirList_.insert("PROF");
+    MOCKER_CPP(&AppMode::StartAppTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::StartExportTask).stubs().will(returnValue(PROFILING_FAILED));
+
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
 }
 
@@ -755,7 +906,7 @@ TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasks)
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_NOTSUPPORT, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
-    EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     EXPECT_EQ("on", rMode.params_->aiv_profiling);
