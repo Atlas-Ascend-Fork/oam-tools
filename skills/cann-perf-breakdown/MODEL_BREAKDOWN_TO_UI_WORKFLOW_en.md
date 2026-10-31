@@ -49,3 +49,17 @@ Stage 1 must provide a passed validation report, a convertible score, and an emp
 ## Data rules
 
 Keep `trace_view.json` with the profiling CSV from collection time because Stage 3 requires it. `perf_data.json` and `timeline.json` are Stage 2 inputs to Stage 3, not Stage 3 outputs. Source code is the architecture authority; trace data can only provide runtime evidence and must not invent missing layers or pipeline ranks.
+
+## Selecting a capture when several ranks are present
+
+A capture directory that holds one subdirectory per rank contains several `trace_view.json` files. The conversion entry point discovers capture files recursively under `--capture-dir` and **accepts only a unique automatic candidate**:
+
+| Discovery result | Behaviour |
+|---|---|
+| exactly one file | used as is |
+| several files | prints a `status: failed` JSON with `stage: conversion_inputs` and a `candidates` list of every path, then exits non-zero |
+| `--trace <path>` given | the explicit path wins; no discovery happens and the unique-candidate rule does not apply |
+
+A multi-rank directory therefore requires `--trace` to name the rank being analysed. The script never picks the lexicographically first hit for you, because the report then could not prove it used the intended capture.
+
+`kernel_details.csv` is not discovered by this entry point: Stage 1 names it explicitly with `1-perf-breakdown/scripts/run_breakdown.py --csv <file>`. `--csv` is not an option of the conversion entry point, so do not pass it there.

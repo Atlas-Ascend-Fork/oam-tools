@@ -40,6 +40,22 @@ python3 <skills>/2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
 
 ---
 
+## 多 rank 采集怎么选文件
+
+一份采集里放了多个 rank 的目录时，`trace_view.json` 会有多份。转换入口在 `--capture-dir` 下递归发现采集文件，**只接受唯一自动候选**：
+
+| 发现结果 | 行为 |
+|---|---|
+| 只有一份 | 直接使用 |
+| 有多份 | 打印 `status: failed` 的 JSON，`stage` 为 `conversion_inputs`，`candidates` 列出全部候选路径，退出码非 0 |
+| 传了 `--trace <路径>` | 显式路径优先，不再自动发现，也不受唯一候选约束 |
+
+也就是说多 rank 目录必须用 `--trace` 指明分析哪个 rank。脚本不会替你按字典序挑第一个 —— 那样报告无法证明自己用的是目标采集。
+
+`kernel_details.csv` 不经此入口发现：① 段用 `1-perf-breakdown/scripts/run_breakdown.py --csv <文件>` 显式指定，`--csv` 不是转换入口的参数，不要传给它。
+
+---
+
 ## 三个 skill 在哪
 
 全部放在 `skills/cann-perf-breakdown/` 下，按执行顺序编号：

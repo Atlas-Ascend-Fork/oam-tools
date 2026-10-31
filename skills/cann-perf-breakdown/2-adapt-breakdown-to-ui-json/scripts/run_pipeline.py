@@ -90,10 +90,28 @@ def die(status, stage, message, **extra):
     sys.exit(0 if status.startswith("awaiting") else 1)
 
 
-def find_one(root, name, explicit=None):
+def find_one(root, name, explicit=None, stages=None):
+    """Resolve one capture file: an explicit path wins, otherwise the candidate must be unique.
+
+    A multi-rank capture directory holds one such file per rank, so taking the
+    lexicographically first hit would silently analyse whichever rank sorts first. The report
+    then cannot prove it used the intended capture, so ambiguity is reported with every
+    candidate path instead of guessed at. validate_conversion.find_one already refuses to
+    guess; capture discovery has to hold the same line.
+
+    The search root is a caller-supplied path, so it is escaped before becoming part of the glob
+    pattern: a capture directory legitimately named ``capture[0]`` would otherwise be read as a
+    character class and match nothing, reporting a present file as missing, while ``capture*2026``
+    would widen the search to unrelated sibling captures.
+    """
     if explicit:
         return explicit
-    hits = sorted(glob.glob(os.path.join(root, "**", name), recursive=True))
+    hits = sorted(glob.glob(os.path.join(glob.escape(root), "**", name), recursive=True))
+    if len(hits) > 1:
+        die("failed", "conversion_inputs",
+            f"ambiguous {name} under {root}: found {len(hits)} candidates {hits}; "
+            f"pass an explicit path to select the intended rank",
+            candidates=hits, stages=stages)
     return hits[0] if hits else None
 
 
@@ -169,7 +187,7 @@ def main():
         die("failed", "conversion_inputs",
             f"no raw_ops.json at {raw}; Skill 2 needs representative-step kernels",
             stages=stages)
-    trace = find_one(capture_dir, "trace_view.json", args.trace)
+    trace = find_one(capture_dir, "trace_view.json", args.trace, stages=stages)
     device_freq = args.device_freq or os.path.join(breakdown, "device_freq.json")
     if not os.path.exists(device_freq):
         device_freq = None

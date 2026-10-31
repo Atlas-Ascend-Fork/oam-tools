@@ -52,7 +52,10 @@ def jload(path):
 
 
 def find_one(out_dir, suffix):
-    matches = sorted(glob.glob(os.path.join(out_dir, f"*{suffix}")))
+    # ``--out`` is a caller-supplied path, so it is escaped before joining the pattern: a
+    # directory legitimately named ``out[0]`` would otherwise parse as a character class and
+    # match nothing, and ``out*2026`` would also match unrelated sibling directories.
+    matches = sorted(glob.glob(os.path.join(glob.escape(out_dir), f"*{suffix}")))
     if not matches:
         raise SystemExit(f"no *{suffix} in {out_dir}")
     if len(matches) > 1:
