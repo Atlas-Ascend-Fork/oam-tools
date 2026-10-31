@@ -322,8 +322,12 @@ Phase 4 分为三步，其中步骤 A 由 Agent 完成，步骤 B-C 由脚本完
 ### 步骤 C：运行 HTML 生成器（脚本完成）
 
 ```bash
-python3 "$(dirname "$(find . -name SKILL.md | grep npu-perf-analysis | head -1)")/references/generate_html.py" \
-    analysis_data.json report.html
+# 按 SKILL.md 内容里的规范标题定位（目录名可能与 Skill 标题不同），未找到匹配即显式失败
+skill_md="$(grep -rl --include=SKILL.md '^# npu-perf-analysis$' . | head -1)"
+[ -n "$skill_md" ] || { echo "未找到标题为 '# npu-perf-analysis' 的 SKILL.md" >&2; exit 1; }
+generate_html="$(dirname "$skill_md")/references/generate_html.py"
+[ -f "$generate_html" ] || { echo "未找到 HTML 生成器：$generate_html" >&2; exit 1; }
+python3 "$generate_html" analysis_data.json report.html
 ```
 
 HTML 生成器支持多种主题风格，参考 cann-perf-breakdown：
