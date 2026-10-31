@@ -63,6 +63,45 @@ def _sha256_file(path):
     return digest.hexdigest()
 
 
+def strip_inline_comment(raw):
+    """Drop a YAML inline comment from a scalar value, honouring quotes.
+
+    ``model_path: "/ckpt" # selected`` is a path followed by a comment, not a path that
+    contains one. The previous ``strip('"\\'')`` only trimmed quote characters off both
+    ends, so a trailing comment blocked the tail strip while the leading quote was still
+    removed, leaving ``/ckpt" # selected`` -- a directory that cannot exist. The
+    checkpoint was then silently missed and the layer count fell back to the source
+    default (issue #310).
+
+    Inside quotes both ``#`` and spaces are content; in a plain scalar ``#`` opens a
+    comment only after whitespace, so ``/ckpt#v2`` and ``/ckpt dir`` stay intact.
+    """
+    text = raw.strip()
+    quote = text[:1]
+    if quote in ('"', "'"):
+        index = 1
+        while index < len(text):
+            char = text[index]
+            if char == '\\' and quote == '"':
+                index += 2
+                continue
+            if char == quote:
+                # A doubled single quote is an escaped quote, not the terminator.
+                if quote == "'" and text[index + 1:index + 2] == "'":
+                    index += 2
+                    continue
+                return text[:index + 1]
+            index += 1
+        # Unterminated quote is not valid YAML: hand the text back untouched and let the
+        # caller's existing quote trim decide, instead of guessing where the path ends.
+        return text
+    for index, char in enumerate(text):
+        if char == '#' and (index == 0 or text[index - 1] in ' \t'):
+            # The whitespace that opens the comment is a separator, not part of the path.
+            return text[:index].rstrip()
+    return text
+
+
 def _validate_checkpoint_numeric_types(adapter, values, path):
     """Reject JSON values that could masquerade as architecture integers."""
     integer_key_attributes = (
@@ -115,7 +154,7 @@ def find_weights_config(model_dir, runtime_config=None, checkpoint_config=None):
                 stripped = line.strip()
                 if not stripped.startswith('model_path:'):
                     continue
-                value = stripped.split(':', 1)[1].strip().strip('"\'')
+                value = strip_inline_comment(stripped.split(':', 1)[1]).strip('"\'')
                 if not value:
                     continue
                 declared = declared or value
