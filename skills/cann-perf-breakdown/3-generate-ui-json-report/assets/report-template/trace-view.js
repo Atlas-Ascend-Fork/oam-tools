@@ -223,8 +223,16 @@
       finishOwnerEvent: ownerForEndpoint(flow.finish),
     }));
 
-    const minTs = Math.min(...durations.map((event) => event.ts));
-    const maxTs = Math.max(...durations.map((event) => event.end));
+    // Spreading every duration event into Math.min/Math.max turns each event into one
+    // function argument, which throws RangeError once a trace holds roughly 100k+ events.
+    // Accumulate in a single pass instead; Infinity/-Infinity keep the empty-input values
+    // that Math.min()/Math.max() returned before.
+    let minTs = Infinity;
+    let maxTs = -Infinity;
+    durations.forEach((event) => {
+      minTs = Math.min(minTs, event.ts);
+      maxTs = Math.max(maxTs, event.end);
+    });
     return { rawEvents, durations, flows, processNames, threadNames, processOrder, threadOrder, minTs, maxTs };
   }
 

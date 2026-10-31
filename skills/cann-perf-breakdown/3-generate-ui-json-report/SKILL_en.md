@@ -66,6 +66,12 @@ rtk node <skill-dir>/scripts/generate-report.mjs --repo <report-repo> --check
 rtk node <skill-dir>/scripts/test-generation-safety.mjs --repo <known-good-report-repo>
 ```
 
+For changes to the Trace view template's large-trace handling, run:
+
+```bash
+rtk node <skill-dir>/scripts/test-large-trace-boundaries.mjs
+```
+
 ## Required deterministic checks
 
 Generation must run:
