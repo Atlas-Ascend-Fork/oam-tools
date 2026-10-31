@@ -47,7 +47,11 @@ from adapters.base import (find_config_class, extract_init_defaults, scan_eviden
 
 
 def read(path):
-    with open(path, 'r', encoding='utf-8', errors='replace') as f:
+    # utf-8-sig consumes a leading UTF-8 BOM (EF BB BF) only. The BOM is *valid* UTF-8, so
+    # errors='replace' cannot catch it: it decodes to U+FEFF and then breaks ast.parse, or
+    # silently defeats the `model_path:` prefix match on runtime.yaml's first line. Interior
+    # U+FEFF characters are body content and must survive — see issue #311.
+    with open(path, 'r', encoding='utf-8-sig', errors='replace') as f:
         return f.read()
 
 
@@ -177,7 +181,10 @@ def build_manifest(config_path, modeling_path, model_name, base_dir, model_dir=N
     weights_values = {}
     if weights_config_path:
         try:
-            with open(weights_config_path, 'r', encoding='utf-8') as f:
+            # Same root cause as read(): json.load on a BOM-prefixed stream raises
+            # "Unexpected UTF-8 BOM". This call does not go through read(), so the fix
+            # there does not cover it.
+            with open(weights_config_path, 'r', encoding='utf-8-sig') as f:
                 weights_values = json.load(f)
         except (OSError, ValueError) as exc:
             raise ValueError(
