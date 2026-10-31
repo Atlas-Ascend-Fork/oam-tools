@@ -33,6 +33,7 @@ from collect import AsysCollect
 from launch import AsysLaunch
 from ..conftest import AssertTest
 from common import FileOperate as f
+from common.const import RetCode
 
 
 def setup_module():
@@ -63,6 +64,79 @@ class TestAsysLaunch(AssertTest):
 
     def teardown_method(self):
         ParamDict.clear()
+
+    def test_launch_env_missing_ini_item(self, mocker, monkeypatch, caplog):
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        obj = AsysLaunch()
+        obj.env_prepare = {
+            "NPU_COLLECT_PATH": test_case_tmp + "/test_collect",
+            "ASCEND_WORK_PATH": test_case_tmp + "/test_work",
+            "DUMP_GE_GRAPH": ParamDict().get_ini("DUMP_GE_GRAPH_NOT_EXIST"),
+        }
+        # The ini item is absent, get_ini() returns the boolean False.
+        self.assertTrue(obj.env_prepare["DUMP_GE_GRAPH"] is False)
+        # Pre-set a user value: the skip must neither overwrite nor delete it
+        # (the warning promises "keeps a user-set value unchanged"), so the
+        # surviving ext_val pins both aspects at once.
+        monkeypatch.setenv("DUMP_GE_GRAPH", "ext_val")
+        monkeypatch.delenv("ASCEND_WORK_PATH", raising=False)
+        monkeypatch.delenv("NPU_COLLECT_PATH", raising=False)
+
+        ret = obj.prepare_for_launch()
+        self.assertTrue(ret != RetCode.FAILED)
+        self.assertTrue(os.environ.get("DUMP_GE_GRAPH") == "ext_val")
+        # Pin the warning semantics: blame the missing asys.ini item
+        # (with ini key and default), not "the variable is not set".
+        self.assertTrue(
+            "The asys.ini item dump_ge_graph is not configured" in caplog.text
+        )
+        self.assertTrue("default value: 2." in caplog.text)
+
+    def test_launch_env_missing_ini_item_uses_ini_key_name(
+        self, mocker, monkeypatch, caplog
+    ):
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        obj = AsysLaunch()
+        obj.env_prepare = {
+            "NPU_COLLECT_PATH": test_case_tmp + "/test_collect",
+            "ASCEND_WORK_PATH": test_case_tmp + "/test_work",
+            "ASCEND_GLOBAL_LOG_LEVEL": ParamDict().get_ini(
+                "ASCEND_GLOBAL_LOG_LEVEL_NOT_EXIST"
+            ),
+        }
+        self.assertTrue(obj.env_prepare["ASCEND_GLOBAL_LOG_LEVEL"] is False)
+        monkeypatch.setenv("ASCEND_GLOBAL_LOG_LEVEL", "ext_val")
+        monkeypatch.delenv("ASCEND_WORK_PATH", raising=False)
+        monkeypatch.delenv("NPU_COLLECT_PATH", raising=False)
+
+        ret = obj.prepare_for_launch()
+        self.assertTrue(ret != RetCode.FAILED)
+        self.assertTrue(os.environ.get("ASCEND_GLOBAL_LOG_LEVEL") == "ext_val")
+        # ASCEND_GLOBAL_LOG_LEVEL maps to the ini key "log_level", not the
+        # lowercased env name: the warning must name the real ini key (a
+        # user configuring "ascend_global_log_level" would be rejected by
+        # config_parser as not available) and the mapped default "INFO".
+        self.assertTrue("The asys.ini item log_level is not configured" in caplog.text)
+        self.assertTrue("default value: INFO." in caplog.text)
+
+    def test_launch_env_ini_item_present(self, mocker, monkeypatch):
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        ParamDict().set_ini("DUMP_GE_GRAPH", "2")
+        obj = AsysLaunch()
+        obj.env_prepare = {
+            "NPU_COLLECT_PATH": test_case_tmp + "/test_collect",
+            "ASCEND_WORK_PATH": test_case_tmp + "/test_work",
+            "DUMP_GE_GRAPH": ParamDict().get_ini("DUMP_GE_GRAPH"),
+        }
+        # delenv up front so monkeypatch restores the external values and
+        # reverts what this test writes, replacing handwritten pops.
+        monkeypatch.delenv("DUMP_GE_GRAPH", raising=False)
+        monkeypatch.delenv("ASCEND_WORK_PATH", raising=False)
+        monkeypatch.delenv("NPU_COLLECT_PATH", raising=False)
+
+        ret = obj.prepare_for_launch()
+        self.assertTrue(ret != RetCode.FAILED)
+        self.assertTrue(os.environ.get("DUMP_GE_GRAPH") == "2")
 
     def test_launch_task_success(self, mocker):
         mocker.patch("common.FileOperate.create_dir", return_value=True)

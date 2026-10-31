@@ -26,10 +26,19 @@ from common import log_info, log_error, log_debug, log_warning
 from common import FileOperate as f
 from common.cmd_run import BASH
 from common.const import RetCode
+from config.config_parser import ASYS_INI_VALUE_MAP
 from view.progress_display import waiting
 from collect import AsysCollect
 
 __all__ = ["AsysLaunch"]
+
+# Reverse lookup for the ini-sourced entries of env_prepare: env var name ->
+# (asys.ini key, default value). The ini key is not derivable from the env
+# name (log_level -> ASCEND_GLOBAL_LOG_LEVEL), so resolve it through the map.
+_INI_ITEM_BY_ENV = {
+    item.para_name: (ini_key, item.default_key)
+    for ini_key, item in ASYS_INI_VALUE_MAP.items()
+}
 
 
 class AsysLaunch:
@@ -63,6 +72,18 @@ class AsysLaunch:
         # prepare environment variable
         for env_name, env_val in self.env_prepare.items():
             log_debug("env_name: {}, env_val: {}".format(env_name, env_val))
+            if not isinstance(env_val, str):
+                # ParamDict().get_ini() returns the boolean False when the
+                # asys.ini item is absent; skip the export instead of writing
+                # a non-str value into os.environ (which raises TypeError).
+                ini_key, default_key = _INI_ITEM_BY_ENV.get(env_name, (env_name, None))
+                log_warning(
+                    "The asys.ini item {} is not configured: asys does not "
+                    "export {} this run and keeps a user-set value "
+                    "unchanged. Configure it in asys.ini to export it, "
+                    "default value: {}.".format(ini_key, env_name, default_key)
+                )
+                continue
             os.environ[env_name] = env_val
         # prepare npu collect path dir
         if not f.create_dir(os.environ["NPU_COLLECT_PATH"]):
