@@ -14,28 +14,21 @@
 用 skills/cann-perf-breakdown 三段流程，从 <采集目录> 拆解 <模型名> 并生成两个 HTML 报告
 ```
 
-对应一条命令：
+两个 HTML 报告来自不同段：① 产出自包含拆解报告（`{prefix}_report.html`），③ 产出交互式 UI 报告。**从采集目录开始的 ① 段是 AI 按 protocol 执行的工作，没有一条命令能代跑。**
+
+一条命令只覆盖 ②③ 的确定性部分，它的输入是 ① 已完成并通过门禁的拆解目录：
 
 ```bash
 python3 <skills>/2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
-  --capture-dir <采集目录> --model-id <模型名> --out <输出目录>
+  --breakdown <①的拆解目录> --model-id <模型名> --out <输出目录>
 ```
 
-它自动找 `kernel_details.csv` / `trace_view.json` / `modeling_*.py`，跑完全部确定性步骤，
-产出 `<输出目录>/breakdown_report.html` 和 `<输出目录>/ui-report/report/index.html`，
-最后打印一个 JSON 状态对象。
+`--capture-dir <采集目录>` 是可选参数，只在 trace/HBM 数据放在别处时才需要传，缺省取 `--breakdown`。
 
-**两处会停下来等人**，因为它们本身就是 AI 阅读源码的工作，没有脚本：
-
-| status | 含义 | 继续方式 |
-|---|---|---|
-| `awaiting_ai_mapping` | 需要 AI 把每个 op 归属到结构节点，写出 `analysis_config_v2.json` | 加 `--breakdown-config <文件>` 重跑 |
-| `awaiting_semantic_review` | 需要 AI 完成九项语义审查 | 加 `--semantic-review <文件>` 重跑 |
-
-停下时会写出请求文件，里面列好了该读哪些输入、该产出什么。这是设计行为，不是失败 —— 退出码为 0。
-
-继续一份已有拆解时再加 `--manifest <已审查的 model_manifest.json>`：语义审查按 SHA256
-绑定到它，重新提取会因格式差异让一份有效审查失效。
+它从就绪门禁开始跑完 ②③ 的全部确定性步骤，产出 `<输出目录>/ui-report/report/index.html`，
+成功时打印 `status: pending_manual_validation`（浏览器与视觉验收仍属 ③）；
+任一阶段不通过时打印 `status: failed` 并附具体阶段与原因，退出码非 0。
+它不代跑 ① 的映射、批判、校验与评分 —— 门禁不过，② 直接拒绝启动。
 
 重复层组的角色名要显式声明，不允许从类名启发式推导：
 
@@ -43,7 +36,7 @@ python3 <skills>/2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
   --rename-group <源码类名>=<报告角色名>     # 可重复
 ```
 
-其他状态：`needs_iteration`（评分未过，附 `required_actions`）、`failed`（附具体阶段与原因）。
+`awaiting_ai_mapping` / `needs_iteration` 这类状态属于 ①（`run_breakdown.py`、`score_breakdown.py`），不是本入口的输出。
 
 ---
 
@@ -70,7 +63,7 @@ CSV + 源码 + trace  →  perf-breakdown-skill  →  adapt-breakdown-to-ui-json
 
 | 段 | 目录 / skill 名 | 输入 | 产出 |
 |---|---|---|---|
-| ① | `<skills>/1-perf-breakdown`<br>`perf-breakdown-skill` | profiling CSV、模型源码、runtime YAML | `analysis_config_v2.json`、`raw_ops*.json`、拆解 HTML |
+| ① | `<skills>/1-perf-breakdown`<br>`perf-breakdown-skill` | profiling CSV、模型源码、runtime YAML | `analysis_config.json`、`raw_ops*.json`、拆解 HTML |
 | ② | `<skills>/2-adapt-breakdown-to-ui-json`<br>`adapt-breakdown-to-ui-json` | ① 的产物 | `*_analysis_config.json`、`*_perf_data.json`、`*_timeline.json`、`model_architecture_graph.json` |
 | ③ | `<skills>/3-generate-ui-json-report`<br>`generate-ui-json-report` | ② 的产物 + `trace_view.json` | `report/` 运行时、`trace_index`、`overlay`、`trace_bindings` |
 
@@ -101,7 +94,7 @@ node <skills>/3-generate-ui-json-report/scripts/generate-report.mjs --repo <repo
 | 手里有 | 从哪开始 |
 |---|---|
 | 只有 profiling 采集和模型源码 | ① |
-| 有 `analysis_config_v2.json`，且校验评分已通过 | ② |
+| 有 `analysis_config.json`，且校验评分已通过 | ② |
 | 有 analysis / perf / timeline 三个 JSON | ③ |
 | 有报告了，只想补原始 trace 或刷新前端 | ③（局部刷新模式） |
 | 有报告了，想改展示/交互 | 直接改 `report/`，不走这条链路 |
@@ -115,7 +108,7 @@ node <skills>/3-generate-ui-json-report/scripts/generate-report.mjs --repo <repo
 ```
 validation_report.json   status: passed（或 passed_with_warnings 且仅含数据可用性 warning）
 breakdown_score.json     convertible: true（status 表达证据层级，不写死 passed）
-analysis_config_v2.json  unmapped_ops: []
+analysis_config.json     unmapped_ops: []
 ```
 
 `unmapped_ops` 非空、评分未过、语义审查过期或哈希失配，② 的就绪门禁会直接拒绝。不要绕过它。

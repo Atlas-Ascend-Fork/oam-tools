@@ -8,14 +8,18 @@ This guide routes an NPU profiling capture through the three performance skills.
 Use the three-stage skills/cann-perf-breakdown workflow to break down <capture-dir> for <model-id> and generate two HTML reports.
 ```
 
-The deterministic pipeline entry point is:
+The two HTML reports come from different stages: Stage 1 writes the self-contained breakdown report (`{prefix}_report.html`) and Stage 3 writes the interactive UI report. **Stage 1 is AI work driven by its protocol; no single command runs it from a capture directory.**
+
+One command covers only the deterministic part of Stages 2 and 3, and its input is a completed, gate-approved Stage 1 breakdown directory:
 
 ```bash
 python3 <skills>/2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
-  --capture-dir <capture-dir> --model-id <model-id> --out <output-dir>
+  --breakdown <stage1-breakdown-dir> --model-id <model-id> --out <output-dir>
 ```
 
-It discovers `kernel_details.csv`, `trace_view.json`, and model source files, then writes the breakdown report and UI report under the output directory.
+`--capture-dir <capture-dir>` is optional: pass it only when the trace/HBM data lives elsewhere; it defaults to `--breakdown`.
+
+The entry point starts at the readiness gate, runs every deterministic Stage 2/3 step, and writes `<output-dir>/ui-report/report/index.html`. On success it prints `status: pending_manual_validation` (browser and visual acceptance remain Stage 3 responsibilities); when a stage does not pass it prints `status: failed` with a concrete stage and reason and exits non-zero. It never reproduces Stage 1's mapping, critique, validation, or scoring, and Stage 2 refuses to start when the gate fails.
 
 ## Three stages
 
@@ -32,7 +36,7 @@ The numeric directory names describe execution order. Runtime lookup must use th
 | Available input | Start at |
 |---|---|
 | profiling capture and model source | Stage 1 |
-| approved `analysis_config_v2.json` and score | Stage 2 |
+| approved `analysis_config.json` and score | Stage 2 |
 | analysis, performance, and timeline JSON files | Stage 3 |
 | an existing report that needs trace refresh or UI changes | Stage 3 (local refresh) |
 
@@ -40,14 +44,7 @@ The numeric directory names describe execution order. Runtime lookup must use th
 
 Stage 1 must provide a passed validation report, a convertible score, and an empty `unmapped_ops` list before Stage 2 can start. Stage 2 must pass conversion validation and keep `model_id`, `report_id`, and `representative_step` consistent before Stage 3 can start.
 
-Two statuses intentionally require AI work and are not script failures:
-
-| Status | Meaning | Continue with |
-|---|---|---|
-| `awaiting_ai_mapping` | operators need semantic mapping | `--breakdown-config <file>` |
-| `awaiting_semantic_review` | source semantics need review | `--semantic-review <file>` |
-
-Other statuses include `needs_iteration` with required actions and `failed` with a concrete stage and reason. Do not infer completion from an exit code alone.
+`awaiting_ai_mapping` and `needs_iteration` are Stage 1 statuses (`run_breakdown.py`, `score_breakdown.py`), not outputs of the pipeline entry point. The entry point prints `pending_manual_validation` on success and `failed` with a concrete stage and reason otherwise. Do not infer completion from an exit code alone — read the printed status object and the handoff.
 
 ## Data rules
 

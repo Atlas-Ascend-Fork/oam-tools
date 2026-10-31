@@ -22,14 +22,16 @@ Invoke: `Use the $cann-perf-breakdown workflow with <capture-directory> as the i
 
 ## Quick start
 
+The adapter takes **a completed Skill 1 breakdown directory that passed the readiness gate**, not a raw profiling capture. With capture data only, finish Skill 1 first as described in the workflow guide, then run the command below; pass the optional `--capture-dir <profiling-directory>` only when trace/HBM data lives in a separate directory (it defaults to `--breakdown`).
+
 ```bash
 python3 2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
-  --capture-dir <profiling-directory> \
+  --breakdown <skill1-breakdown-directory> \
   --model-id <model-id> \
   --out <output-directory>
 ```
 
-The entry point runs conversion and report generation when the input evidence satisfies the stage gates. If AI mapping or semantic review is required, it writes a request file and pauses; the workflow guide describes how to continue.
+The entry point starts at the readiness gate and then runs conversion and report generation. On success it prints `status: pending_manual_validation` and writes `<output-directory>/ui-report/report/index.html`; when a stage does not pass it prints `status: failed` with the concrete stage and reason and exits non-zero. It never reproduces Skill 1's mapping, critique, validation, or scoring, and browser and visual acceptance remain Skill 3 responsibilities.
 
 ## Directory layout
 

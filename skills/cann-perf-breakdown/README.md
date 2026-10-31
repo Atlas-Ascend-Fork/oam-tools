@@ -22,14 +22,16 @@ cp -a oam-tools/skills/cann-perf-breakdown ~/.codex/skills/
 
 ## 快速入口
 
+适配脚本的输入是**已完成 Skill 1 拆解并通过就绪门禁的目录**，不是原始 profiling 采集目录。手里只有采集数据时，先按工作流文档完成 Skill 1，再运行下面的命令；需要从单独目录读取 trace/HBM 数据时，再追加可选参数 `--capture-dir <profiling-directory>`（缺省取 `--breakdown`）。
+
 ```bash
 python3 2-adapt-breakdown-to-ui-json/scripts/run_pipeline.py \
-  --capture-dir <profiling-directory> \
+  --breakdown <skill1-breakdown-directory> \
   --model-id <model-id> \
   --out <output-directory>
 ```
 
-该入口会在输入证据满足阶段门禁时依次执行转换和报告生成；需要 AI 语义映射或审查时，会输出请求文件并暂停，具体继续方式见工作流文档。
+该入口从就绪门禁开始，依次执行转换和报告生成，成功时打印 `status: pending_manual_validation` 并产出 `<output-directory>/ui-report/report/index.html`；任一阶段不通过时打印 `status: failed` 并附具体阶段与原因，以非 0 退出。它不代跑 Skill 1 的映射、批判、校验与评分，浏览器与视觉验收属 Skill 3。
 
 ## 目录约定
 
