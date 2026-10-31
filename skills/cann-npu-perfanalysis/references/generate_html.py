@@ -57,11 +57,24 @@ def badge(label, priority=None):
 
 
 def progress_bar(value_pct, warn=15, severe=30, higher_is_bad=True, width_scale=1.8):
+    """按阈值给 value_pct 上三档颜色，返回进度条 HTML。
+
+    阈值顺序约定：本函数两个分支都要求 warn < severe（先比 severe 定最高档，
+    再比 warn 定中间档），否则中间档不可达。正向指标（higher_is_bad=False，
+    如 Computing 传 30/50、核心类型分布传 50/80）为 绿(>=severe) > 橙(>=warn)
+    > 红；负向指标（higher_is_bad=True，如 CommNO 传 15/30、Free 传 10/20）为
+    红(>=severe) > 橙(>=warn) > 绿。
+
+    注意：同文件 cell_style 的 higher_is_bad=False 分支顺序相反，要求
+    severe < warn（先比 v <= severe 定红，再比 v <= warn 定橙），如
+    Computing 单元格传的是 50/30。两个 helper 的阈值参数顺序不通用，
+    改动任一侧的判定顺序前先看 test/host/test_progress_bar_threshold_colors.py。
+    """
     v = float(value_pct)
     if higher_is_bad:
         color = '#e74c3c' if v >= severe else '#e67e22' if v >= warn else '#2ecc71'
     else:
-        color = '#2ecc71' if v >= warn else '#e67e22' if v >= severe else '#e74c3c'
+        color = '#2ecc71' if v >= severe else '#e67e22' if v >= warn else '#e74c3c'
     w = max(4, int(min(v, 100) * width_scale))
     return (f'<div style="display:flex;align-items:center;gap:8px">'
             f'<div style="height:10px;width:{w}px;background:{color};border-radius:5px;min-width:4px"></div>'
