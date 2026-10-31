@@ -115,8 +115,11 @@ docker run --name oam-tools -it swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:
 After entering the container, execute the following command to initialize the environment:
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh | bash
+curl -fsSL -o init_env.sh https://raw.gitcode.com/cann/oam-tools/raw/master/init_env.sh \
+  && bash init_env.sh
 ```
+
+> Review `init_env.sh` before executing it; do not pipe remote scripts directly into `bash` (`curl ... | bash`). CANN packages downloaded by the script are verified against the official sha256 checksum before execution.
 
 `init_env.sh` automatically installs the Python dependencies declared in the repository root `requirements.txt`. After environment deployment completes, continue with the following steps:
 

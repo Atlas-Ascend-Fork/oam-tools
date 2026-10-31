@@ -26,6 +26,8 @@ CANN_VERSION="${CANN_VERSION:-}"
 CHIP_TYPE="910b"
 CANN_BASE_URL="https://ascend.devcloud.huaweicloud.com/artifactory/cann-run/software"
 OAM_TOOLS_RAW_BASE_URL="${OAM_TOOLS_RAW_BASE_URL:-https://raw.gitcode.com/cann/oam-tools/raw/master}"
+# Whitelist of official download hosts; executable .run packages must come from these (security).
+ALLOWED_DOWNLOAD_HOSTS="ascend.devcloud.huaweicloud.com raw.gitcode.com"
 if [ -z "${INSTALL_PATH:-}" ]; then
     if [ "$(id -u)" -eq 0 ]; then
         INSTALL_PATH="/usr/local/Ascend"
@@ -40,6 +42,95 @@ log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 check_command() { command -v "$1" &>/dev/null; }
+
+get_url_host() {
+    local host="$1"
+    host="${host#*://}"
+    host="${host%%[/?#]*}"
+    host="${host##*@}"
+    host="${host%%:*}"
+    printf '%s' "$host"
+}
+
+# validate_download_url <url> <label> [strict|advisory]
+# strict (default): the URL must be https:// and its host must be in
+#   ALLOWED_DOWNLOAD_HOSTS; used for everything that gets executed.
+# advisory: https:// is still mandatory, but a non-whitelisted host (only
+#   possible via user-supplied OAM_TOOLS_RAW_BASE_URL) only triggers a warning.
+validate_download_url() {
+    local url="$1"
+    local label="$2"
+    local mode="${3:-strict}"
+    local host allowed
+
+    case "$url" in
+        https://*) ;;
+        *)
+            log_error "${label}: non-HTTPS download URL is not allowed: ${url}"
+            return 1
+            ;;
+    esac
+
+    host=$(get_url_host "$url")
+    for allowed in $ALLOWED_DOWNLOAD_HOSTS; do
+        if [ "$host" = "$allowed" ]; then
+            return 0
+        fi
+    done
+
+    if [ "$mode" = "advisory" ]; then
+        log_warn "${label}: '${host}' is not an official source (allowed: ${ALLOWED_DOWNLOAD_HOSTS})"
+        log_warn "Make sure you trust this source before using the fetched content"
+        return 0
+    fi
+
+    log_error "${label}: download host '${host}' is not in the allowed source whitelist: ${ALLOWED_DOWNLOAD_HOSTS}"
+    return 1
+}
+
+# verify_run_package <pkg_path> <pkg_url> <label>
+# Downloads the official sha256 checksum published next to the package and
+# verifies the package digest over HTTPS. A package that cannot be verified
+# is never executed.
+verify_run_package() {
+    local pkg_path="$1"
+    local pkg_url="$2"
+    local label="$3"
+    local checksum_file="${pkg_path}.sha256"
+    local expected actual
+
+    check_command sha256sum || {
+        log_error "sha256sum is required to verify ${label}"
+        return 1
+    }
+
+    log_info "Verifying ${label} (sha256)..."
+    curl -fsSL --connect-timeout 15 --retry 2 "${pkg_url}.sha256" -o "$checksum_file" || {
+        rm -f "$checksum_file"
+        log_error "Failed to fetch official checksum: ${pkg_url}.sha256"
+        log_error "Refusing to execute unverified package: ${pkg_path}"
+        return 1
+    }
+
+    expected=$(tr -d '[:space:]' < "$checksum_file" | tr '[:upper:]' '[:lower:]')
+    if ! printf '%s' "$expected" | grep -qE '^[0-9a-f]{64}$'; then
+        rm -f "$checksum_file"
+        log_error "Invalid sha256 checksum format for ${label}: ${pkg_url}.sha256"
+        return 1
+    fi
+
+    actual=$(sha256sum "$pkg_path" | awk '{print $1}')
+    if [ "$actual" != "$expected" ]; then
+        rm -f "$checksum_file" "$pkg_path"
+        log_error "sha256 mismatch for ${label}: expected ${expected}, got ${actual}"
+        log_error "Package is corrupted or tampered with; it has been removed: ${pkg_path}"
+        return 1
+    fi
+
+    rm -f "$checksum_file"
+    log_info "${label} integrity verified"
+    return 0
+}
 
 is_root_user() { [ "$(id -u)" -eq 0 ]; }
 
@@ -69,6 +160,7 @@ get_cann_version_from_cmake() {
             return 1
         fi
         log_warn "version.cmake not found locally, fetching from ${OAM_TOOLS_RAW_BASE_URL}/version.cmake" >&2
+        validate_download_url "${OAM_TOOLS_RAW_BASE_URL}/version.cmake" "version.cmake download" advisory 1>&2 || return 1
         version_content=$(curl -fsSL "${OAM_TOOLS_RAW_BASE_URL}/version.cmake") || {
             log_error "Failed to fetch version.cmake" >&2
             return 1
@@ -155,8 +247,16 @@ install_cann() {
     log_warn "This will download ~3GB of packages"
 
     local arch=$(get_arch)
-    local download_dir="/tmp/cann_install"
-    mkdir -p "$download_dir"
+    local previous_dir="$PWD"
+    local download_dir
+    download_dir=$(mktemp -d "${TMPDIR:-/tmp}/cann_install.XXXXXX") || {
+        log_error "Failed to create private CANN download directory"
+        return 1
+    }
+    chmod 700 "$download_dir"
+    # shellcheck disable=SC2064  # expand the private path now, before any cd
+    trap 'rm -rf -- "$download_dir"' RETURN
+    trap 'rm -rf -- "$download_dir"; exit 130' INT TERM HUP QUIT
     cd "$download_dir"
 
     local ops_package_chip_type=$(get_ops_package_chip_type "$CHIP_TYPE")
@@ -165,24 +265,30 @@ install_cann() {
     local toolkit_url="${CANN_BASE_URL}/${CANN_VERSION}/${arch}/${toolkit_pkg}"
     local ops_url="${CANN_BASE_URL}/${CANN_VERSION}/${arch}/${ops_pkg}"
 
+    validate_download_url "$toolkit_url" "CANN toolkit download" || return 1
     if [ ! -f "$toolkit_pkg" ]; then
         log_info "Downloading CANN toolkit (${arch})..."
         log_info "URL: $toolkit_url"
-        wget -q --show-progress --no-check-certificate -O "$toolkit_pkg" "$toolkit_url" || {
+        wget -q --show-progress -O "$toolkit_pkg" "$toolkit_url" || {
+            rm -f "$toolkit_pkg"
             log_error "Failed to download toolkit"
             return 1
         }
     fi
+    verify_run_package "${download_dir}/${toolkit_pkg}" "$toolkit_url" "CANN toolkit package" || return 1
 
     if [ "$SKIP_OPS" = "false" ]; then
+        validate_download_url "$ops_url" "CANN ops download" || return 1
         if [ ! -f "$ops_pkg" ]; then
             log_info "Downloading CANN ops (${ops_package_chip_type}, ${arch})..."
             log_info "URL: $ops_url"
-            wget -q --show-progress --no-check-certificate -O "$ops_pkg" "$ops_url" || {
+            wget -q --show-progress -O "$ops_pkg" "$ops_url" || {
+                rm -f "$ops_pkg"
                 log_error "Failed to download ops"
                 return 1
             }
         fi
+        verify_run_package "${download_dir}/${ops_pkg}" "$ops_url" "CANN ops package" || return 1
     fi
 
     log_info "Installing CANN toolkit..."
@@ -201,8 +307,8 @@ install_cann() {
     fi
 
     log_info "Cleaning up..."
-    rm -f "$toolkit_pkg" "$ops_pkg"
-    cd - > /dev/null
+    cd "$previous_dir"
+    trap - INT TERM HUP QUIT
 
     log_info "CANN installation completed"
 }
@@ -226,7 +332,7 @@ setup_cann_env() {
 
     local pkg_inc="$CANN_PATH/pkg_inc"
     local arch_inc=""
-    
+
     if [ -d "$CANN_PATH/x86_64-linux/include" ]; then
         arch_inc="$CANN_PATH/x86_64-linux/include"
     elif [ -d "$CANN_PATH/aarch64-linux/include" ]; then
@@ -362,10 +468,19 @@ install_python_deps() {
         }
     elif check_command curl; then
         log_warn "requirements.txt not found locally, installing from: $remote_requirements_url"
+        validate_download_url "$remote_requirements_url" "requirements.txt download" advisory || return 1
         requirements_content=$(curl -fsSL "$remote_requirements_url") || {
             log_error "Failed to fetch requirements.txt"
             return 1
         }
+        if [ -z "$(printf '%s\n' "$requirements_content" | tr -d '[:space:]')" ]; then
+            log_error "Fetched requirements.txt is empty, refusing to install"
+            return 1
+        fi
+        if printf '%s\n' "$requirements_content" | grep -qE '^[[:space:]]*-'; then
+            log_error "Fetched requirements.txt contains pip option lines (e.g. --index-url), refusing to install"
+            return 1
+        fi
         local tmp_requirements
         tmp_requirements=$(mktemp "${TMPDIR:-/tmp}/oam_requirements.XXXXXX") || {
             log_error "Failed to create temporary requirements file"
