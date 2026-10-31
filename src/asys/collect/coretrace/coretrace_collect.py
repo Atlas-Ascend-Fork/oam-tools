@@ -83,30 +83,35 @@ class ParseCoreTrace:
 
     def parse_addr_src_line(self, fp, data, shift):
         parsed_line = ""
-        for bin_name, addrs in data.maps.items():
+        lookup_addr = fp - shift
+        for bin_name, mappings in data.maps.items():
             if bin_name == "":
                 continue
+            base_addr = min(start_addr for start_addr, _ in mappings)
             bin_path = self.get_binary_path(bin_name)
-            start_addr, end_addr = addrs
-            if start_addr < fp < end_addr:
-                delta = hex(fp - start_addr - shift)
-                cmd = [self.__addr2line, "-Cifps", "-e", bin_path, "-a", delta]
-                try:
-                    out = self.run_addr2line(cmd)
-                except (OSError, ValueError) as e:
-                    if not self.warned:
-                        log_warning(f'Run "{" ".join(cmd)}" failed, error detail: {e}')
-                        self.warned = True
-                    out = []
-                if len(out) == 0:
-                    parsed_line += "0x%x    %s    %s" % (fp, delta, bin_name) + "\n"
-                else:
-                    for func in out:
-                        parsed_line += (
-                            "0x%x    %s    %s" % (fp, func.strip(), bin_name.strip())
-                            + "\n"
-                        )
-                return parsed_line
+            for start_addr, end_addr in mappings:
+                if start_addr <= lookup_addr < end_addr:
+                    delta = hex(lookup_addr - base_addr)
+                    cmd = [self.__addr2line, "-Cifps", "-e", bin_path, "-a", delta]
+                    try:
+                        out = self.run_addr2line(cmd)
+                    except (OSError, ValueError) as e:
+                        if not self.warned:
+                            log_warning(
+                                f'Run "{" ".join(cmd)}" failed, error detail: {e}'
+                            )
+                            self.warned = True
+                        out = []
+                    if len(out) == 0:
+                        parsed_line += "0x%x    %s    %s" % (fp, delta, bin_name) + "\n"
+                    else:
+                        for func in out:
+                            parsed_line += (
+                                "0x%x    %s    %s"
+                                % (fp, func.strip(), bin_name.strip())
+                                + "\n"
+                            )
+                    return parsed_line
         return parsed_line
 
     def parse_line(self, line, parse_data):
@@ -134,10 +139,7 @@ class ParseCoreTrace:
                     lambda x: int(x, base=16), line_parts[0].split("-")
                 )
                 bin_name = line_parts[1].strip("\x00")
-                if bin_name in parse_data.maps:
-                    start_addr = min(parse_data.maps[bin_name][0], start_addr)
-                    end_addr = max(parse_data.maps[bin_name][1], end_addr)
-                parse_data.maps[bin_name] = [start_addr, end_addr]
+                parse_data.maps.setdefault(bin_name, []).append((start_addr, end_addr))
                 return ""
         except (IndexError, ValueError):
             return this_line
