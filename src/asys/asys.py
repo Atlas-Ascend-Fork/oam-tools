@@ -83,8 +83,8 @@ def main():
     asys_parser = CommandLineParser()
     try:
         parse_ret = asys_parser.parse()
-    except SystemExit:
-        return False
+    except SystemExit as exc:
+        return exc.code in (0, None)
     param_dict = ParamDict()
     command = param_dict.get_command()
     if command is None:
@@ -150,7 +150,11 @@ def main():
     return task_res
 
 
-if __name__ == "__main__":
-    main()
-    # clean __pycache__ file
+def _run_cli():
+    result = main()
     clean_pycache()
+    return 0 if result else 1
+
+
+if __name__ == "__main__":
+    sys.exit(_run_cli())

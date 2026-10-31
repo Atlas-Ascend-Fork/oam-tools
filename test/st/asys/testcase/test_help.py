@@ -147,7 +147,7 @@ class TestHelp(AssertTest):
     @pytest.mark.skip(reason="temporarily skipped due to test failure")
     def test_asys_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         print(captured.out)  # noqa: T201  # test diagnostic output
         except_msg = """usage: asys [-h]
@@ -190,7 +190,7 @@ option
 
     def test_asys_collect_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "collect", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys collect [-h] [--task_dir ] [--output ] [--tar ] [-r {stacktrace}]
                 [--remote ] [--all] [--quiet] [--timeout]
@@ -238,7 +238,7 @@ options:
 
     def test_asys_launch_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "launch", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys launch [-h] --task   [--output ] [--tar ]
 
@@ -266,7 +266,7 @@ options:
 
     def test_asys_diagnose_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "diagnose", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys diagnose [-h] -r {stress_detect,hbm_detect,cpu_detect,component,aicore_stl_detect}
                      [-d ] [--timeout ] [--output ]
@@ -302,7 +302,7 @@ options:
 
     def test_asys_health_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "health", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys health [-h] [-d ]
 
@@ -324,7 +324,7 @@ options:
 
     def test_asys_info_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "info", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys info [-h] -r {hardware,software,status} [-d ]
 
@@ -352,7 +352,7 @@ options:
 
     def test_asys_analyze_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "analyze", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys analyze [-h] -r {trace,coredump,coretrace,stackcore,aicore_error,ub}
                 [-d ] [--file   | --path  ] [--exe_file ] [--core_file ]
@@ -413,7 +413,7 @@ options:
 
     def test_asys_config_print_help(self, capsys):
         sys.argv = [ASYS_MAIN_PATH, "config", "-h"]
-        self.assertTrue(not asys.main())
+        self.assertTrue(asys.main())
         captured = capsys.readouterr()
         except_msg = """usage: asys config [-h] [--get] [-d ] [--restore] --stress_detect
 

@@ -21,10 +21,11 @@
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
 import os
+import runpy
 import sys
 import pytest
 
-from .conftest import ASYS_SRC_PATH, CONF_SRC_PATH, ut_root_path
+from .conftest import ASYS_MAIN_PATH, ASYS_SRC_PATH, CONF_SRC_PATH, ut_root_path
 from .conftest import AssertTest
 
 
@@ -193,7 +194,7 @@ class TestAsysMain(AssertTest):
     def test_clean_env(self, mocker):
         mocker.patch("common.FileOperate.create_dir", return_value=RetCode.SUCCESS)
         mocker.patch(
-            "cmdline.cmd_parser.CommandLineParser.parse", side_effect=SystemExit
+            "cmdline.cmd_parser.CommandLineParser.parse", side_effect=SystemExit(2)
         )
         mocker.patch("config.config_parser.AsysConfigParser.parse", return_value=True)
         mocker.patch("params.param_dict.ParamDict.get_command", return_value="collect")
@@ -205,3 +206,24 @@ class TestAsysMain(AssertTest):
             if "__pycache__" in dirs:
                 check = True
         self.assertTrue(not check)
+
+    @pytest.mark.parametrize(("result", "expected"), [(True, 0), (False, 1)])
+    def test_cli_exit_code_reflects_main_result(self, mocker, result, expected):
+        mocker.patch("asys.main", return_value=result)
+        mocker.patch("asys.clean_pycache")
+        self.assertTrue(asys._run_cli() == expected)
+
+    @pytest.mark.parametrize(
+        ("parse_exit_code", "expected"), [(None, 0), (0, 0), (2, 1)]
+    )
+    def test_main_guard_propagates_exit_code(
+        self, monkeypatch, mocker, parse_exit_code, expected
+    ):
+        mocker.patch(
+            "cmdline.cmd_parser.CommandLineParser.parse",
+            side_effect=SystemExit(parse_exit_code),
+        )
+        monkeypatch.setattr(sys, "argv", [ASYS_MAIN_PATH, "collect"])
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_path(ASYS_MAIN_PATH, run_name="__main__")
+        self.assertTrue(exc_info.value.code == expected)
