@@ -61,6 +61,110 @@ class TestInfo(AssertTest):
         captured = capsys.readouterr()
         self.assertTrue(captured.out.count("Host Info") == 1)
 
+    def test_info_hardware_sums_per_device_core_counts(self, mocker):
+        device_info = mocker.Mock()
+        device_info.get_ccpu_count.side_effect = [8, 12]
+        device_info.get_aicpu_count.side_effect = [4, 8]
+        device_info.get_aicore_count.side_effect = [32, 40]
+        device_info.get_veccore_count.side_effect = [64, 80]
+        device_info.get_device_info_loop.side_effect = ["Ascend X", "Arch X"]
+
+        info = object.__new__(AsysInfo)
+        info.device_info = device_info
+        info.device_num = 2
+        table_data = {" Device Info ": []}
+
+        info._AsysInfo__get_device_info(table_data)
+        rows = dict(table_data[" Device Info "])
+
+        self.assertTrue(rows["Control CPU Count"] == "20 (8 + 12)")
+        self.assertTrue(rows["AI CPU Count"] == "12 (4 + 8)")
+        self.assertTrue(rows["AI Core Count"] == "72 (32 + 40)")
+        self.assertTrue(rows["AI Vector Count"] == "144 (64 + 80)")
+
+    @pytest.mark.parametrize(
+        (
+            "device_num",
+            "expected_ccpu",
+            "expected_aicpu",
+            "expected_aicore",
+            "expected_vector",
+        ),
+        [
+            (1, "8 (8 * 1)", "4 (4 * 1)", "32 (32 * 1)", "64 (64 * 1)"),
+            (2, "16 (8 * 2)", "8 (4 * 2)", "64 (32 * 2)", "128 (64 * 2)"),
+        ],
+    )
+    def test_info_hardware_same_core_counts_keep_multiplication_summary(
+        self,
+        mocker,
+        device_num,
+        expected_ccpu,
+        expected_aicpu,
+        expected_aicore,
+        expected_vector,
+    ):
+        device_info = mocker.Mock()
+        device_info.get_ccpu_count.side_effect = [8] * device_num
+        device_info.get_aicpu_count.side_effect = [4] * device_num
+        device_info.get_aicore_count.side_effect = [32] * device_num
+        device_info.get_veccore_count.side_effect = [64] * device_num
+        device_info.get_device_info_loop.side_effect = ["Ascend X", "Arch X"]
+
+        info = object.__new__(AsysInfo)
+        info.device_info = device_info
+        info.device_num = device_num
+        table_data = {" Device Info ": []}
+
+        info._AsysInfo__get_device_info(table_data)
+        rows = dict(table_data[" Device Info "])
+
+        self.assertTrue(rows["Control CPU Count"] == expected_ccpu)
+        self.assertTrue(rows["AI CPU Count"] == expected_aicpu)
+        self.assertTrue(rows["AI Core Count"] == expected_aicore)
+        self.assertTrue(rows["AI Vector Count"] == expected_vector)
+
+    @pytest.mark.parametrize("unavailable_count", ["-", None, -1])
+    def test_info_hardware_does_not_report_partial_core_count(
+        self, mocker, unavailable_count
+    ):
+        device_info = mocker.Mock()
+        device_info.get_ccpu_count.side_effect = [8, 12]
+        device_info.get_aicpu_count.side_effect = [4, 8]
+        device_info.get_aicore_count.side_effect = [32, unavailable_count]
+        device_info.get_veccore_count.side_effect = [64, 80]
+        device_info.get_device_info_loop.side_effect = ["Ascend X", "Arch X"]
+
+        info = object.__new__(AsysInfo)
+        info.device_info = device_info
+        info.device_num = 2
+        table_data = {" Device Info ": []}
+
+        info._AsysInfo__get_device_info(table_data)
+        rows = dict(table_data[" Device Info "])
+
+        self.assertTrue(rows["AI Core Count"] == "-")
+
+    def test_info_hardware_zero_devices_reports_zero_cores(self, mocker):
+        device_info = mocker.Mock()
+        device_info.get_device_info_loop.return_value = "Unknown"
+
+        info = object.__new__(AsysInfo)
+        info.device_info = device_info
+        info.device_num = 0
+        table_data = {" Device Info ": []}
+
+        info._AsysInfo__get_device_info(table_data)
+        rows = dict(table_data[" Device Info "])
+
+        for name in (
+            "Control CPU Count",
+            "AI CPU Count",
+            "AI Core Count",
+            "AI Vector Count",
+        ):
+            self.assertTrue(rows[name] == "0 (no devices)")
+
     def test_info_hardware_not_data(self, capsys, mocker):
         """
         @描述: 使用-r参数, 执行info功能

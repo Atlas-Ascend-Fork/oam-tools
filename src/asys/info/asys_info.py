@@ -109,19 +109,21 @@ class AsysInfo:
                 continue
             table_data[" Host Info "].append([query_name, host_info])
 
+    def __get_device_count_summary(self, count_func):
+        if self.device_num == 0:
+            return "0 (no devices)"
+
+        counts = [count_func(device_id) for device_id in range(self.device_num)]
+        if any(type(count) is not int or count < 0 for count in counts):
+            return NOT_SUPPORT
+
+        if len(set(counts)) == 1:
+            detail = f"{counts[0]} * {self.device_num}"
+        else:
+            detail = " + ".join(str(count) for count in counts)
+        return f"{sum(counts)} ({detail})"
+
     def __get_device_info(self, table_data):
-        ccpu_count = self.device_info.get_device_info_loop(
-            self.device_num, self.device_info.get_ccpu_count, NOT_SUPPORT
-        )
-        aicpu_count = self.device_info.get_device_info_loop(
-            self.device_num, self.device_info.get_aicpu_count, NOT_SUPPORT
-        )
-        aicore_count = self.device_info.get_device_info_loop(
-            self.device_num, self.device_info.get_aicore_count, NOT_SUPPORT
-        )
-        vector_count = self.device_info.get_device_info_loop(
-            self.device_num, self.device_info.get_veccore_count, NOT_SUPPORT
-        )
         device_info_query_cmds = {
             "NPU Count": self.device_num,
             "Chip Info": self.device_info.get_device_info_loop(
@@ -130,14 +132,18 @@ class AsysInfo:
             "Arch Info": self.device_info.get_device_info_loop(
                 self.device_num, self.device_info.get_npu_arch, UNKNOWN
             ),
-            "Control CPU Count": str(ccpu_count * self.device_num)
-            + f" ({ccpu_count} * {self.device_num})",
-            "AI CPU Count": str(aicpu_count * self.device_num)
-            + f" ({aicpu_count} * {self.device_num})",
-            "AI Core Count": str(aicore_count * self.device_num)
-            + f" ({aicore_count} * {self.device_num})",
-            "AI Vector Count": str(vector_count * self.device_num)
-            + f" ({vector_count} * {self.device_num})",
+            "Control CPU Count": self.__get_device_count_summary(
+                self.device_info.get_ccpu_count
+            ),
+            "AI CPU Count": self.__get_device_count_summary(
+                self.device_info.get_aicpu_count
+            ),
+            "AI Core Count": self.__get_device_count_summary(
+                self.device_info.get_aicore_count
+            ),
+            "AI Vector Count": self.__get_device_count_summary(
+                self.device_info.get_veccore_count
+            ),
         }
         for query_name, query_cmds in device_info_query_cmds.items():
             table_data[" Device Info "].append([query_name, query_cmds])
