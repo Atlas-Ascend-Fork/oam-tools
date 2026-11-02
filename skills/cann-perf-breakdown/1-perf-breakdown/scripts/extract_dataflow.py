@@ -43,6 +43,51 @@ binary merges). Control flow is classified rather than uniformly rejected, becau
 Only the latter two land in `unsupported`. Treating a quantisation-mode `if` as
 unsupported made every real model report its main compute as unextractable, which is
 what forced callers to hand-declare the very edges this script exists to derive.
+
+The classification covers every construct that hides an execution path, not just `if`:
+`match` (whose subject always runs but whose arms do not), `except*`, and any statement
+type this dispatch does not name. A `match self.quant_mode:` is config-gated exactly like
+the `if` above and yields the same named variants; a `match` on a runtime value is
+`data_dependent`. Falling through silently is the failure mode this reducer exists to
+prevent, so an unrecognised statement that still calls a submodule is reported rather
+than dropped.
+
+The `async` spellings classify exactly like their sync ones, because `await` says when a
+call may suspend, not whether it happens: `async for layer in self.layers:` is the same
+repeated block as `for`, `async with` opens its body like `with`, and `x = await self.f(x)`
+is the same call as `x = self.f(x)`. An `async def forward` is scanned like a `def forward`
+for the same reason -- skipping it reported zero modules and zero unsupported, which reads
+as "nothing to see here" rather than "this method was never looked at".
+
+A loop's `else:` clause is reduced when the body cannot `break`, since then it always runs.
+When the body can `break` the clause is still reduced, but as a two-arm merge -- the clause
+against "the loop broke, so the clause never ran" -- because whether it ran is a runtime
+fact and both producers are possible, so a phi names both instead of the graph picking one.
+Two things are reported rather than merged: a clause holding a submodule call, which cannot
+be placed on a path that may never execute, and a merge the arms cannot represent at all
+(they disagree on whether the residual is None).
+
+A `match` selector is its subject *and* every `case.guard`, so `case 0 if x.sum():` makes
+the whole match data-dependent however statically readable the subject is. A match also has
+no implicit "ran nothing" arm the way an `if` without `else` does: matching no case raises
+MatchError, so the next statement is only reached through some case body.
+
+A branch whose arms call no submodule is still reduced, not skipped. Its arms rebind names,
+and skipping the construct left the pre-branch writer in place -- a graph claiming the old
+producer, which is the same lie as dropping the calls. Merging the arms records every
+possible producer as a phi, and only a merge that cannot be represented at all (arms that
+disagree on whether the residual is None) is escalated to `unsupported`.
+
+The same rule holds for the constructs with no selector to classify, and "holds no submodule
+call" is not a reason to skip one either. A call-free loop is reduced through the same path
+as a loop whose body calls submodules, so its body's rebindings land and its `else:` clause
+reaches the two-arm merge above instead of being dropped along with the whole statement. A
+call-free `with` reduces in place, because its body always runs -- either `__enter__` succeeds
+and every statement in it runs, or control leaves the construct. A call-free `try` merges the
+body (and its `else:`) against each handler, because reaching the next statement means one of
+those happened and which one is a runtime fact, then reduces `finally:` in place, since that
+runs on every outcome. Only a `CONTROL_FLOW_NODES` member this dispatch does not name is
+reported outright, and it is reported whether or not it holds a call.
 """
 import argparse
 import ast
@@ -74,6 +119,123 @@ CONFIG_ATTR_HINTS = ('size', 'mode', 'enable', 'enabled', 'use_', 'is_moe', 'n_'
 #: readers that parse numbers as doubles lose exactness past 2**53 — so it is reported
 #: as unknown size instead.
 MAX_STATIC_MODULE_COUNT = 10 ** 6
+
+#: Statement types whose execution path cannot be read straight off source order, so they
+#: are classified by `_control_flow` instead of being reduced in place.
+#:
+#: `Match` (3.10+) and `TryStar` (3.11+) are looked up with `getattr` and *filtered out*
+#: when the running interpreter has no such node. Giving them a fallback type instead
+#: (`getattr(ast, "Match", ast.If)`) would both duplicate an entry in the tuple and assert
+#: an equivalence that is simply not true. On an interpreter without them the tuple is
+#: exactly the original node set, no more and no less.
+#:
+#: The `async` spellings are here for the same reason their sync ones are: `await` says when
+#: a call may suspend, not whether it happens, so `async for layer in self.layers:` runs
+#: every iteration exactly like `for` and `async with` opens its body exactly like `with`.
+#: Leaving them out sent both to `_unrecognized`, whose callee test sees no `self.` there
+#: (the callee is the loop variable), so the async repeated block vanished while the report
+#: still claimed nothing was unsupported.
+CONTROL_FLOW_NODES = tuple(
+    node for node in (
+        ast.If, ast.For, ast.While, ast.With, ast.Try,
+        ast.AsyncFor, ast.AsyncWith,
+        getattr(ast, 'TryStar', None), getattr(ast, 'Match', None),
+    ) if isinstance(node, type))
+
+#: Loop spellings that bind a target and iterate an expression: `for` and `async for`.
+#: Every "which names does this loop bind" / "what does it iterate" test branches on this
+#: one tuple, so the async form cannot drift away from the sync one.
+LOOP_NODES = (ast.For, ast.AsyncFor)
+
+#: Loops plus `while`: the constructs reduced as a repeated block by `_loop`.
+ITERATIVE_NODES = LOOP_NODES + (ast.While,)
+
+#: `ast.Match` where the interpreter has it, else None. Kept separate from the tuple above
+#: because the match handler needs the type for its own isinstance dispatch.
+MATCH_NODE = getattr(ast, 'Match', None)
+
+#: `with` / `async with`: the body always runs, so a call-free one reduces in place and the
+#: `as` target is a rebinding whose producer this reducer cannot see.
+WITH_NODES = (ast.With, ast.AsyncWith)
+
+#: `try` / `try*`: the body and each handler are alternative outcomes, so a call-free one
+#: merges its arms exactly like an `if` whose arms call nothing. `TryStar` is 3.11+ and is
+#: filtered out on an older interpreter for the same reason it is in `CONTROL_FLOW_NODES`.
+TRY_NODES = tuple(node for node in (ast.Try, getattr(ast, 'TryStar', None))
+                  if isinstance(node, type))
+
+
+def _nested_loop_targets(statement):
+    """Loop variables bound by any loop nested inside `statement` (its own excluded).
+
+    The gate deciding whether a construct contains submodule calls has to see these.
+    `for block in self.blocks:` whose body is another `for layer in block.layers:` only
+    ever calls `layer(...)`, so without the inner binding the outer loop looks call-free
+    and its entire body is dropped before traversal even starts -- the same silent hole
+    this reducer is supposed to close, one level up.
+
+    `async for` binds its target exactly like `for`, so it counts here too: an
+    `async for` nested in a `for` (or the other way round) must not make the enclosing
+    loop look call-free.
+    """
+    targets = set()
+    for node in ast.walk(statement):
+        if isinstance(node, LOOP_NODES) and node is not statement:
+            targets |= set(_targets_written(node.target))
+    return targets
+
+
+def _outermost_calls(calls):
+    """Keep only the outermost call of each nesting chain in `calls`.
+
+    `_submodule_calls()` walks, so for `self.route(self.pre(x))` it yields the outer *and*
+    the inner call, while `_add_call_tree()` descends into arguments on its own. Handing it
+    both records `self.pre` a second time -- a phantom step plus a phantom fork on its input,
+    which is precisely the "graph that is not ground truth" this script exists to prevent.
+    The inner call is already the nested source of the outer one, so only the outermost call
+    of a chain is a separate step of the graph.
+    """
+    nested = set()
+    for _, call in calls:
+        for child in ast.walk(call):
+            if child is not call and isinstance(child, ast.Call):
+                nested.add(id(child))
+    return [(path, node) for path, node in calls if id(node) not in nested]
+
+
+def _selector_kind(selectors):
+    """Classify the expression(s) that decide which arm of a branch runs.
+
+    A `match` arm is picked by its subject *and* by its `case.guard`, so every one of them
+    has to be construction-time config for the choice to be static. Classifying the subject
+    alone labelled `match self.quant_mode: case 0 if x.sum():` as
+    `selected_by: execution_profile` -- a static claim about a choice a tensor makes at
+    runtime -- and left the guard's own calls out of the graph, because arm extraction only
+    walks `case.body`.
+    """
+    kinds = [_test_kind(selector) for selector in selectors if selector is not None]
+    for kind in kinds:
+        if kind != 'config_gated':
+            return kind
+    return 'config_gated'
+
+
+def _match_condition(statement):
+    """The `match` selector as source text: the subject, plus every guard that narrows an arm.
+
+    The subject alone is not the whole selector once guards exist, and `condition` is what a
+    reader of `dataflow_source.json` uses to work out which deviation to declare.
+    """
+    condition = ast.unparse(statement.subject)
+    guards = [f'case {index} if {ast.unparse(case.guard)}'
+              for index, case in enumerate(statement.cases) if case.guard is not None]
+    return f'{condition} | ' + '; '.join(guards) if guards else condition
+
+
+def _sorted_call_sites(calls):
+    """Stable `[{symbol, lineno}]` view of a list of (callee path, Call node) pairs."""
+    return sorted(({'symbol': path, 'lineno': node.lineno} for path, node in calls),
+                  key=lambda item: (item['lineno'], item['symbol']))
 
 
 def _test_kind(test):
@@ -213,7 +375,16 @@ def _unpacked_bindings(target, value):
 
 
 def _call_of(value):
-    """The outermost submodule call in an expression, if any."""
+    """The outermost submodule call in an expression, if any.
+
+    `await` is transparent. `x = await layer(x)` invokes `layer` with the same arguments
+    and binds the same result; the coroutine wrapper says when the caller may suspend, not
+    whether the submodule ran or what it wrote. Treating `Await` as "not a call" made every
+    awaited invocation look like a plain rebinding, so the reducer dropped it without a
+    word -- the same silent hole, spelled asynchronously.
+    """
+    while isinstance(value, ast.Await):
+        value = value.value
     if isinstance(value, ast.Call):
         return value
     return None
@@ -305,6 +476,7 @@ class ForwardGraph:
         self.reads_of = {}        # (variable, writer) -> [call ids that read it]
         self.parameters = _parameter_names(func)
         self.known_none = set()    # local bindings proven to be None at this point
+        self.loop_targets = []     # stack of loop-variable names enclosing this statement
 
     def _record_reads(self, value, call_id, skip=()):
         """Resolve every name read in `value` to its last writer.
@@ -499,7 +671,7 @@ class ForwardGraph:
         if isinstance(statement, ast.Return):
             self._returns(statement)
             return
-        if isinstance(statement, (ast.If, ast.For, ast.While, ast.With, ast.Try)):
+        if isinstance(statement, CONTROL_FLOW_NODES):
             self._control_flow(statement)
             return
         if isinstance(statement, (ast.Assign, ast.AnnAssign)):
@@ -513,96 +685,327 @@ class ForwardGraph:
             if call is not None:
                 self._add_call_tree(call, [], statement)
             return
+        self._unrecognized(statement)
+
+    def _submodule_calls(self, statement, loop_targets=()):
+        """(callee path, Call node) for every submodule-shaped call inside `statement`.
+
+        `self.<name>` is the usual callee, but inside `for layer in self.layers:` the callee
+        is the loop variable, so the enclosing loop targets count as submodule shapes too.
+        "Does this construct contain a call" and "which calls does it report" must share one
+        predicate: when they disagree, a construct is judged to contain a call and then
+        reports an empty call list.
+        """
+        targets = set(loop_targets)
+        found = []
+        for node in ast.walk(statement):
+            if not isinstance(node, ast.Call):
+                continue
+            path = _attr_path(node.func)
+            if path.startswith('self.') or path.split('[')[0].split('.')[0] in targets:
+                found.append((path, node))
+        return found
+
+    def _unrecognized(self, statement):
+        """Never let a statement that calls a submodule fall off the end silently.
+
+        The dispatch above is a hardcoded list, so anything it does not name -- today a
+        `raise` or `assert` carrying a submodule call, tomorrow whatever a new Python adds
+        -- used to reach the implicit `return None` and vanish. The graph then looked
+        complete while a whole call was missing, and the downstream gate never fired
+        because `unsupported` stayed empty. Reporting one extra explicit "unsupported" is
+        always cheaper than that hole.
+
+        Both examples named here are measured, not illustrative. An `async for` used to be
+        listed as a third one and was not: async constructs are now classified by
+        `_control_flow` like their sync spellings, so this fallback never sees them.
+        """
+        calls = self._submodule_calls(statement, self._enclosing_loop_targets())
+        if not calls:
+            return
+        self.unsupported.append({
+            'lineno': statement.lineno,
+            'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
+            'construct': type(statement).__name__,
+            'severity': 'unparsable',
+            'call_symbols': sorted({path for path, _ in calls}),
+            'call_sites': _sorted_call_sites(calls),
+            'reason': f'{type(statement).__name__} 包含 submodule 调用，但不属于此 reducer '
+                      f'已识别的语句类型，无法确定其执行语义；'
+                      f'需要在 config.deviations 中显式声明',
+        })
+
+    def _enclosing_loop_targets(self):
+        """Union of the loop variables of every `for` currently being traversed."""
+        if not self.loop_targets:
+            return set()
+        return set().union(*self.loop_targets)
 
     def _control_flow(self, statement):
         # A loop over a ModuleList calls the *loop variable* (`for layer in self.layers:
         # x = layer(x)`), not `self.<name>`, so requiring a `self.` callee misses the single
-        # most important repeated-block shape in the family.
-        loop_targets = set()
-        if isinstance(statement, ast.For):
-            loop_targets = set(_targets_written(statement.target))
-        contains_call = any(
-            isinstance(node, ast.Call)
-            and (_attr_path(node.func).startswith('self.')
-                 or _attr_path(node.func).split('[')[0].split('.')[0] in loop_targets)
-            for node in ast.walk(statement))
-        if not contains_call:
-            # A call-free branch can still change provenance (notably ``residual = None``).
-            # We cannot attach a selected execution arm to the later fused call, so reject
-            # the construct explicitly instead of silently carrying stale writer state.
-            writes_none = any(
-                isinstance(node, (ast.Assign, ast.AnnAssign))
-                and isinstance(getattr(node, 'value', None), ast.Constant)
-                and node.value.value is None
-                for node in ast.walk(statement))
-            if writes_none:
-                self.unsupported.append({
-                    'lineno': statement.lineno,
-                    'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
-                    'construct': type(statement).__name__,
-                    'severity': 'unparsable',
-                    'call_symbols': [],
-                    'call_sites': [],
-                    'reason': '分支虽然没有 submodule 调用，但修改了残差绑定；'
-                              '无法在后续 fused 调用前确定该路径是否初始化残差，'
-                              '需要在 config.deviations 中显式声明',
-                })
-            return
-        call_symbols = sorted({
-            _attr_path(node.func)
-            for node in ast.walk(statement)
-            if isinstance(node, ast.Call) and _attr_path(node.func).startswith('self.')
-        })
-        call_sites = sorted((
-            {'symbol': _attr_path(node.func), 'lineno': node.lineno}
-            for node in ast.walk(statement)
-            if isinstance(node, ast.Call) and _attr_path(node.func).startswith('self.')
-        ), key=lambda item: (item['lineno'], item['symbol']))
+        # most important repeated-block shape in the family. A construct *nested* in such a
+        # loop body must see the same targets, otherwise a `match` under
+        # `for layer in self.layers:` looks call-free and vanishes without a trace.
+        loop_targets = self._enclosing_loop_targets()
+        if isinstance(statement, LOOP_NODES):
+            loop_targets |= set(_targets_written(statement.target))
+        loop_targets |= _nested_loop_targets(statement)
+
+        calls = self._submodule_calls(statement, loop_targets)
 
         # A loop over submodules is the repeated-block construct, not a variant: every
         # iteration runs. Extract the body once and record the iteration count separately.
-        if isinstance(statement, (ast.For, ast.While)):
-            self._loop(statement)
-            return
-        if not isinstance(statement, ast.If):
-            self.unsupported.append({
-                'lineno': statement.lineno,
-                'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
-                'construct': type(statement).__name__,
-                'severity': 'unparsable',
-                'call_symbols': call_symbols,
-                'call_sites': call_sites,
-                'reason': f'{type(statement).__name__} 包含 submodule 调用，此 reducer 无法'
-                          f'确定其执行语义；需要显式 deviation 声明',
-            })
+        if isinstance(statement, ITERATIVE_NODES):
+            # Call-free loops take the same path: the body still rebinds names, and only
+            # `_loop` reaches `_loop_else`. Sending them elsewhere dropped a call-free
+            # loop's whole `else:` clause, which is the same lie as dropping its calls.
+            self._loop(statement, loop_targets)
             return
 
-        kind = _test_kind(statement.test)
-        condition = ast.unparse(statement.test)
-        if kind != 'config_gated':
+        if MATCH_NODE is not None and isinstance(statement, MATCH_NODE):
+            self._match(statement, calls, loop_targets)
+            return
+
+        if isinstance(statement, ast.If):
+            condition = ast.unparse(statement.test)
+            self._selector_branch(
+                statement,
+                arms=(('then', statement.body), ('else', statement.orelse)),
+                selectors=(statement.test,),
+                condition=condition,
+                calls=calls,
+                construct='If',
+                reason=f'分支条件 `{condition}` 依赖运行期数据，展开后的数据流图不可靠；'
+                       f'需要在 config 中以 deviations 显式声明所走分支',
+                implicit_passthrough=not statement.orelse,
+            )
+            return
+
+        if not calls:
+            if isinstance(statement, WITH_NODES):
+                self._with(statement)
+            elif isinstance(statement, TRY_NODES):
+                self._try(statement)
+            else:
+                self._unhandled_control_flow(statement)
+            return
+        self.unsupported.append({
+            'lineno': statement.lineno,
+            'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
+            'construct': type(statement).__name__,
+            'severity': 'unparsable',
+            'call_symbols': sorted({path for path, _ in calls}),
+            'call_sites': _sorted_call_sites(calls),
+            'reason': f'{type(statement).__name__} 包含 submodule 调用，此 reducer 无法'
+                      f'确定其执行语义；需要显式 deviation 声明',
+        })
+
+    def _with(self, statement):
+        """A call-free `with`: the body always runs, so reduce it in place.
+
+        `with` opens no alternative execution path -- either `__enter__` succeeds and every
+        statement in the body runs, or it raises and control leaves the construct. So there
+        is nothing to merge and nothing to report. Skipping the body left the pre-`with`
+        writer in place: `x = self.prep(x)` / `y = self.other(x)` / `with self.ctx: x = y`
+        made the next read of `x` name only `self.prep`, a producer the body had already
+        overwritten -- the same lie as dropping a call.
+
+        An `as` target is bound to whatever `__enter__` returned, which this reducer cannot
+        see, so it is recorded as a rebinding with no known producer. Leaving the previous
+        writer there would be the stale-producer lie again, and inventing one would be worse.
+
+        The pop runs before the body is reduced, and that order carries semantics: a body
+        statement reading the target (`with open('f') as x:` / `y = x`) propagates whatever
+        `last_writer['x']` holds when it is reduced, so popping afterwards would hand `y`
+        the pre-`with` producer -- the stale-producer lie this construct exists to prevent.
+        """
+        for item in statement.items:
+            if item.optional_vars is None:
+                continue
+            for name in _targets_written(item.optional_vars):
+                self.last_writer.pop(name, None)
+                self.phi_writers.pop(name, None)
+                self.known_none.discard(name)
+        for inner in statement.body:
+            self._statement(inner)
+
+    def _try(self, statement):
+        """A call-free `try`: body and handlers are alternative outcomes, so merge them.
+
+        Reaching the statement after the `try` means either the body (and its `else:`) ran to
+        the end, or an exception diverted into exactly one handler. Which one is a runtime
+        fact, so the arms merge into a phi naming every possible producer, exactly like an
+        `if` whose arms call nothing. No variant is emitted: `selected_by: execution_profile`
+        would claim the profile decides whether an exception was raised, which it does not.
+        `finally:` runs on every outcome, so it is reduced in place *after* the merge rather
+        than being treated as one more arm.
+
+        Arms that disagree on whether the residual is None cannot be merged at all, and
+        `_extract_variants` escalates that once, under this construct's own label and range.
+        """
+        arms = [('try', list(statement.body) + list(statement.orelse))]
+        arms.extend((f'except{index}', list(handler.body))
+                    for index, handler in enumerate(statement.handlers))
+        self._extract_variants(statement, arms=arms, condition=None, call_symbols=[],
+                               call_sites=[], implicit_passthrough=False,
+                               static_selector=False)
+        for inner in statement.finalbody:
+            self._statement(inner)
+
+    def _unhandled_control_flow(self, statement):
+        """A `CONTROL_FLOW_NODES` member no branch above names: report it, never drop it.
+
+        Unreachable today -- the tuple is `if`, `match`, the loops, `with` and `try`, and each
+        has a handler -- but a node added to that tuple without one used to land in a
+        call-free path that reduced nothing and reported only a `= None` write, so the
+        construct vanished while the report still claimed nothing was unsupported. Booking it
+        as `unparsable` whether or not it holds a submodule call is the same argument
+        `_unrecognized` makes one statement over.
+        """
+        calls = self._submodule_calls(statement, self._enclosing_loop_targets())
+        self.unsupported.append({
+            'lineno': statement.lineno,
+            'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
+            'construct': type(statement).__name__,
+            'severity': 'unparsable',
+            'call_symbols': sorted({path for path, _ in calls}),
+            'call_sites': _sorted_call_sites(calls),
+            'reason': f'{type(statement).__name__} 属于控制流节点，但此 reducer 没有对应的'
+                      f'归约分支，无法确定其执行语义；需要在 config.deviations 中显式声明',
+        })
+
+    def _selector_branch(self, statement, arms, selectors, condition, calls, construct,
+                         reason, implicit_passthrough):
+        """`if`/`match`: classify the selector, then extract the arms or report the branch.
+
+        Shared so the two cannot drift: the same selector spelled `if self.quant_mode:` and
+        `match self.quant_mode:` is exactly as statically resolvable, so it must get the same
+        severity and the same named-variant extraction.
+
+        A selector that is not fixed before the run *and* whose arms call submodules cannot be
+        resolved at all, so it is reported and needs a deviation declaration. When the arms
+        call nothing there is still state to keep: an arm that rebinds a name changes every
+        later read of it, and dropping the branch here used to leave the pre-branch writer in
+        place -- a graph that silently claims the old producer, which is the same failure mode
+        as dropping the calls. Merging the arms records both possibilities as a phi instead,
+        and escalates to `unsupported` only where the merge is not representable (arms that
+        disagree on whether the residual is None, which `_extract_variants` detects).
+        """
+        call_symbols = sorted({path for path, _ in calls})
+        call_sites = _sorted_call_sites(calls)
+        kind = _selector_kind(selectors)
+        if calls and kind != 'config_gated':
             self.unsupported.append({
                 'lineno': statement.lineno,
                 'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
-                'construct': 'If',
-                'severity': 'data_dependent',
+                'construct': construct,
+                'severity': 'data_dependent' if kind == 'data_dependent' else 'unparsable',
                 'condition': condition,
                 'call_symbols': call_symbols,
                 'call_sites': call_sites,
-                'reason': f'分支条件 `{condition}` 依赖运行期数据，展开后的数据流图不可靠；'
-                          f'需要在 config 中以 deviations 显式声明所走分支',
+                'reason': reason,
             })
             return
+        self._extract_variants(
+            statement,
+            arms=arms,
+            condition=condition,
+            call_symbols=call_symbols,
+            call_sites=call_sites,
+            implicit_passthrough=implicit_passthrough,
+            static_selector=kind == 'config_gated',
+        )
 
-        # Config-gated: each arm is a self-contained variant selected before the run. Extract
-        # them as siblings so a caller can bind its execution_profile to one, instead of
-        # losing every call inside the branch.
-        branch_id = self.next_variant_id
-        self.next_variant_id += 1
+    def _match(self, statement, calls, loop_targets):
+        """`match subject:` -- the subject always runs, the case bodies do not.
+
+        Three consequences, and getting any one of them wrong costs real graph content:
+
+        * A call in `statement.subject` executes whichever arm wins, so it belongs on the
+          main path as an ordinary call. Lumping it in with the arm calls dropped a step
+          that provably happens and -- when the arms themselves call nothing -- turned a
+          perfectly extractable statement into a blocking error purely because of the
+          syntax it happened to be written in. Only the *outermost* call of a nested subject
+          is added: `_add_call_tree()` descends into arguments itself, so feeding it both
+          halves of `self.route(self.pre(x))` records `self.pre` twice and invents a fork on
+          `x` that the source does not have.
+        * The subject is classified exactly like an `if` test. `match self.quant_mode:` is
+          no less statically resolved than `if self.quant_mode:`, and the module docstring
+          is explicit that a config-gated selector is extracted as named variants instead of
+          rejected; rejecting it is what once made every real model report its main compute
+          as unextractable. So are the guards: `case 0 if x.sum():` picks its arm on a tensor
+          value, so the whole match is data-dependent whatever the subject says.
+        * A match runs exactly one case body or raises MatchError -- "ran nothing and carried
+          on" is not a reachable outcome -- so unlike an `if` without `else` it has no
+          implicit passthrough arm. Granting it one added a path that cannot execute, whose
+          `returns` then claimed the pre-match value (`from_call: -1`), and made
+          `case object():` (which matches every object, exactly like a bare `case _:`) look
+          non-exhaustive on top of that.
+        """
+        subject_calls = self._submodule_calls(statement.subject, loop_targets)
+        subject_ids = {id(node) for _, node in subject_calls}
+        for _, node in _outermost_calls(subject_calls):
+            # Evaluated before any arm is considered, and its result is not bound to a name
+            # here, so it is recorded the same way as a bare expression call.
+            self._add_call_tree(node, [], node)
+
+        # A guard's own calls stay in `arm_calls`: they are arm-conditional, so they never
+        # join the main path, but a match that gets reported must list them instead of
+        # losing a `self.check(x)` that provably appears in the source.
+        arm_calls = [(path, node) for path, node in calls if id(node) not in subject_ids]
+        condition = _match_condition(statement)
+        self._selector_branch(
+            statement,
+            arms=tuple((f'case[{index}]', list(case.body))
+                       for index, case in enumerate(statement.cases)),
+            selectors=(statement.subject, *(case.guard for case in statement.cases)),
+            condition=condition,
+            calls=arm_calls,
+            construct='Match',
+            reason=f'match 目标 `{condition}` 无法在运行前确定命中哪个 case，'
+                   f'展开后的数据流图不可靠；'
+                   f'需要在 config 中以 deviations 显式声明所走分支',
+            implicit_passthrough=False,
+        )
+
+    def _extract_variants(self, statement, arms, condition, call_symbols, call_sites,
+                          implicit_passthrough=False, static_selector=True,
+                          construct=None, lineno=None, end_lineno=None):
+        """Reduce each arm, then merge the arms' writer/phi state.
+
+        Shared by `if` and `match` so the two cannot drift. When the selector is
+        construction-time config (`static_selector`) exactly one arm runs per deployment, so
+        each arm is emitted as a named variant and the caller binds its `execution_profile`
+        to it instead of losing everything inside the branch. When the selector is *not*
+        static the arms are still reduced -- an arm that rebinds a name changes every later
+        read of it, and skipping the branch used to leave the pre-branch writer in place, a
+        graph claiming the old producer -- but no variant is emitted, because
+        `selected_by: execution_profile` would claim a choice the profile cannot make. The
+        arms' writers merge into a phi instead: every possible producer, none invented.
+        An arm that produces neither a call nor an `unsupported` entry contributes its state
+        but no variant in either mode, so `branch_id` is allocated lazily to leave no gap in
+        the numbering callers bind to.
+
+        `implicit_passthrough` marks a construct where "run nothing at all" is itself one of
+        the outcomes. That is an `if` with no `else` and a breakable loop's `else:` clause
+        (the loop may have broken, in which case the clause never ran); a `match` that
+        matches nothing raises MatchError instead of continuing, so granting it a passthrough
+        arm invents an execution that cannot happen.
+
+        `construct`/`lineno`/`end_lineno` name the construct an escalation is reported
+        against. They default to `statement`, which is right for `if` and `match`, but a
+        loop's `else:` clause is not the loop: reporting the clause's rebind against `For`
+        and the loop's whole range would make one source fact answer for a different line
+        range than the clause-holds-a-call path reports, and a declared deviation is matched
+        on exactly those two fields (`check_dataflow.py` D5 -> `_source_ref_covers`).
+        """
+        branch_id = None
         saved_writers = dict(self.last_writer)
         saved_phi = {name: list(writers) for name, writers in self.phi_writers.items()}
         saved_known_none = set(self.known_none)
         arm_states = []
-        for label, body in (('then', statement.body), ('else', statement.orelse)):
+        for label, body in arms:
             if not body:
                 continue
             self.last_writer = dict(saved_writers)
@@ -615,11 +1018,14 @@ class ForwardGraph:
                 self._statement(inner)
             produced = list(range(calls_before, len(self.calls)))
             unsupported_produced = list(range(unsupported_before, len(self.unsupported)))
-            if not produced and not unsupported_produced:
+            if not static_selector or (not produced and not unsupported_produced):
                 arm_states.append((dict(self.last_writer), {
                     name: list(writers) for name, writers in self.phi_writers.items()},
                                    set(self.known_none)))
                 continue
+            if branch_id is None:
+                branch_id = self.next_variant_id
+                self.next_variant_id += 1
             membership = {'branch_id': branch_id, 'arm': label}
             for call_id in produced:
                 self.calls[call_id].setdefault('variant_memberships', []).append(
@@ -641,7 +1047,7 @@ class ForwardGraph:
                 name: list(writers) for name, writers in self.phi_writers.items()},
                                set(self.known_none)))
 
-        if not statement.orelse:
+        if implicit_passthrough:
             arm_states.append((saved_writers, saved_phi, saved_known_none))
         merged_writers = dict(saved_writers)
         merged_phi = {name: list(writers) for name, writers in saved_phi.items()}
@@ -673,46 +1079,165 @@ class ForwardGraph:
         known_none_states = [state[2] for state in arm_states]
         if known_none_states and any(state != known_none_states[0]
                                      for state in known_none_states[1:]):
-            self.unsupported.append({
-                'lineno': statement.lineno,
-                'end_lineno': getattr(statement, 'end_lineno', statement.lineno),
-                'construct': type(statement).__name__,
+            entry = {
+                'lineno': statement.lineno if lineno is None else lineno,
+                'end_lineno': (getattr(statement, 'end_lineno', statement.lineno)
+                               if end_lineno is None else end_lineno),
+                'construct': (type(statement).__name__ if construct is None
+                              else construct),
                 'severity': 'unparsable',
-                'condition': condition,
-                'call_symbols': call_symbols,
-                'call_sites': call_sites,
-                'reason': '不同分支对残差是否为 None 的结论不一致；'
-                          '后续 fused 调用无法绑定到唯一的残差拓扑，'
-                          '需要在 config.deviations 中显式声明',
-            })
+            }
+            if condition is not None:
+                # A loop's `else:` clause has no selector expression to name -- it is gated
+                # on "the loop was not broken" -- so it is left out and D5 falls back to
+                # `construct`, rather than recording a null the user cannot match on.
+                entry['condition'] = condition
+            entry['call_symbols'] = call_symbols
+            entry['call_sites'] = call_sites
+            entry['reason'] = '不同分支对残差是否为 None 的结论不一致；' \
+                              '后续 fused 调用无法绑定到唯一的残差拓扑，' \
+                              '需要在 config.deviations 中显式声明'
+            self.unsupported.append(entry)
         self.known_none = set.intersection(*(state[2] for state in arm_states)) \
             if arm_states else saved_known_none
 
-    def _loop(self, statement):
-        """A `for`/`while` whose body calls submodules: the repeated-block construct.
+    def _loop(self, statement, loop_targets=()):
+        """A loop whose body calls submodules: the repeated-block construct.
 
         Every iteration executes, so the body belongs on the main path. What the graph must
         not claim is a specific iteration count when the bound is dynamic — that is recorded
         as metadata, not as flattened repetition.
+
+        `async for` reduces identically: `await` decides where the coroutine may suspend,
+        not whether an iteration runs. The loop's own `else:` clause is a different matter
+        and is handled by `_loop_else` *after* this loop is booked, so a call there lands on
+        the main path instead of being tagged as one of the repeated iterations.
         """
-        iterable = ast.unparse(statement.iter) if isinstance(statement, ast.For) else \
+        iterable = ast.unparse(statement.iter) if isinstance(statement, LOOP_NODES) else \
             ast.unparse(statement.test)
         calls_before = len(self.calls)
-        for inner in statement.body:
-            self._statement(inner)
-        produced = list(range(calls_before, len(self.calls)))
-        if not produced:
+        # Publish this loop's variables for the duration of the body so a nested construct
+        # recognises `layer.first(x)` as a submodule call instead of an unrelated function.
+        own_targets = set(_targets_written(statement.target)) \
+            if isinstance(statement, LOOP_NODES) else set()
+        visible = set(loop_targets) | own_targets
+        self.loop_targets.append(visible)
+        try:
+            for inner in statement.body:
+                self._statement(inner)
+        finally:
+            self.loop_targets.pop()
+        # An inner loop already attributed its own calls; the outer one takes the rest
+        # rather than overwriting the inner loop_id and listing the call twice.
+        produced = [call_id for call_id in range(calls_before, len(self.calls))
+                    if 'loop' not in self.calls[call_id]]
+        if produced:
+            for call_id in produced:
+                self.calls[call_id]['loop'] = {'loop_id': len(self.loops)}
+            self.loops.append({
+                'loop_id': len(self.loops),
+                'lineno': statement.lineno,
+                'construct': type(statement).__name__,
+                'iterates_over': iterable,
+                'call_ids': produced,
+                'note': '循环体每次迭代都执行，属于主路径；迭代次数由运行期决定，'
+                        '不在此处展开为固定次数',
+            })
+        self._loop_else(statement, visible)
+
+    def _loop_else(self, statement, loop_targets):
+        """A loop's `else:` clause -- reduced when it must run, reported when it may not.
+
+        `for ... else:` / `while ... else:` runs the clause only when the loop finished
+        without `break`, so the clause is not part of the repeated block. It used to be
+        skipped outright: `for i in range(3): pass` + `else: x = self.fallback(x)` produced
+        `calls=[]`, `unsupported=[]`, `blocking_unsupported=0`, i.e. a whole submodule call
+        gone while the report claimed nothing was unsupported -- the exact hole
+        `_unrecognized` exists to close, one construct over.
+
+        Two readings, and the graph must not pick silently between them:
+
+        * no `break` lexically in the body: the clause always runs, so it is main-path code
+          that merely happens to be written inside the loop statement. Reduce it in place
+          (the loop variable is still bound after the loop, so it stays visible).
+        * the body can `break`: whether the clause runs is a runtime fact. Placing its calls
+          on the main path would claim an edge that may never execute, so report them.
+
+        A nested loop's own `break` counts as "can break" too. Telling the two apart needs
+        control-flow analysis this reducer does not do, and over-reporting one blocking
+        construct is the cheap direction -- it is what the `_unrecognized` docstring argues.
+
+        Both branches below answer for the *clause*, under the same `*Else` label and the
+        same line range, whether or not the clause holds a submodule call. Per-statement
+        labels would make one source fact (this clause may not run, and it rebinds the
+        residual) something a user has to declare twice -- and differently depending on
+        whether the loop body happened to call a submodule, since that alone decides which
+        branch runs.
+
+        A call-free clause is *merged*, not reported and not dropped. It has no call to
+        place, but it still rebinds names, and returning early here left the pre-clause
+        writer in place: `x = self.prep(x)` / `y = self.other(x)` / a breakable
+        `for layer in self.layers:` / `else: x = y` made the next read of `x` name only
+        `layer`, a producer the clause may have overwritten -- the same lie as dropping the
+        calls, and inconsistent with the break-free branch above, which reduces the very
+        same clause in place. So the clause is reduced against the arm where the loop broke
+        and it never ran, exactly as an `if` with no `else` is, and the phi names both
+        producers. No variant is emitted: `selected_by: execution_profile` would claim the
+        profile decides whether the loop broke, which it does not.
+        """
+        clause = getattr(statement, 'orelse', None) or []
+        if not clause:
             return
-        for call_id in produced:
-            self.calls[call_id]['loop'] = {'loop_id': len(self.loops)}
-        self.loops.append({
-            'loop_id': len(self.loops),
-            'lineno': statement.lineno,
-            'construct': type(statement).__name__,
-            'iterates_over': iterable,
-            'call_ids': produced,
-            'note': '循环体每次迭代都执行，属于主路径；迭代次数由运行期决定，'
-                    '不在此处展开为固定次数',
+        can_break = any(isinstance(node, ast.Break)
+                        for inner in statement.body
+                        for node in ast.walk(inner))
+        if not can_break:
+            self.loop_targets.append(set(loop_targets))
+            try:
+                for inner in clause:
+                    self._statement(inner)
+            finally:
+                self.loop_targets.pop()
+            return
+        last = clause[-1]
+        clause_end = getattr(last, 'end_lineno', last.lineno)
+        calls = [call for inner in clause
+                 for call in self._submodule_calls(inner, loop_targets)]
+        if not calls:
+            # Nothing to place, but the clause still rebinds names. Reduce it against the
+            # "the loop broke, so this never ran" arm and let the merge keep every possible
+            # producer; `_extract_variants` escalates -- once, under the clause's own label
+            # and range -- only where the two arms cannot be merged at all, i.e. where they
+            # disagree on whether the residual is None, which is what the `= None` clause
+            # used to be reported for by hand here.
+            self.loop_targets.append(set(loop_targets))
+            try:
+                self._extract_variants(
+                    statement,
+                    arms=(('else', clause),),
+                    condition=None,
+                    call_symbols=[],
+                    call_sites=[],
+                    implicit_passthrough=True,
+                    static_selector=False,
+                    construct=f'{type(statement).__name__}Else',
+                    lineno=clause[0].lineno,
+                    end_lineno=clause_end,
+                )
+            finally:
+                self.loop_targets.pop()
+            return
+        self.unsupported.append({
+            'lineno': clause[0].lineno,
+            'end_lineno': clause_end,
+            'construct': f'{type(statement).__name__}Else',
+            'severity': 'unparsable',
+            'call_symbols': sorted({path for path, _ in calls}),
+            'call_sites': _sorted_call_sites(calls),
+            'reason': f'{type(statement).__name__} 的 else 子句只在循环未被 break 时执行，'
+                      f'循环体内存在 break，此 reducer 不跟踪其是否触发，'
+                      f'无法确定其中的 submodule 调用是否在主路径上；'
+                      f'需要在 config.deviations 中显式声明',
         })
 
     def _rebind_unpacked(self, targets, value):
@@ -980,6 +1505,11 @@ def extract_file(path, class_names=None, forward_name='forward', include_variant
     These are not alternative spellings of `forward` — they are the methods a deployment
     actually runs, selected by config at construction time. Analysing only `forward` reports
     the dispatcher and misses every op in the method that executed.
+
+    `async def forward` counts as a forward. Skipping it did not raise or warn: the class
+    simply matched no method, so the file reported `module_count: 0` and an async forward
+    was indistinguishable from a file with no model in it -- every call in it invisible to
+    the gate downstream.
     """
     with open(path, encoding='utf-8') as stream:
         tree = ast.parse(stream.read(), filename=path)
@@ -990,7 +1520,7 @@ def extract_file(path, class_names=None, forward_name='forward', include_variant
         if class_names and node.name not in class_names:
             continue
         methods = [n for n in node.body
-                   if isinstance(n, ast.FunctionDef)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
                    and (n.name == forward_name
                         or (include_variants and n.name.startswith(forward_name + '_')))]
         if not methods:
