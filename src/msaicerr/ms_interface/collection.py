@@ -155,11 +155,11 @@ class Collection:
             dump_data_cmd = ["grep", "dump exception to file", "-inrE", plog_dir]
             adump_dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).+?tid\:\d+"
-                r".*?extra-info\/data-dump\/(\d+)\/([\w.]+)"
+                r".*?extra-info\/data-dump\/(\d+)\/([\w.\-]+)"
             )
             ge_dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).+? "
-                r"DumpNodeInfo:.*?extra-info\/data-dump\/(\d+)\/([\w.]+)"
+                r"DumpNodeInfo:.*?extra-info\/data-dump\/(\d+)\/([\w.\-]+)"
             )
             adump_dump_data_ret = utils.get_inquire_result(
                 dump_data_cmd, adump_dump_data_regexp
@@ -184,7 +184,7 @@ class Collection:
 
             dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).+?tid\:\d+"
-                r".*?extra-info\/data-dump\/(\d)+\/([\w.]+)"
+                r".*?extra-info\/data-dump\/(\d+)\/([\w.\-]+)"
             )
             dump_data_ret = utils.get_inquire_result(dump_data_cmd, dump_data_regexp)
             if not dump_data_ret:
@@ -449,7 +449,7 @@ class Collection:
         dump_data_cmd = ["grep", "dump custom exception to file", "-inrE", plog_dir]
         dump_data_regexp = (
             r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).+?"
-            r"extra-info\/data-dump\/(\d+)\/([\w.]+\.custom\.\d+)"
+            r"extra-info\/data-dump\/(\d+)\/([\w.\-]+\.custom\.\d+)"
         )
         dump_data_ret = utils.get_inquire_result(dump_data_cmd, dump_data_regexp)
         if not dump_data_ret:
@@ -545,7 +545,7 @@ class Collection:
 
     def check_dump_data_is_valid(self, err_time, data_name, rename=""):
         find_dump_data_cmd = ["find", self.report_path, "-name", rename or data_name]
-        regexp = r".*?\/data-dump\/\d+\/([\w.]+)"
+        regexp = r".*?\/data-dump\/\d+\/([\w.\-]+)"
         dump_data_file_list = utils.get_inquire_result(find_dump_data_cmd, regexp)
         home = os.environ.get("HOME")
         if not dump_data_file_list:

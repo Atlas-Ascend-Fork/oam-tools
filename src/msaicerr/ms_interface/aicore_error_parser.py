@@ -496,11 +496,11 @@ class AicoreErrorParser:
             dump_data_cmd = ["grep", "dump exception to file", "-inrE", plog_dir]
             adump_dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).*?"
-                r"tid\:(\d+).*?extra-info\/data-dump\/\d+\/([\w.]+)"
+                r"tid\:(\d+).*?extra-info\/data-dump\/\d+\/([\w.\-]+)"
             )
             ge_dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).*?"
-                r"(\d+) DumpNodeInfo:.*?extra-info\/data-dump\/\d+\/([\w.]+)"
+                r"(\d+) DumpNodeInfo:.*?extra-info\/data-dump\/\d+\/([\w.\-]+)"
             )
             adump_dump_data_ret = utils.get_inquire_result(
                 dump_data_cmd, adump_dump_data_regexp
@@ -524,7 +524,7 @@ class AicoreErrorParser:
 
             dump_data_regexp = (
                 r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).*?"
-                r"tid\:(\d+).*?extra-info\/data-dump\/\d+\/([\w.]+)"
+                r"tid\:(\d+).*?extra-info\/data-dump\/\d+\/([\w.\-]+)"
             )
             dump_data_ret = utils.get_inquire_result(dump_data_cmd, dump_data_regexp)
             dump_data_ret = [item[1:] for item in sorted(dump_data_ret)]
@@ -548,7 +548,7 @@ class AicoreErrorParser:
         dump_data_cmd = ["grep", "dump custom exception to file", "-inrE", plog_dir]
         dump_data_regexp = (
             r"(\d+-\d+-\d+-\d+:\d+:\d+\.\d+\.\d+).+?"
-            r"extra-info\/data-dump\/(\d+)\/([\w.]+\.custom\.\d+)"
+            r"extra-info\/data-dump\/(\d+)\/([\w.\-]+\.custom\.\d+)"
         )
         custom_files = []
         name_mapping = utils.parse_name_mapping_csv(

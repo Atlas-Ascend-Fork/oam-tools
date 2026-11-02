@@ -177,6 +177,230 @@ class TestUtilsMethods(CommonAssert):
         self.assertEqual(data_name, data_name_res)
 
     @pytest.mark.parametrize(
+        "collect_level, device_id",
+        [(0, "0"), (0, "7"), (0, "10"), (0, "15"), (1, "10"), (1, "15")],
+    )
+    def test_collect_dump_uses_complete_device_id(self, collect_level, device_id):
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        plog_path = output_path / "collection" / "plog"
+        plog_path.mkdir(parents=True)
+        plog_path.joinpath("dump.log").write_text(
+            DUMP_EXCEPTION_TO_FILE.replace("data-dump/0/", f"data-dump/{device_id}/"),
+            encoding="utf-8",
+        )
+        data_name = "exception_info.42.1.1726159207469285"
+        expected_data = b"dump from selected device"
+        other_id = "1" if device_id == "0" else "0"
+        for directory_id, content in (
+            (device_id, expected_data),
+            (other_id, b"dump from another device"),
+        ):
+            dump_dir = report_path / "extra-info" / "data-dump" / directory_id
+            dump_dir.mkdir(parents=True)
+            dump_dir.joinpath(data_name).write_bytes(content)
+
+        collection = Collection(report_path, output_path)
+        collection.collect_level = collect_level
+        err_time, parsed_device_id, parsed_name = collection.get_dump_data_info()
+        collected_path = collection.collect_data_dump(parsed_device_id, parsed_name)
+
+        # collect_data_dump returns the dump directory it copied into.
+        self.assertEqual(
+            collected_path,
+            os.path.join(collection.output_path, "collection", "dump"),
+        )
+        assert (
+            output_path.joinpath("collection", "dump", data_name).read_bytes()
+            == expected_data
+        )
+        self.assertEqual(err_time, "2024-09-12-16:40:08.360.226")
+        self.assertEqual(parsed_device_id, device_id)
+        self.assertEqual(parsed_name, data_name)
+
+    def test_collect_dump_keeps_hyphens_in_the_data_name(self):
+        # A generated dump name may carry a hyphen; the name capture must not
+        # stop at it, otherwise collect_data_dump cannot find the file.
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        plog_path = output_path / "collection" / "plog"
+        plog_path.mkdir(parents=True)
+        data_name = "exception_info.42-1.1726159207469285"
+        plog_path.joinpath("dump.log").write_text(
+            DUMP_EXCEPTION_TO_FILE.replace(
+                "exception_info.42.1.1726159207469285", data_name
+            ),
+            encoding="utf-8",
+        )
+        dump_dir = report_path / "extra-info" / "data-dump" / "0"
+        dump_dir.mkdir(parents=True)
+        dump_dir.joinpath(data_name).write_bytes(b"hyphenated dump")
+
+        collection = Collection(report_path, output_path)
+        _, parsed_device_id, parsed_name = collection.get_dump_data_info()
+        assert collection.collect_data_dump(parsed_device_id, parsed_name)
+        self.assertEqual(parsed_device_id, "0")
+        self.assertEqual(parsed_name, data_name)
+        assert (
+            output_path.joinpath("collection", "dump", data_name).read_bytes()
+            == b"hyphenated dump"
+        )
+
+    def test_collect_dump_uses_the_earliest_record_of_several_devices(self):
+        # One plog can hold a dump record per device; the parser sorts by the
+        # error time and reports the earliest one.
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        plog_path = output_path / "collection" / "plog"
+        plog_path.mkdir(parents=True)
+        later = DUMP_EXCEPTION_TO_FILE
+        earlier = DUMP_EXCEPTION_TO_FILE.replace(
+            "2024-09-12-16:40:08.360.226", "2024-09-12-16:40:07.000.000"
+        ).replace("data-dump/0/", "data-dump/7/")
+        plog_path.joinpath("dump.log").write_text(
+            later + "\n" + earlier + "\n", encoding="utf-8"
+        )
+        data_name = "exception_info.42.1.1726159207469285"
+        for directory_id, content in (
+            ("0", b"dump from device 0"),
+            ("7", b"dump from device 7"),
+        ):
+            dump_dir = report_path / "extra-info" / "data-dump" / directory_id
+            dump_dir.mkdir(parents=True)
+            dump_dir.joinpath(data_name).write_bytes(content)
+
+        collection = Collection(report_path, output_path)
+        err_time, parsed_device_id, parsed_name = collection.get_dump_data_info()
+        collection.collect_data_dump(parsed_device_id, parsed_name)
+
+        self.assertEqual(err_time, "2024-09-12-16:40:07.000.000")
+        self.assertEqual(parsed_device_id, "7")
+        self.assertEqual(parsed_name, data_name)
+        assert (
+            output_path.joinpath("collection", "dump", data_name).read_bytes()
+            == b"dump from device 7"
+        )
+
+    def test_collect_dump_at_level_one_falls_back_to_the_ge_record(self):
+        # collect_level=1 adds the GE DumpNodeInfo branch; prove the
+        # parameterisation is not a duplicate of the level 0 path.
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        plog_path = output_path / "collection" / "plog"
+        plog_path.mkdir(parents=True)
+        plog_path.joinpath("dump.log").write_text(
+            GE_DUMP_EXCEPTION_TO_FILE_L1, encoding="utf-8"
+        )
+        data_name = "GatherV2.GatherV21.1.1733469426252033"
+        dump_dir = report_path / "extra-info" / "data-dump" / "1"
+        dump_dir.mkdir(parents=True)
+        dump_dir.joinpath(data_name).write_bytes(b"ge dump")
+
+        collection = Collection(report_path, output_path)
+        collection.collect_level = 1
+        err_time, parsed_device_id, parsed_name = collection.get_dump_data_info()
+        collection.collect_data_dump(parsed_device_id, parsed_name)
+
+        self.assertEqual(err_time, "2024-12-06-15:17:06.252.046")
+        self.assertEqual(parsed_device_id, "1")
+        self.assertEqual(parsed_name, data_name)
+        assert (
+            output_path.joinpath("collection", "dump", data_name).read_bytes()
+            == b"ge dump"
+        )
+
+    @pytest.mark.parametrize(
+        "log_record, directory_id, data_name, expected_time",
+        [
+            (
+                DUMP_EXCEPTION_TO_FILE.replace(
+                    "exception_info.42.1.1726159207469285",
+                    "exception_info.42-1.1726159207469285",
+                ),
+                "0",
+                "exception_info.42-1.1726159207469285",
+                "2024-09-12-16:40:08.360.226",
+            ),
+            (
+                GE_DUMP_EXCEPTION_TO_FILE_L1.replace(
+                    "GatherV2.GatherV21.1.1733469426252033",
+                    "GatherV2-decode.GatherV21.1.1733469426252033",
+                ),
+                "1",
+                "GatherV2-decode.GatherV21.1.1733469426252033",
+                "2024-12-06-15:17:06.252.046",
+            ),
+        ],
+    )
+    def test_collect_dump_at_level_one_keeps_hyphens_in_the_data_name(
+        self, log_record, directory_id, data_name, expected_time
+    ):
+        # Level 1 parses the adump and the GE DumpNodeInfo regexp in turn;
+        # hyphenated file names must survive both branches.
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        plog_path = output_path / "collection" / "plog"
+        plog_path.mkdir(parents=True)
+        plog_path.joinpath("dump.log").write_text(log_record, encoding="utf-8")
+        dump_dir = report_path / "extra-info" / "data-dump" / directory_id
+        dump_dir.mkdir(parents=True)
+        dump_dir.joinpath(data_name).write_bytes(b"hyphenated level 1 dump")
+
+        collection = Collection(report_path, output_path)
+        collection.collect_level = 1
+        err_time, parsed_device_id, parsed_name = collection.get_dump_data_info()
+        collection.collect_data_dump(parsed_device_id, parsed_name)
+
+        self.assertEqual(err_time, expected_time)
+        self.assertEqual(parsed_device_id, directory_id)
+        self.assertEqual(parsed_name, data_name)
+        assert (
+            output_path.joinpath("collection", "dump", data_name).read_bytes()
+            == b"hyphenated level 1 dump"
+        )
+
+    def test_collect_custom_dump_keeps_hyphens_in_the_data_name(self):
+        # The custom dump record capture must keep hyphens, otherwise the
+        # file copied by collect_custom_dump cannot be matched by name.
+        custom_name = "exception_info.42-1.1726159207469285.custom.1726159207469500"
+        output_path = self.temp.joinpath(f"info_{CUR_TIME_STR}")
+        collection_plog_path = output_path.joinpath("collection/plog")
+        collection_plog_path.mkdir(parents=True, exist_ok=True)
+        collection_plog_path.joinpath("dump_exception.log").write_text(
+            DUMP_CUSTOM_EXCEPTION_TO_FILE.replace(
+                "exception_info.42.1.1726159207469285",
+                "exception_info.42-1.1726159207469285",
+            ),
+            encoding="utf-8",
+        )
+        input_path = self.temp.joinpath(f"asys_output_{CUR_TIME_STR}")
+        input_path.joinpath(f"extra-info/data-dump/0/{custom_name}").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        input_path.joinpath(f"extra-info/data-dump/0/{custom_name}").touch()
+        collection = Collection(input_path, output_path)
+        collection.collect_custom_dump("0")
+        collected = list(output_path.rglob(f"collection/dump/{custom_name}"))
+        self.assertEqual(len(collected), 1)
+
+    def test_check_dump_data_is_valid_keeps_hyphens_in_the_data_name(self):
+        # A hyphenated dump located under data-dump/<device>/ must validate;
+        # a missing dump still reports the invalid-dump error.
+        data_name = "exception_info.42-1.1726159207469285"
+        report_path = self.temp / "report"
+        output_path = self.temp / "out"
+        dump_dir = report_path / "extra-info" / "data-dump" / "0"
+        dump_dir.mkdir(parents=True)
+        dump_dir.joinpath(data_name).write_bytes(b"hyphenated dump")
+
+        collection = Collection(report_path, output_path)
+        collection.check_dump_data_is_valid("2024-09-12-16:40:08.360.226", data_name)
+        with pytest.raises(utils.AicErrException):
+            collection.check_dump_data_is_valid(
+                "2024-09-12-16:40:08.360.226", "missing.42.1.1"
+            )
+
+    @pytest.mark.parametrize(
         "collect_level, reg_inquire_result",
         [
             (

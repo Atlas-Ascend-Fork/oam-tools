@@ -240,6 +240,75 @@ class TestUtilsMethods(CommonAssert):
         thread_id, _ = dump_data_info_list[0]
         self.assertEqual(thread_id, "1592077")
 
+    def test_get_dump_data_info_keeps_hyphens_in_the_data_name(self, tmp_path):
+        # The level 0 name capture must not stop at a hyphen, otherwise the
+        # parsed data_name no longer matches the collected dump file.
+        plog_dir = tmp_path.joinpath("info/collection/plog")
+        plog_dir.mkdir(parents=True)
+        data_name = "exception_info.42-1.1726159207469285"
+        plog_dir.joinpath("aicore_error.log").write_text(
+            "[ERROR] IDEDD(1,python3):2024-09-12-16:40:08.360.226 [tid:123] [Dump][Exception] "
+            "dump exception to file, file: x/extra-info/data-dump/0/" + data_name,
+            encoding="utf-8",
+        )
+        parser = AicoreErrorParser(str(tmp_path.joinpath("info")))
+        err_info = parser.get_dump_data_info()
+        self.assertEqual(err_info[0], ("123", data_name))
+
+    def test_get_dump_data_info_keeps_hyphens_in_the_adump_record(self, tmp_path):
+        # Same charset rule for the level 1 adump branch.
+        plog_dir = tmp_path.joinpath("info/collection/plog")
+        plog_dir.mkdir(parents=True)
+        data_name = "exception_info.42-1.1726159207469285"
+        plog_dir.joinpath("aicore_error.log").write_text(
+            "[ERROR] IDEDD(1,python3):2024-09-12-16:40:08.360.226 [tid:123] [Dump][Exception] "
+            "dump exception to file, file: x/extra-info/data-dump/0/" + data_name,
+            encoding="utf-8",
+        )
+        parser = AicoreErrorParser(str(tmp_path.joinpath("info")))
+        parser.parse_level = 1
+        err_info = parser.get_dump_data_info()
+        self.assertEqual(err_info[0], ("123", data_name))
+
+    def test_get_dump_data_info_keeps_hyphens_in_the_ge_record(self, tmp_path):
+        # Same charset rule for the level 1 GE DumpNodeInfo branch.
+        plog_dir = tmp_path.joinpath("info/collection/plog")
+        plog_dir.mkdir(parents=True)
+        data_name = "GatherV2-decode.GatherV21.1.1733469426252033"
+        plog_dir.joinpath("aicore_error.log").write_text(
+            "[ERROR] GE(1582604,python3):2024-12-06-15:17:06.252.046 "
+            "[exception_dumper.cc:424]1582604 DumpNodeInfo: "
+            "ErrorNo: 4294967295(failed) [INIT][DEFAULT][Dump][Exception] "
+            "dump exception to file, file: /home/aic_test/dump/extra-info/data-dump/1/"
+            + data_name,
+            encoding="utf-8",
+        )
+        parser = AicoreErrorParser(str(tmp_path.joinpath("info")))
+        parser.parse_level = 1
+        err_info = parser.get_dump_data_info()
+        self.assertEqual(err_info[0], ("1582604", data_name))
+
+    def test_get_custom_dump_files_keeps_hyphens_in_the_data_name(self, tmp_path):
+        # The custom dump name capture must keep hyphens, otherwise an
+        # existing custom dump file is silently dropped from parsing.
+        collect_path = tmp_path.joinpath("info")
+        plog_dir = collect_path.joinpath("collection/plog")
+        dump_dir = collect_path.joinpath("collection/dump")
+        plog_dir.mkdir(parents=True, exist_ok=True)
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        custom_name = "exception_info.42-1.1726159207469285.custom.1726159207469000"
+        plog_dir.joinpath("aicore_error.log").write_text(
+            "[ERROR] IDEDD(1,python3):2024-09-12-16:40:08.360.227 [tid:1] [Dump][Exception] "
+            "dump custom exception to file, file: x/extra-info/data-dump/0/"
+            + custom_name,
+            encoding="utf-8",
+        )
+        custom_file = dump_dir.joinpath(custom_name)
+        custom_file.touch()
+        parser = AicoreErrorParser(str(collect_path), device_id=0)
+        res = getattr(parser, "_get_custom_dump_files")(str(dump_dir))
+        self.assertEqual(res, [str(custom_file)])
+
     def test_get_custom_dump_files(self, tmp_path):
         """只认dump目录下实际存在的自定义dump文件，不按命令行device过滤
         （采集侧已按报错device过滤，解析侧再按self.device_id过滤会在device
