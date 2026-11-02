@@ -129,7 +129,25 @@ def test_buckets_partition_the_expert_list():
     inv = bei.build({}, performance(), attribution(), manifest(), ep_rank=0)
     counts = inv["counts"]
     assert (counts["individually_measured"] + counts["fused_measured"]
-            + counts["residency_unresolved"] + counts["remote_ep_shard"]) == len(inv["experts"])
+            + counts["residency_unresolved"] + counts["remote_ep_shard"]
+            + counts["source_only"]) == len(inv["experts"])
+
+
+def test_source_only_shared_expert_is_counted_and_still_partitions():
+    """An unobserved shared expert is a legal state; without its bucket the sum falls short.
+
+    This is the inventory `validate_conversion.py` rejected: 1 shared expert declared, none
+    observed, so the four measured/unresolved buckets summed to 0 while 1 expert was listed.
+    """
+    inv = bei.build({}, performance(shared_time=None), attribution(), manifest(), ep_rank=0)
+    counts = inv["counts"]
+    assert counts["source_only"] == 1
+    shared = [e for e in inv["experts"] if e["kind"] == "shared"][0]
+    assert shared["data_state"] == "source_only"
+    assert shared["time_us"] is None
+    assert (counts["individually_measured"] + counts["fused_measured"]
+            + counts["residency_unresolved"] + counts["remote_ep_shard"]
+            + counts["source_only"]) == len(inv["experts"])
 
 
 def test_declared_total_never_taken_from_kernel_shapes():

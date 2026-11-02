@@ -23,6 +23,7 @@ import glob
 import json
 import os
 import sys
+from collections import Counter
 
 #: A key must be written even when its value is null, because an absent key and a null value
 #: are different claims: null means the capture did not measure it, absent means the pipeline
@@ -44,6 +45,21 @@ COUNTER_METRIC_KEYS = ("aiv_time_us", "aicore_time_pct", "cube_utilization_pct",
 #: key present" would misfire, since the old emitter already wrote aicore_time_us as null.
 #: schema_version cannot serve here — old and new both emit "2.1-ui" and no consumer reads it.
 COUNTER_SHAPE_MARKER = "counter_coverage"
+
+#: `counts` key -> the `data_state` value that bucket tallies. The names differ for the
+#: individually measured bucket (`counts` says what was measured, `data_state` says what the
+#: expert is), so the pairing is written out instead of assumed positional. Single source of
+#: truth for both the partition sum and the per-bucket comparison below.
+STATE_BUCKET_TO_DATA_STATE = {
+    "individually_measured": "measured",
+    "fused_measured": "fused_measured",
+    "residency_unresolved": "residency_unresolved",
+    "remote_ep_shard": "remote_ep_shard",
+    # `source_only` is a legal data_state: a declared shared expert whose kernels fell outside
+    # this capture. It stays in the partition (with `time_us` null) or a legitimate inventory
+    # is rejected as unbalanced.
+    "source_only": "source_only",
+}
 
 
 def jload(path):
@@ -343,13 +359,27 @@ def main():
               f"the inventory lists all {total} declared experts",
               "" if total == len(experts) else f"declared {total} but listed {len(experts)}")
 
-        bucketed = sum(counts.get(key) or 0 for key in
-                       ("individually_measured", "fused_measured",
-                        "residency_unresolved", "remote_ep_shard"))
+        bucketed = sum(counts.get(key) or 0 for key in STATE_BUCKET_TO_DATA_STATE)
         check(bucketed == len(experts),
               "every expert falls in exactly one data_state bucket",
               "" if bucketed == len(experts)
               else f"buckets sum to {bucketed}, listed {len(experts)}")
+
+        # A balancing total says nothing about the split: moving one expert from `source_only`
+        # to `fused_measured` in `counts` keeps the sum at the listed number while telling the
+        # UI a group measurement exists that the capture never made. So compare each tally
+        # against the states the listed experts actually carry. A `data_state` outside the five
+        # buckets needs no separate check: it drops out of `listed` here and out of `bucketed`
+        # above, so one of the two already fails.
+        listed = Counter(expert.get("data_state") for expert in experts)
+        miscounted = [
+            f"{key}: counts={counts.get(key) or 0}, listed {listed.get(state, 0)}"
+            for key, state in sorted(STATE_BUCKET_TO_DATA_STATE.items())
+            if (counts.get(key) or 0) != listed.get(state, 0)
+        ]
+        check(not miscounted,
+              "each data_state bucket count matches the listed experts",
+              "; ".join(miscounted))
 
         # The whole point of the inventory: a fused or absent expert must not carry a time.
         # A per-expert number here would be a fabrication, since the profiler measured the

@@ -15,7 +15,7 @@
 """Emit the MoE expert inventory: every declared expert, and what the capture measured.
 
 The source declares 256 routed experts plus 1 shared expert per MoE layer. A capture almost
-never contains 257 separable measurements, for two independent reasons that must not be
+never contains 257 separable measurements, for three independent reasons that must not be
 conflated:
 
 1. **Expert parallelism.** With `moe_ep_size = N` only `n_routed_experts / N` experts have
@@ -28,6 +28,10 @@ conflated:
    duration. Per-expert time is not recoverable from it by any arithmetic the profiler
    supports — splitting the fused duration by token count would fabricate per-expert numbers
    that read as measurements.
+
+3. **Source-only declarations.** An expert declared in the model source may have no kernel
+   attributed to it in this capture. It stays listed with unknown time; it is not a zero-time
+   measurement, and it must not be folded into the fusion or remote-rank cases.
 
 So this emits an inventory, not a per-expert breakdown: each expert gets an identity and a
 `data_state` saying whether its own duration is recoverable. A single shared expert can
@@ -229,6 +233,7 @@ def build(config, performance, attribution, manifest=None, ep_rank=None):
 
     resident_count = sum(1 for e in experts if e["resident_on_profiled_rank"])
     unresolved_count = sum(1 for e in experts if e["data_state"] == "residency_unresolved")
+    source_only_count = sum(1 for e in experts if e["data_state"] == "source_only")
     return {
         "schema_version": 1,
         "model_id": performance.get("model_id"),
@@ -286,6 +291,11 @@ def build(config, performance, attribution, manifest=None, ep_rank=None):
             "fused_measured": sum(1 for e in experts if e["data_state"] == "fused_measured"),
             "residency_unresolved": unresolved_count,
             "remote_ep_shard": sum(1 for e in experts if e["data_state"] == "remote_ep_shard"),
+            # `source_only` is a legal state — a declared shared expert whose kernels fell
+            # outside this capture — so it must be counted like the other four. Omitting it
+            # made the four counted buckets sum to less than the listed experts, and the
+            # validator read that partition gap as a conversion error.
+            "source_only": source_only_count,
         },
         "fused_group_nodes": [
             {
@@ -343,10 +353,21 @@ def main():
           f"{inventory['declared']['shared_experts']} shared)")
     print(f"moe_ep_size {ep['moe_ep_size']}, {ep['local_routed_experts']} routed experts "
           f"resident on the profiled rank")
+    # All five buckets on ONE line, with no informational line printed after it.
+    # `run_pipeline.py` records only stdout's last line as this stage's status
+    # (`r.stdout.strip().splitlines()[-1]` -> `stages["expert_inventory"]`), so a separate
+    # `source_only` note after the summary displaced the whole bucket split from the
+    # recorded status whenever `--ep-rank` was passed: `residency_unresolved` is then 0,
+    # the actionable NOTE below does not print, and the status ended up being source-only
+    # prose instead of `individually measured 0, fused 16, ...`. The unknown-time caveat
+    # rides along inline for the same reason; its full wording stays in each expert's
+    # `reason` and in the `data_state` table of SKILL.md.
     print(f"individually measured {counts['individually_measured']}, "
           f"fused {counts['fused_measured']}, "
           f"residency unresolved {counts['residency_unresolved']}, "
-          f"remote {counts['remote_ep_shard']}")
+          f"remote {counts['remote_ep_shard']}, "
+          f"source-only {counts['source_only']}"
+          + (" (time_us is null, not 0.0)" if counts["source_only"] else ""))
     if counts["residency_unresolved"]:
         print("NOTE the capture does not record ep_rank; pass --ep-rank to resolve which "
               "global expert indices are resident")

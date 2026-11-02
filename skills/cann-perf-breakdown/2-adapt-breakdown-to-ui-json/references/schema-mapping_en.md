@@ -138,7 +138,7 @@ expert_parallelism  moe_ep_size  local_routed_experts  residency_evidence
 measurability       separable_per_expert  reason  what_would_be_needed
 counts              declared_total  resident_on_profiled_rank
                     individually_measured  fused_measured
-                    residency_unresolved  remote_ep_shard
+                    residency_unresolved  remote_ep_shard  source_only
 fused_group_nodes   node_id  time_us  nops  covers_experts
 experts[]           expert_id  expert_index  kind  data_state  local_slot
                     resident_on_profiled_rank  measured_by_node_id
@@ -148,7 +148,12 @@ experts[]           expert_id  expert_index  kind  data_state  local_slot
 `data_state` is `measured` (one declared shared expert with attributed kernels),
 `fused_measured` (routed group kernels or aggregate nodes covering multiple shared
 experts; individual `time_us` is null), `remote_ep_shard` (another EP rank, time
-unknown), or `residency_unresolved` (count known, identity not).
+unknown), `residency_unresolved` (count known, identity not), or `source_only`
+(declared in the source, no kernel attributed in this capture; `time_us` null).
+`counts` has one bucket per `data_state`, so the five sum to the listed experts —
+the partition `validate_conversion.py` checks, per bucket as well as in total: each
+tally is compared against the `data_state` the listed experts actually carry, so a
+count moved between buckets to repair the sum still fails.
 
 `moe_ep_size` comes from the stacked expert weight's leading dimension in the
 `GroupedMatmul` inputs. Declared totals come from the manifest facts with their

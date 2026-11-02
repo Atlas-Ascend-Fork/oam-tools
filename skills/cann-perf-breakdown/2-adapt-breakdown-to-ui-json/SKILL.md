@@ -287,7 +287,7 @@ an assumed frequency, because every cycle-derived metric divides by it.
 `build_expert_inventory.py` writes `<model-id>_expert_inventory.json` for any
 model declaring experts. It lists **every** declared expert (DS3.2: 256 routed +
 1 shared = 257) and gives each a `data_state` saying precisely what the capture
-measured. Two independent reasons keep 257 declared experts from becoming 257
+measured. Three independent reasons keep 257 declared experts from becoming 257
 measurements, and they must not be conflated:
 
 | `data_state` | Meaning |
@@ -296,6 +296,16 @@ measurements, and they must not be conflated:
 | `fused_measured` | routed experts in a measured group, or multiple shared experts covered by aggregate nodes; individual `time_us` is null |
 | `remote_ep_shard` | executes on another expert-parallel rank; time **unknown**, not zero |
 | `residency_unresolved` | resident count known, global identity not — see below |
+| `source_only` | declared in the source but no kernel was attributed to it in this capture; `time_us` is null, not zero |
+
+`counts` carries one bucket per `data_state`, `source_only` included, so the five
+buckets always sum to the number of listed experts. `validate_conversion.py`
+checks that partition **two ways**: the five buckets must sum to the number of
+listed experts, *and* each bucket must equal how many listed experts actually
+carry that `data_state`. A state missing from `counts` reads as a conversion
+error, and moving a count between buckets to repair the total does **not** pass
+— the split is compared too, because a re-labelled bucket would tell the UI that
+a measurement exists which this capture never made.
 
 **Expert parallelism.** With `moe_ep_size = N` only `n_routed_experts / N`
 experts have weights on the profiled rank. On the DS3.2 capture that is **16 of

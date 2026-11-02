@@ -144,6 +144,7 @@ def test_shared_aggregate_does_not_bypass_routed_residency(
         "fused_measured": actual_counts["fused_measured"],
         "residency_unresolved": actual_counts["residency_unresolved"],
         "remote_ep_shard": actual_counts["remote_ep_shard"],
+        "source_only": actual_counts["source_only"],
     }
     assert inventory["counts"] == expected_counts
     (tmp_path / "fixture_expert_inventory.json").write_text(json.dumps(inventory))
