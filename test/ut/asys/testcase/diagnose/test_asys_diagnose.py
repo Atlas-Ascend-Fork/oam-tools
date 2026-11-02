@@ -1310,6 +1310,14 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch("subprocess.Popen", return_value=fake_ret)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysDiagnose0())
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=4)
+        # 910_93 hbm_detect/cpu_detect bypass the mocked interface.run_diagnose
+        # and call run_hbm/run_cpu: mock the dsmi/hal queries they touch so the
+        # ECC stats are environment-independent (same mocks as the hbm cases).
+        # side_effect [0, 4]: ecc grows 4 per device, distinguishable from the
+        # hardcoded "0" placeholder of undiagnosed devices 0/1.
+        mocker.patch.object(DeviceInfo, "get_ecc_isolated_page", side_effect=[0, 4])
+        mocker.patch.object(DeviceInfo, "get_phyid_from_logicid", return_value=0)
+        mocker.patch.object(DeviceInfo, "get_masterid_from_phyid", return_value=0)
         ret = (
             {2: ["Pass", "0"], 3: ["Pass", "0"]}
             if run_mode == "hbm_detect"
@@ -1355,7 +1363,7 @@ class TestAsysDiagnose(AssertTest):
  +========================+=============================+
  +--- Hardware -----------+-----------------------------+
  | HBM Detect             | Warn, Warn, Pass, Pass      |
- |                        | (0, 0, -, -)                |
+ |                        | (0, 0, 4, 4)                |
  +------------------------+-----------------------------+
 """
         elif run_mode == "component":
@@ -1369,3 +1377,62 @@ class TestAsysDiagnose(AssertTest):
 """
         captured = capsys.readouterr()
         self.assertTrue(except_msg in captured.out)
+
+    def test_diagnose_device_without_a3_ecc_unqueryable(self, mocker, caplog, capsys):
+        """hbm_detect with unqueryable ECC stats: pins the "-" branch of run_hbm.
+
+        Same setup as test_diagnose_device_without_a3, but get_ecc_isolated_page
+        returns "-" (dsmi handle absent), so the ECC count column is "-" too and
+        the "cannot be queried" warning fires. Keeps that user-visible branch
+        covered no matter whether the host has a real NPU driver.
+        """
+
+        class Args:
+            d = False
+            r = "hbm_detect"
+            subparser_name = "diagnose"
+            output = None
+            timeout = 5
+
+        fake_ret = subprocess.Popen(
+            "ls",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+        )  # nosec B602  # test mock creation
+        mocker.patch("subprocess.Popen", return_value=fake_ret)
+        mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysDiagnose0())
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=4)
+        mocker.patch.object(DeviceInfo, "get_ecc_isolated_page", return_value="-")
+        mocker.patch.object(DeviceInfo, "get_phyid_from_logicid", return_value=0)
+        mocker.patch.object(DeviceInfo, "get_masterid_from_phyid", return_value=0)
+        mocker.patch(
+            "diagnose.asys_diagnose.AsysDiagnose.get_diagnose_devices_chip_info",
+            return_value=([2, 3], "Ascend 910_93"),
+        )
+        mocker.patch(
+            "diagnose.asys_diagnose.AsysDiagnose._check_support", return_value=True
+        )
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch("os.path.exists", return_value=True)
+
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(Args())
+
+        AsysDiagnose().run()
+        except_msg = """\r-\r\r\\\r\r|\r\r/\r
+ +------------------------+-----------------------------+
+ | Group of 4 Device      | Diagnostic Result           |
+ +========================+=============================+
+ +--- Hardware -----------+-----------------------------+
+ | HBM Detect             | Warn, Warn, Pass, Pass      |
+ |                        | (0, 0, -, -)                |
+ +------------------------+-----------------------------+
+"""
+        captured = capsys.readouterr()
+        self.assertTrue(except_msg in captured.out)
+        self.assertTrue(
+            "The statistics of all uncorrectable ECC errors in the lifecycle "
+            "cannot be queried." in caplog.text
+        )
