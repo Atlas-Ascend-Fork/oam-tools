@@ -417,8 +417,24 @@ class AsysAnalyze:
 
     def run(self):
         if f.check_exists(self.path) and f.check_exists(self.output):
-            if os.path.relpath(self.path, self.output).endswith(".."):
-                self.clean_output()
+            real_path = os.path.realpath(self.path)
+            real_output = os.path.realpath(self.output)
+            # commonpath, not a ``startswith`` on ``real_path + os.path.sep``:
+            # for ``--path /`` that concatenation is ``//``, which no absolute
+            # output starts with, so the guard would let everything through.
+            try:
+                output_in_path = (
+                    os.path.commonpath([real_path, real_output]) == real_path
+                )
+            except ValueError:
+                # Different Windows drives cannot nest.
+                output_in_path = False
+            if output_in_path:
+                # The output directory may have been created below the input
+                # directory for this run. It is safe to remove that new
+                # directory, but never remove the input directory itself.
+                if real_output != real_path:
+                    self.clean_output()
                 log_error(
                     'The output directory cannot be the same as the "path" directory or its subdirectories.'
                 )

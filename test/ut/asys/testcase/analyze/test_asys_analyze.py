@@ -900,3 +900,73 @@ class TestAsysAnalyze(AssertTest):
             'The output directory cannot be the same as the "path" directory or its subdirectories.'
             in caplog.text
         )
+
+    def test_asys_analyze_rejects_exact_path_output(self, mocker, caplog):
+        coredump_file = os.path.join(ut_root_path, "data/coredump")
+        analyze = AsysAnalyze.__new__(AsysAnalyze)
+        analyze.path = coredump_file
+        analyze.output = coredump_file
+        analyze.run_mode = "coretrace"
+        mocker.patch("common.FileOperate.check_exists", return_value=True)
+        clean_output = mocker.patch.object(analyze, "clean_output")
+
+        self.assertTrue(not analyze.run())
+        clean_output.assert_not_called()
+        self.assertTrue(
+            'The output directory cannot be the same as the "path" directory or its subdirectories.'
+            in caplog.text
+        )
+
+    def test_asys_analyze_rejects_symlinked_child_output(self, mocker, caplog):
+        analyze = AsysAnalyze.__new__(AsysAnalyze)
+        analyze.path = "/input-link"
+        analyze.output = "/output-link"
+        analyze.run_mode = "coretrace"
+        mocker.patch("common.FileOperate.check_exists", return_value=True)
+        mocker.patch(
+            "os.path.realpath", side_effect=["/data/input", "/data/input/nested"]
+        )
+        clean_output = mocker.patch.object(analyze, "clean_output")
+
+        self.assertTrue(not analyze.run())
+        clean_output.assert_called_once()
+        self.assertTrue(
+            'The output directory cannot be the same as the "path" directory or its subdirectories.'
+            in caplog.text
+        )
+
+    def test_asys_analyze_allows_sibling_output(self, mocker):
+        analyze = AsysAnalyze.__new__(AsysAnalyze)
+        analyze.path = "/input-link"
+        analyze.output = "/output-link"
+        analyze.run_mode = "trace"
+        mocker.patch("common.FileOperate.check_exists", return_value=True)
+        mocker.patch("os.path.realpath", side_effect=["/data/input", "/data/output"])
+        mocker.patch.object(analyze, "_AsysAnalyze__atrace_analyze", return_value=True)
+        clean_output = mocker.patch.object(analyze, "clean_output")
+
+        self.assertTrue(analyze.run())
+        clean_output.assert_not_called()
+
+        clean_output.reset_mock()
+        mocker.patch("os.path.realpath", side_effect=["/data/input", "/data/input.."])
+        self.assertTrue(analyze.run())
+        clean_output.assert_not_called()
+
+    def test_asys_analyze_rejects_output_under_root(self, mocker):
+        analyze = AsysAnalyze.__new__(AsysAnalyze)
+        analyze.path = "/"
+        analyze.output = "/home/user/asys_output_x"
+        analyze.run_mode = "trace"
+        mocker.patch("common.FileOperate.check_exists", return_value=True)
+        mocker.patch("os.path.realpath", side_effect=["/", "/home/user/asys_output_x"])
+        mocker.patch.object(analyze, "_AsysAnalyze__atrace_analyze", return_value=True)
+        clean_output = mocker.patch.object(analyze, "clean_output")
+
+        # "/" 是所有绝对输出路径的祖先，commonpath 判定下输出必然落在 path
+        # 之内，必须拒绝；否则 coretrace 会 os.walk("/") 扫全盘。base 的 relpath
+        # 判据同样是拒绝。
+        self.assertTrue(not analyze.run())
+        # 输出目录本身是本次运行在 path 之下新建的子目录，删掉它是安全的；
+        # 输入目录 "/" 不会被删（real_output != real_path 守卫）。
+        clean_output.assert_called_once()
