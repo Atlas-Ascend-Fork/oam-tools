@@ -28,12 +28,30 @@ CANN_BASE_URL="https://ascend.devcloud.huaweicloud.com/artifactory/cann-run/soft
 OAM_TOOLS_RAW_BASE_URL="${OAM_TOOLS_RAW_BASE_URL:-https://raw.gitcode.com/cann/oam-tools/raw/master}"
 # Whitelist of official download hosts; executable .run packages must come from these (security).
 ALLOWED_DOWNLOAD_HOSTS="ascend.devcloud.huaweicloud.com raw.gitcode.com"
+INSTALL_PATH_EXPLICIT="false"
+# CANN_PATH is an internal accumulator handed from install_cann to
+# setup_cann_env, deliberately not an inherited setting: an environment value
+# of the same name would masquerade as that cache and let detection be
+# skipped entirely (fujun19, PR #899 2026-11-01).
+CANN_PATH=""
+# Sampled before the default below is assigned, so "set but empty" stays
+# distinguishable from "never set".
+INSTALL_PATH_WAS_SET="${INSTALL_PATH+set}"
 if [ -z "${INSTALL_PATH:-}" ]; then
+    # An exported but empty INSTALL_PATH is a common way to undefine a
+    # variable; unlike --install-path "" it is not an error, but say so
+    # instead of silently using the default root.
+    if [ -n "$INSTALL_PATH_WAS_SET" ]; then
+        # log_warn is defined below; this runs before the helpers exist.
+        echo -e "${YELLOW}[WARN]${NC} INSTALL_PATH is set but empty; it is treated as unset"
+    fi
     if [ "$(id -u)" -eq 0 ]; then
         INSTALL_PATH="/usr/local/Ascend"
     else
         INSTALL_PATH="${HOME}/Ascend"
     fi
+else
+    INSTALL_PATH_EXPLICIT="true"
 fi
 SKIP_OPS="false"
 
@@ -202,7 +220,68 @@ get_arch() {
     esac
 }
 
+# Warn when the selected directory carries a version of its own that does not
+# match the requested CANN_VERSION, so a fallback to another toolkit cannot
+# silently change the version that gets built against.
+warn_on_version_mismatch() {
+    local path="${1%/}"
+    local base="${path##*/}"
+    local parent version=""
+    case "$base" in
+        cann-*)
+            version="${base#cann-}"
+            ;;
+        [0-9]*)
+            # The "$INSTALL_PATH"/ascend-toolkit/* entry names the directory
+            # after the version itself, so the version has to be read from the
+            # parent. Requiring the name to start with a digit keeps
+            # ascend-toolkit/latest on the other branch: "latest" is a real
+            # layout, not a version, and must not turn into a warning.
+            parent="${path%/*}"
+            parent="${parent##*/}"
+            if [ "$parent" = "ascend-toolkit" ]; then
+                version="$base"
+            fi
+            ;;
+    esac
+    if [ -n "$CANN_VERSION" ] && [ -n "$version" ] &&
+        [ "$version" != "$CANN_VERSION" ] &&
+        [ "$version" != "${CANN_VERSION}-beta.1" ]; then
+        # stderr: detect_cann_path is captured with $(), so a warning
+        # on stdout would end up in the returned path.
+        log_warn "Detected CANN ${version} while CANN_VERSION is ${CANN_VERSION}" >&2
+    fi
+}
+
+# Scan the configured install root. Versioned directories that match
+# CANN_VERSION come first, so a differently versioned toolkit can only be
+# picked up by the wildcard entries below them.
+scan_install_root() {
+    local p
+    local install_paths=(
+        "$INSTALL_PATH/cann-${CANN_VERSION}"
+        "$INSTALL_PATH/cann-${CANN_VERSION}-beta.1"
+        "$INSTALL_PATH/ascend-toolkit/latest"
+        "$INSTALL_PATH/latest"
+        "$INSTALL_PATH/cann"
+        "$INSTALL_PATH"/ascend-toolkit/*
+        "$INSTALL_PATH"/cann-*
+    )
+    for p in "${install_paths[@]}"; do
+        if [ -d "$p" ] && [ -f "$p/bin/setenv.bash" ]; then
+            warn_on_version_mismatch "$p"
+            echo "$p"
+            return 0
+        fi
+    done
+    return 1
+}
+
 detect_cann_path() {
+    if [ "$INSTALL_PATH_EXPLICIT" = "true" ]; then
+        scan_install_root && return 0
+    fi
+
     local paths=(
         "/usr/local/Ascend/ascend-toolkit/latest"
         "/usr/local/Ascend/latest"
@@ -224,12 +303,31 @@ detect_cann_path() {
     done
 
     if [ -d "/usr/local/Ascend" ]; then
+        # Same shape as the cann-* loop below: a differently versioned toolkit
+        # reached through this wildcard has to warn here too. This loop runs
+        # before scan_install_root, so without it the default install path
+        # never reaches the warning in that function.
         for d in /usr/local/Ascend/ascend-toolkit/*; do
-            [ -d "$d" ] && [ -f "$d/bin/setenv.bash" ] && echo "$d" && return 0
+            if [ -d "$d" ] && [ -f "$d/bin/setenv.bash" ]; then
+                warn_on_version_mismatch "$d"
+                echo "$d"
+                return 0
+            fi
         done
         for d in /usr/local/Ascend/cann-*; do
-            [ -d "$d" ] && [ -f "$d/bin/setenv.bash" ] && echo "$d" && return 0
+            if [ -d "$d" ] && [ -f "$d/bin/setenv.bash" ]; then
+                warn_on_version_mismatch "$d"
+                echo "$d"
+                return 0
+            fi
         done
+    fi
+    # Automatic defaults retain the standard exact-path search before the
+    # additional install-root fallback; only an explicit root takes priority.
+    # The explicit branch above already scanned this root, so skip the
+    # duplicate pass instead of globbing the same directories twice.
+    if [ "$INSTALL_PATH_EXPLICIT" != "true" ]; then
+        scan_install_root && return 0
     fi
     return 1
 }
@@ -240,6 +338,10 @@ install_cann() {
     local existing_cann=$(detect_cann_path)
     if [ -n "$existing_cann" ]; then
         log_info "CANN already installed at: $existing_cann"
+        # Remember the hit so setup_cann_env does not run detect_cann_path
+        # a second time and print the version-mismatch warning twice
+        # (fujun19, PR #762 2026-10-21).
+        CANN_PATH="$existing_cann"
         return 0
     fi
 
@@ -316,7 +418,10 @@ install_cann() {
 setup_cann_env() {
     log_info "Setting up CANN environment..."
 
-    CANN_PATH=$(detect_cann_path)
+    # install_cann remembers an already-installed hit; only an unset value
+    # (fresh installation or --skip-cann) triggers a fresh probe, so the
+    # version-mismatch warning is not printed twice in the default flow.
+    CANN_PATH="${CANN_PATH:-$(detect_cann_path)}"
     if [ -z "$CANN_PATH" ]; then
         log_error "CANN installation not found after installation!"
         return 1
@@ -524,7 +629,10 @@ show_help() {
     echo "Options:"
     echo "  --cann-version VERSION   CANN version (default: ${default_cann_version})"
     echo "  --chip-type TYPE         Chip type examples: 910b, 910_93/A3, 950 (default: ${CHIP_TYPE})"
-    echo "  --install-path PATH      Installation path (default: ${INSTALL_PATH})"
+    echo "  --install-path PATH      Installation path (default: ${INSTALL_PATH});"
+    echo "                           an empty value is an error. The INSTALL_PATH"
+    echo "                           environment variable behaves the same, except"
+    echo "                           that an empty INSTALL_PATH means unset."
     echo "  --skip-cann              Skip CANN installation"
     echo "  --skip-ops, --toolkit-only  Skip ops package download (compile-only scenario)"
     echo "  --help                   Show this help"
@@ -553,7 +661,14 @@ main() {
                 shift 2
                 ;;
             --install-path)
+                # A trailing --install-path leaves $2 unset; shift 2 would
+                # then fail under `set -e` and abort without an explanation.
+                if [ $# -lt 2 ] || [ -z "$2" ]; then
+                    log_error "--install-path requires a non-empty value"
+                    exit 1
+                fi
                 INSTALL_PATH="$2"
+                INSTALL_PATH_EXPLICIT="true"
                 shift 2
                 ;;
             --skip-cann)
@@ -574,6 +689,41 @@ main() {
                 ;;
         esac
     done
+
+    # Resolve against the caller's cwd before main or the installer changes it.
+    # -m also supports a not-yet-created install root, without creating it here.
+    if [ -z "$INSTALL_PATH" ]; then
+        log_error "Installation path must not be empty (--install-path)"
+        exit 1
+    fi
+    if check_command realpath; then
+        if ! INSTALL_PATH=$(realpath -m -- "$INSTALL_PATH"); then
+            log_error "Failed to normalize installation path"
+            exit 1
+        fi
+    else
+        # Keep existing installations usable without adding an unconditional
+        # dependency. Bash resolves existing directories; new roots stay absolute.
+        local normalized="$INSTALL_PATH"
+        case "$normalized" in
+            /*) ;;
+            *) normalized="$(pwd -P)/${normalized#./}" ;;
+        esac
+        while [[ "$normalized" != "/" && "$normalized" == */ ]]; do
+            normalized="${normalized%/}"
+        done
+        if [ -d "$normalized" ]; then
+            normalized=$(cd -- "$normalized" && pwd -P)
+        fi
+        # Only speak up when the fallback actually had to rewrite the value:
+        # unlike realpath -m it neither resolves symlinks nor collapses "..".
+        if [ "$normalized" != "$INSTALL_PATH" ]; then
+            # One argument: log_warn only expands $1, so a second word here
+            # would be dropped and the resolved path never printed.
+            log_warn "realpath is unavailable; resolved the installation path to ${normalized} without expanding symlinks or .. entries"
+        fi
+        INSTALL_PATH="$normalized"
+    fi
 
     if [ -z "$CANN_VERSION" ]; then
         if ! CANN_VERSION=$(get_cann_version_from_cmake "$version_file"); then
