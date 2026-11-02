@@ -21,7 +21,11 @@
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
 
+import pytest
+
 from collect.log import collect_host_logs
+from common import consts
+from common.file_operate import COPY_MODE, MOVE_MODE
 from testcase.conftest import AssertTest
 
 
@@ -59,3 +63,30 @@ class TestHostLogCollect(AssertTest):
 
         mocker.patch("params.ParamDict.get_command", return_value="launch")
         self.assertTrue(not collect_host_logs("./"))
+
+    @pytest.mark.parametrize(
+        "command,expected_mode",
+        [
+            ("collect", COPY_MODE),
+            (consts.launch_cmd, MOVE_MODE),
+        ],
+    )
+    def test_collect_cann_logs_continues_after_failure(
+        self, mocker, command, expected_mode
+    ):
+        calls = []
+        modes = []
+
+        def collect_dir(source, target, mode):
+            calls.append(source.rsplit("/", 1)[-1])
+            modes.append(mode)
+            return calls[-1] != "debug"
+
+        mocker.patch("common.FileOperate.collect_dir", side_effect=collect_dir)
+        mocker.patch("params.ParamDict.get_command", return_value=command)
+
+        from collect.log.host_log_collect import collect_cann_logs
+
+        self.assertTrue(not collect_cann_logs("./"))
+        self.assertTrue(calls == ["debug", "run", "security"])
+        self.assertTrue(modes == [expected_mode] * 3)

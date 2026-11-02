@@ -31,7 +31,11 @@ __all__ = ["collect_host_logs"]
 def collect_messages(output_root_dir):
     root_path = os.sep
     message_root_dir = os.path.join(root_path, "var", "log")
-    message_file_name = "syslog" if f.check_file(os.path.join(message_root_dir, "syslog")) else "messages"
+    message_file_name = (
+        "syslog"
+        if f.check_file(os.path.join(message_root_dir, "syslog"))
+        else "messages"
+    )
     message_source = os.path.join(message_root_dir, message_file_name)
     message_target = os.path.join(output_root_dir, "dfx", "log", "host", "message")
     return f.collect_file_to_dir(message_source, message_target, COPY_MODE)
@@ -51,25 +55,30 @@ def collect_cann_logs(output_root_dir):
     ret = True
     for log_type in log_types:
         cann_source = os.path.join(cann_log_path, log_type)
-        cann_target = os.path.join(output_root_dir, "dfx", "log", "host", "cann", log_type)
+        cann_target = os.path.join(
+            output_root_dir, "dfx", "log", "host", "cann", log_type
+        )
         if not os.path.exists(cann_source):
             log_warning("No file exists in %s/%s" % (env_path_name, log_type))
         if ParamDict().get_command() == consts.launch_cmd:
-            ret = ret and f.collect_dir(cann_source, cann_target, MOVE_MODE)
+            current_ret = f.collect_dir(cann_source, cann_target, MOVE_MODE)
         else:
-            ret = ret and f.collect_dir(cann_source, cann_target, COPY_MODE)
+            current_ret = f.collect_dir(cann_source, cann_target, COPY_MODE)
+        ret = ret and current_ret
     return ret
 
 
 def collect_install_logs(output_root_dir):
     root_path = os.sep
-    install_source = os.path.join(root_path, "var", "log", "ascend_seclog", "ascend_install.log")
+    install_source = os.path.join(
+        root_path, "var", "log", "ascend_seclog", "ascend_install.log"
+    )
     install_target = os.path.join(output_root_dir, "dfx", "log", "host", "install")
     return f.collect_file_to_dir(install_source, install_target, COPY_MODE)
 
 
 def collect_host_logs(output_root_dir):
-    err = 0 # err equals to zero denotes no errors
+    err = 0  # err equals to zero denotes no errors
     message_ret = collect_messages(output_root_dir)
     if not message_ret:
         log_warning("Collect host messages failed.")
