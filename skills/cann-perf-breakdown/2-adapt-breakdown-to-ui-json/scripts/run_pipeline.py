@@ -77,6 +77,13 @@ STAGE3 = find_peer_skill("cann-perf-ui-json-report")
 
 sys.path.insert(0, HERE)
 import breakdown_paths  # noqa: E402
+# Imported rather than redeclared: `build_trace_bindings.py` owns both the default slack and
+# the rule for what a usable value is, and a second copy here would let the pipeline accept a
+# tolerance the join then refuses -- or worse, default to a different number silently.
+from build_trace_bindings import (  # noqa: E402
+    DEFAULT_TIME_MATCH_TOLERANCE_US,
+    positive_float,
+)
 
 
 def run(cmd, **kwargs):
@@ -157,6 +164,17 @@ def main():
     ap.add_argument("--extractor-model",
                     help="agent/model that produced the reviewed breakdown; defaults to the "
                          "breakdown generation provenance or perf-breakdown-skill")
+    ap.add_argument("--time-tolerance-us", metavar="US", type=positive_float,
+                    default=DEFAULT_TIME_MATCH_TOLERANCE_US,
+                    help="absolute slack, in microseconds, build_trace_bindings.py allows "
+                         "between the two exports' start time and duration when it joins the "
+                         "Timeline to trace_view.json. Default "
+                         f"{DEFAULT_TIME_MATCH_TOLERANCE_US:g} us. This is the only supported "
+                         "way to widen that join, and the bindings stage is the last one -- so "
+                         "an unusable value is refused here, at parse time, rather than after "
+                         "every earlier stage has already run. Raise it only when a capture is "
+                         "known to disagree by more; widening it re-admits the ambiguity the "
+                         "join exists to avoid.")
     args = ap.parse_args()
 
     out = os.path.abspath(args.out)
@@ -387,10 +405,14 @@ def main():
              "--timeline", timeline_fact, "--attribution", attribution,
              "--trace", os.path.join(repo, "trace_view.json"),
              "--enrich-trace", os.path.join(repo, "trace_view.json"),
-             "--out", os.path.join(repo, "report/outputs/trace_bindings.json")])
+             "--out", os.path.join(repo, "report/outputs/trace_bindings.json"),
+             # Always passed, default included, so the value the join actually ran with is in
+             # the echoed command line above rather than implied by whichever script version
+             # happened to be on disk. `str(float)` round-trips, so no precision is lost here.
+             "--time-tolerance-us", args.time_tolerance_us])
     if r.returncode:
         die("failed", "bindings", (r.stderr or r.stdout)[-800:], stages=stages)
-    stages["bindings"] = "ok"
+    stages["bindings"] = {"status": "ok", "time_tolerance_us": args.time_tolerance_us}
 
     handoff = os.path.join(repo, "ui-report-handoff.json")
     r = run(["node", os.path.join(STAGE3, "scripts/generate-report.mjs"),
