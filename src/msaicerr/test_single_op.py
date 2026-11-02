@@ -22,7 +22,22 @@ Copyright Information:
 Huawei Technologies Co., Ltd. All Rights Reserved © 2024
 """
 
-from ms_interface.single_op_test_frame.single_op_case import SingleOpCase
+import sys
+
+USAGE = (
+    "usage: python3 test_single_op.py [-h]\n\n"
+    "Runs a single-op test with the config defined in this file. Before "
+    "running, replace every '/yourpath/...' placeholder path in the config "
+    "with the actual compiled artifact paths, then execute the script "
+    "without arguments. '-h/--help' only prints this help and exits without "
+    "running the test."
+)
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+    print(USAGE)
+    sys.exit(0)
+
+from ms_interface.single_op_test_frame.single_op_case import SingleOpCase  # noqa: E402
 
 config = {
     "cce_file": "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.cce",
@@ -36,13 +51,15 @@ config = {
     "input_file_list": [
         "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.input.0.npy",
         "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.input.1.npy",
-        "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.input.2.npy"
+        "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.input.2.npy",
     ],
     "output_file_list": [
         "/yourpath/te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1.output.0.npy"
     ],
     "kernel_name": "te_gatherv2_8241ce80d37e6d97ac20a118920e96111fd0f4f0877012278629ce7d5d4c7d4b_1",
-    "compile_temp_dir": "temp_20250331132228"
+    "compile_temp_dir": "temp_20250331132228",
 }
 OP_TEST = "single_op"
-SingleOpCase.run(config, OP_TEST)
+
+if __name__ == "__main__":
+    SingleOpCase.run(config, OP_TEST)
