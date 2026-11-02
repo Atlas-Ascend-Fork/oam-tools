@@ -6,7 +6,7 @@
 
 ### 架构图
 
-![](figures/prof_sw_arch.svg)
+![prof_sw_arch](figures/prof_sw_arch.svg)
 
 ## 核心模块介绍
 
@@ -54,7 +54,7 @@
 
 ### 部署图
 
-![](figures/prof_deploy_view.svg)
+![prof_deploy_view](figures/prof_deploy_view.svg)
 
 **msprofiler.so**：提供acl prof接口能力。
 **profapi.so**：profiling数据采集的接口层，Host和Device部署的profapi.so是归一的。profapi.so通过dlopen的方式加载profimpl.so，在对动态库大小敏感的场景下，如果生产态下不需要做profiling数据采集，用户可以不部署profimpl.so，仅部署profapi.so，保证上层业务组件的so可以正常加载。
@@ -64,7 +64,7 @@
 
 ### 用例图
 
-![](figures/prof_user_case.svg)
+![prof_user_case](figures/prof_user_case.svg)
 
 ### 动态 Profiling
 
