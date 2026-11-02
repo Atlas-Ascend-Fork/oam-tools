@@ -199,6 +199,7 @@ class AsysDiagnose:
     def get_diagnose_devices_chip_info(self, device_id):
         diagnose_devices = []
         chip_info = UNKNOWN
+        self._diagnose_device_chip_info = {}
         diagnose_supported = AsysDiagnoseSupportedChip()
         if device_id is False:
             for i in range(self.devices_num):
@@ -209,6 +210,7 @@ class AsysDiagnose:
                     )
                     continue
                 diagnose_devices.append(i)
+                self._diagnose_device_chip_info[i] = _chip_info
                 chip_info = _chip_info
         else:
             ret, _chip_info = diagnose_supported.get_supported_chip_info(device_id)
@@ -217,6 +219,7 @@ class AsysDiagnose:
             else:
                 chip_info = _chip_info
                 diagnose_devices = [device_id]
+                self._diagnose_device_chip_info[device_id] = _chip_info
         return diagnose_devices, chip_info
 
     def hardware_detect(self, run_mode):
@@ -224,6 +227,7 @@ class AsysDiagnose:
         device_id = ParamDict().get_arg("device_id")
         diagnose_devices, chip_info = self.get_diagnose_devices_chip_info(device_id)
         if not diagnose_devices or chip_info == UNKNOWN:
+            log_error(f"{chip_info} is not supported.")
             return False
 
         # aicore_stl_detect is supported on Ascend950 and Ascend960DT only.
@@ -250,14 +254,27 @@ class AsysDiagnose:
         elif self.device_obj.ascend_ml == RetCode.FAILED:
             return False
 
+        device_chip_info = getattr(self, "_diagnose_device_chip_info", None)
+        if not device_chip_info:
+            device_chip_info = {
+                current_id: chip_info for current_id in diagnose_devices
+            }
+        chip_handler = ChipHandler()
+        handlers_by_type = {}
+        for current_device_id in diagnose_devices:
+            handler = chip_handler.get_handler(device_chip_info[current_device_id])
+            if handler is None:
+                log_error(f"{device_chip_info[current_device_id]} is not supported.")
+                return False
+            handlers_by_type.setdefault(type(handler), [handler, []])[1].append(
+                current_device_id
+            )
+
         t = threading.Thread(target=self.wait_view, daemon=True)
         t.start()
-        # Multi-thread parallel execution
-        handler = ChipHandler().get_handler(chip_info)
-        if handler is None:
-            log_error(f"{chip_info} is not supported.")
-            return False
-        ret = handler.run_diagnose(self.device_obj, diagnose_devices, run_mode)
+        ret = {}
+        for handler, handler_devices in handlers_by_type.values():
+            ret.update(handler.run_diagnose(self.device_obj, handler_devices, run_mode))
 
         # ret add not support device
         if device_id is False:

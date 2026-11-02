@@ -808,6 +808,102 @@ class TestAsysDiagnose(AssertTest):
         captured = capsys.readouterr()
         self.assertTrue(except_msg in captured.out)
 
+    @pytest.mark.parametrize(
+        ("chip_models", "master_ids", "expected_calls"),
+        [
+            (["Ascend 910_93 V1"] * 3, [0, 0, 2], [0, 2]),
+            (["Ascend 910B1 V1"] * 3, [0, 0, 2], [0, 1, 2]),
+            (
+                ["Ascend 910_93 V1", "Ascend 910_93 V1", "Ascend 910B1 V1"],
+                [0, 2, 2],
+                [0, 1, 2],
+            ),
+            (
+                ["Ascend 910B1 V1", "Ascend 910_93 V1", "Ascend 910_93 V1"],
+                [0, 0, 2],
+                [0, 1, 2],
+            ),
+        ],
+    )
+    def test_diagnose_all_devices_dispatches_by_chip_family(
+        self, monkeypatch, capsys, chip_models, master_ids, expected_calls
+    ):
+        class Args:
+            d = None
+            r = "cpu_detect"
+            subparser_name = "diagnose"
+            output = None
+            timeout = 5
+
+        class FakeSupportedChip:
+            def get_supported_chip_info(self, device_id):
+                return True, chip_models[device_id]
+
+        calls = []
+        reported_results = {}
+
+        class FakeAscendMl:
+            def AmlCpuDetect(self, device_id, _timeout):
+                calls.append(device_id.value)
+                return 0
+
+        class FakeDevice:
+            ascend_ml = FakeAscendMl()
+
+            @staticmethod
+            def get_phyid_from_logicid(device_id):
+                return device_id
+
+            @staticmethod
+            def get_masterid_from_phyid(phy_id):
+                return master_ids[phy_id]
+
+        monkeypatch.setattr(
+            asys_diagnose,
+            "AsysDiagnoseSupportedChip",
+            lambda: FakeSupportedChip(),
+        )
+        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose.os, "getuid", lambda: 0)
+        monkeypatch.setattr(AsysDiagnose, "wait_view", lambda _self: None)
+        monkeypatch.setattr(
+            AsysDiagnose,
+            "print_save",
+            lambda _self, _device_id, result, _run_mode: reported_results.update(
+                result
+            ),
+        )
+
+        ParamDict.clear()
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(Args())
+        diagnose = object.__new__(AsysDiagnose)
+        diagnose.finish_flag = False
+        diagnose.device_obj = FakeDevice()
+        diagnose.devices_num = len(chip_models)
+
+        self.assertTrue(diagnose.hardware_detect("cpu_detect"))
+        self.assertTrue(sorted(calls) == expected_calls)
+        if len(set(chip_models)) > 1:
+            self.assertTrue(sorted(reported_results) == [0, 1, 2])
+        capsys.readouterr()
+
+    def test_hardware_detect_empty_devices_reports_unsupported(
+        self, monkeypatch, caplog
+    ):
+        """An empty supported-device set must retain the explicit failure log."""
+
+        monkeypatch.setattr(
+            AsysDiagnose,
+            "get_diagnose_devices_chip_info",
+            lambda _self, _device_id: ([], "Unknown"),
+        )
+        monkeypatch.setattr(ParamDict, "get_arg", lambda _self, _key: False)
+        diagnose = object.__new__(AsysDiagnose)
+
+        assert diagnose.hardware_detect("cpu_detect") is False
+        assert "Unknown is not supported." in caplog.text
+
     def test_diagnose_aicore_stl_950_pass(self, mocker, capsys):
         """aicore_stl_detect on Ascend950 with a passing device."""
         self.assertTrue(True)
