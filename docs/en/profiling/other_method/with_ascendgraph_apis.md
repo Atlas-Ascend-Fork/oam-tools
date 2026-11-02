@@ -36,7 +36,7 @@ The Ascend Graph API collects performance data during graph construction.
 
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id6 -->
 > [!NOTE] Note
-> For details about the APIs, see [Graph Development](https://gitcode.com/cann/ge/blob/9.2.0/docs/zh/user_guides/graph_dev/README.md).
+> For details about the APIs, see [Graph Development](https://gitcode.com/cann/ge/blob/9.2.0/docs/en/user_guides/graph_dev/README.md).
 <!-- end id6 -->
 
 ## Collect Performance Raw Data (Passing option Through GEInitialize)

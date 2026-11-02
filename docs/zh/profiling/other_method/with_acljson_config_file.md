@@ -9,7 +9,7 @@
 <!-- end id1 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id50 -->
-本节仅介绍如何在推理程序中开启性能数据采集，推理应用完整开发过程请参见《[应用开发 \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/README.md)》。
+本节仅介绍如何在推理程序中开启性能数据采集，推理应用完整开发过程请参见《[应用开发 \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/c/00_acl_cpp_dev.md)》。
 <!-- end id50 -->
 
 ## 前提条件
@@ -52,7 +52,7 @@
 
 3. 配置acl.json文件完成后，请重新编译应用工程、并运行应用工程。
    <!-- npu="950,A3,910b,910,310p,310b" id51 -->
-   应用开发详细内容请参考《[应用开发 \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/README.md)》。
+   应用开发详细内容请参考《[应用开发 \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/c/00_acl_cpp_dev.md)》。
    <!-- end id51 -->
 
     “output”指定路径下生成Profiling性能原始数据，如下所示。

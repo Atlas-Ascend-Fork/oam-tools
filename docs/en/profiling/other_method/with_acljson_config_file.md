@@ -11,7 +11,7 @@ For parsing operations, see [Using the msprof Command to Parse, Query, and Expor
 <!-- end id1 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id50 -->
-This section only describes how to enable performance data collection in the inference program. For the complete development process of an inference application, see *[Application Development \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/README.md)*.
+This section only describes how to enable performance data collection in the inference program. For the complete development process of an inference application, see *[Application Development \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/en/app-dev/c/00_acl_cpp_dev.md)*.
 <!-- end id50 -->
 
 ## Prerequisites
@@ -54,7 +54,7 @@ Complete the acl.json file configuration and then compile and run the applicatio
 
 3. After the acl.json file is configured, recompile the application project and run it.
    <!-- npu="950,A3,910b,910,310p,310b" id51 -->
-   For details about application development, see [Application Development \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/zh/app-dev/README.md).
+   For details about application development, see [Application Development \(C&C++\)](https://gitcode.com/cann/docs/blob/9.2.0/docs/en/app-dev/c/00_acl_cpp_dev.md).
    <!-- end id51 -->
 
     The raw Profiling performance data is generated in the path specified by "output", as shown below.

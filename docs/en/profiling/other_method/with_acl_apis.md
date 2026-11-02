@@ -15,7 +15,7 @@ This section describes how to collect performance data through APIs in offline i
 |Method 3: Subscribe to operator information|Parse the collected performance data and write it to a pipe. The user reads it into memory and then calls an API to obtain the performance data.|
 
 <!-- npu="950,A3,910b,910,310p,310b" id22 -->
-Note: For interface details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/zh/api_ref/README.md).
+Note: For interface details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/en/api_ref/README.md).
 <!-- end id22 -->
 
 > [!NOTE] Note
@@ -44,7 +44,7 @@ The performance data collection function is enabled by calling APIs, so that raw
 > [!NOTE] Note
 >For the persistence path of the collected performance data passed in by the aclprofInit API, ensure that the user process has read and write permissions.
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id23 -->
->For interface details, see also [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/zh/api_ref/README.md).
+>For interface details, see also [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/en/api_ref/README.md).
 <!-- end id23 -->
 
 **API Call Example**
@@ -116,7 +116,7 @@ To obtain performance data of user and upper-layer framework programs, before Pr
 > [!NOTE] Note
 > When only the msproftx function is enabled, set the deviceIdList parameter of the aclprofCreateConfig API to empty and the deviceNums parameter to 0.
 <!-- npu="950,A3,910b,910,310p,310b,IPV350" id24 -->
-> For interface details, see also [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/zh/api_ref/README.md).
+> For interface details, see also [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/en/api_ref/README.md).
 <!-- end id24 -->
 
 **API Call Example**
@@ -317,7 +317,7 @@ By calling the message subscription API, the collected Profiling data is parsed 
 |aclprofDestroySubscribeConfig|Destroys the data of the aclprofSubscribeConfig type created through the aclprofCreateSubscribeConfig API. This is a synchronous interface.|
 
 > [!NOTE] Note
-> For details about the APIs, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/zh/api_ref/README.md).
+> For details about the APIs, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.2.0/docs/en/api_ref/README.md).
 
 ## Collected Data Description
 
