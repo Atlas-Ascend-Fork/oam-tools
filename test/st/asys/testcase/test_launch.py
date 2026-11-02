@@ -20,6 +20,7 @@
 
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
+import logging
 import os
 import sys
 import pytest
@@ -271,20 +272,26 @@ class TestLaunch(AssertTest):
             ("--task", "/usr/bin/python3.7 test.sh"),
         ],
     )
-    def test_launch_task_without_script(self, capsys, arg_name, arg_val):
+    def test_launch_task_without_script(self, caplog, arg_name, arg_val):
         """
         @描述: 执行launch功能, task参数无效
         @类型: FUNCTION
         @输入: asys launch --task={无效可执行指令}
-        @步骤: 校验main函数返回值是否为False;
-        @预期结果: main函数返回值为False;
+        @步骤: 校验main函数返回值是否为False; 校验错误日志;
+        @预期结果: main函数返回值为False; 错误日志包含预期消息;
         """
         sys.argv = [CONF_SRC_PATH, "launch", "=".join([arg_name, arg_val])]
         ParamDict().set_env_type("EP")
+        caplog.set_level(logging.ERROR)
         self.assertTrue(not asys.main())
-        self.assertTrue(
-            f'root:log.py:26 argument "task" no executable script, argument value: "{arg_name} {arg_val}"'
+        expected_message = (
+            f'Argument "{arg_name.lstrip("-")}" no executable script, '
+            f'argument value: "{arg_val}"'
         )
+        assert any(
+            record.levelname == "ERROR" and expected_message in record.getMessage()
+            for record in caplog.records
+        ), caplog.text
 
     @pytest.mark.parametrize(
         ["arg_name", "arg_val"],
