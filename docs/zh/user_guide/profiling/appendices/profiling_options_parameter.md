@@ -89,7 +89,7 @@
 
 - msproftx：控制msproftx用户和上层框架程序输出性能数据的开关，可选on或off，默认值为off。
 
-    需要先在应用程序脚本中添加如下mstx API或msproftx API，推荐使用mstx API。
+  需要先在应用程序脚本中添加如下mstx API或msproftx API，推荐使用mstx API。
 
 - runtime\_api：控制runtime API性能数据采集开关，可选on或off，默认为off。可采集runtime API性能数据，包括Host与Device之间、Device间的同步异步内存复制时延等。
 - sys\_hardware\_mem\_freq：片上内存、QoS传输带宽、LLC三级缓存带宽、加速器带宽、SoC传输带宽、组件内存占用等的采集开关。不同产品的采集内容略有差异，请以实际结果为准。范围\[1,100\]，单位Hz。

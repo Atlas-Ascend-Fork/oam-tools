@@ -3,8 +3,8 @@
 当用户需要定位应用程序或上层框架程序的性能瓶颈时，可通过特定接口，记录应用程序执行期间特定事件发生的时间跨度，写入性能数据文件。
 
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-- 通用场景：推荐使用[mstx API](https://gitcode.com/Ascend/mstx/blob/master/docs/zh/install_guide/mstx_install_guide.md)（也可选[msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/runtimeapi/aclcppdevg_03_1264.html)）。
-- PyTorch场景：使用[TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/master/docs/zh/developer_notes/ascend_pytorch_profiler_user_guide.md#%E9%87%87%E9%9B%86%E5%B9%B6%E8%A7%A3%E6%9E%90mstx%E6%95%B0%E6%8D%AE)。
+- 通用场景：推荐使用[mstx API](https://gitcode.com/Ascend/op-plugin/blob/master/docs/zh/custom_APIs/menu_Pytorch_API.md)（也可选[msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)）。
+- PyTorch场景：使用[TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/master/docs/zh/developer_notes/ascend_pytorch_profiler_user_guide.md)。
 <!-- end id1 -->
 
 ## 前提条件
