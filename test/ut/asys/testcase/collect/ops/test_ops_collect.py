@@ -449,6 +449,56 @@ class TestOpsCollect(AssertTest):
         )
         self.assertTrue(collect_ops_files_env_var(test_case_tmp, "./"))
 
+    def test_ops_collect_env_var_empty_state_is_info(self, mocker, caplog):
+        # 无故障环境的预期空态：无 dump、无故障 kernel_name 可按名搜索，
+        # 应降级为 INFO 空态提示并返回成功语义，不再触发 caller 的
+        # "Ops collect failed." WARNING（#385）
+        import logging
+
+        from collect.ops.ops_collect import collect_ops_files_env_var
+
+        mocker.patch("params.ParamDict.get_arg", return_value=False)
+        mocker.patch("common.FileOperate.check_dir", return_value=False)
+        mocker.patch("collect.ops.ops_collect.get_fault_kernel_name", return_value=None)
+        with caplog.at_level(logging.INFO):
+            self.assertTrue(collect_ops_files_env_var("./output", "./ops") is True)
+        self.assertTrue("WARNING" not in caplog.text)
+        self.assertTrue("No fault operator file" in caplog.text)
+
+    def test_ops_collect_kernel_found_but_files_missing_is_warning(
+        self, mocker, caplog
+    ):
+        # plog 已解析出故障算子名但候选路径无对应 .o/.json，属真实采集缺失，
+        # 必须保留 WARNING 并带上 kernel_name，不得降级为正常空态（#385）
+        from collect.ops.ops_collect import collect_ops_files_env_var
+
+        mocker.patch("params.ParamDict.get_arg", return_value=False)
+        mocker.patch("common.FileOperate.check_dir", return_value=False)
+        mocker.patch(
+            "collect.ops.ops_collect.get_fault_kernel_name",
+            return_value="fault_kernel_0",
+        )
+        self.assertTrue(collect_ops_files_env_var("./output", "./ops") is False)
+        self.assertTrue("WARNING" in caplog.text)
+        self.assertTrue("fault_kernel_0" in caplog.text)
+        self.assertTrue("no fault occurred" not in caplog.text)
+
+    def test_collect_file_empty_state_no_warning(self, mocker, caplog):
+        # 端到端：无故障空态经过 collect_file 整条路径也不应出现任何 WARNING，
+        # 否则 INFO"正常空态"与 WARNING"Ops collect failed."自相矛盾（#385）
+        import logging
+
+        from collect.ops.ops_collect import collect_file
+
+        mocker.patch("params.ParamDict.get_command", return_value=consts.collect_cmd)
+        mocker.patch("params.ParamDict.get_arg", return_value=False)
+        mocker.patch("collect.ops.ops_collect.is_sk_scenario", return_value=False)
+        mocker.patch("common.FileOperate.check_dir", return_value=False)
+        mocker.patch("collect.ops.ops_collect.get_fault_kernel_name", return_value=None)
+        with caplog.at_level(logging.INFO):
+            collect_file("./output")
+        self.assertTrue("WARNING" not in caplog.text)
+
     def test_collect_file_sk_scenario_skip_env_search(self, mocker):
         from collect.ops.ops_collect import collect_file
 

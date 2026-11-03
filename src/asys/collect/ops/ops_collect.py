@@ -236,7 +236,21 @@ def collect_ops_files_env_var(output_root_path, ops_target_dir):
         if collect_files:
             return collect_op_files(collect_files, ops_target_dir, COPY_MODE)
 
-    log_warning("The JSON file of the fault kernel_name is not found.")
+    if not kernel_name:
+        # No fault kernel in plog means no fault to locate, nothing to collect.
+        # This is an expected empty state, not a collect failure.
+        log_info(
+            "No fault operator file to collect, this is normal when no fault occurred."
+        )
+        return True
+
+    # A fault kernel exists but its operator file is not found in any candidate
+    # path, the collection is incomplete.
+    log_warning(
+        "The operator file of the fault kernel_name {} is not found.".format(
+            kernel_name
+        )
+    )
     return False
 
 

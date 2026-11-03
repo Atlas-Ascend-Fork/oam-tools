@@ -20,6 +20,7 @@
 
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
+import logging
 import os
 
 from testcase.conftest import ut_root_path
@@ -64,6 +65,25 @@ class TestDataDumpCollect(AssertTest):
         mocker.patch("common.FileOperate.collect_dir", return_value=True)
         collect_data_dump("./output")
         self.assertTrue("failed" not in caplog.text)
+
+    def test_data_dump_collect_empty_state_is_info(self, mocker, caplog):
+        # 无故障环境的预期空态：候选路径下没有 extra-info/data-dump 可采集，
+        # 应降级为 INFO 空态提示，不再以 WARNING + "failed" 误导用户（#385）
+        mocker.patch("params.ParamDict.get_command", return_value=consts.collect_cmd)
+        mocker.patch("common.FileOperate.check_dir", return_value=False)
+        with caplog.at_level(logging.INFO):
+            collect_data_dump("./output")
+        self.assertTrue("WARNING" not in caplog.text)
+        self.assertTrue("No dump data" in caplog.text)
+
+    def test_data_dump_collect_copy_failed_is_warning(self, mocker, caplog):
+        # 源目录存在但拷贝失败属真实采集失败，必须保留 WARNING（#385）
+        mocker.patch("params.ParamDict.get_command", return_value=consts.collect_cmd)
+        mocker.patch("common.FileOperate.check_dir", return_value=True)
+        mocker.patch("common.FileOperate.collect_dir", return_value=False)
+        collect_data_dump("./output")
+        self.assertTrue("WARNING" in caplog.text)
+        self.assertTrue("failed" in caplog.text)
 
     def test_data_dump_get_collect_path_npu(self, mocker):
         mocker.patch(

@@ -22,7 +22,7 @@ from params import ParamDict
 from common import consts
 from common import FileOperate as f
 from common.file_operate import MOVE_MODE, COPY_MODE
-from common import log_debug, log_warning
+from common import log_debug, log_info, log_warning
 from drv import EnvVarName
 
 __all__ = ["collect_data_dump"]
@@ -75,7 +75,8 @@ def get_source_dir():
 def collect_data_dump(output_root_path):
     data_dump_source_dir = get_source_dir()
     if data_dump_source_dir is None:
-        log_warning("Data-dump collect failed.")
+        # No fault dump data in the environment is an expected empty state, not a collect failure.
+        log_info("No dump data to collect, this is normal when no fault occurred.")
         return
 
     data_dump_target_dir = os.path.join(output_root_path, "dfx", "data-dump")
