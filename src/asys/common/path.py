@@ -56,7 +56,7 @@ def get_log_conf_path(name):
             "/var/log/npu/conf/slog.conf",
             "/var/log/npu/conf/slog/slog.conf",
         ]
-        search_re = "logAgentFileDir=(.+?)\n"
+        search_re = r"^[ \t]*logAgentFileDir[ \t]*=[ \t]*([^\r\n]+)"
         log_path = "/var/log/npu/slog/"
     elif name == "bbox":
         log_conf_paths = [
@@ -65,7 +65,7 @@ def get_log_conf_path(name):
             "/var/log/npu/conf/bbox.conf",
             "/var/log/npu/conf/bbox/bbox.conf",
         ]
-        search_re = "MNTN_PATH=(.+?)\n"
+        search_re = r"^[ \t]*MNTN_PATH[ \t]*=[ \t]*([^\r\n]+)"
         log_path = "/var/log/npu/hisi_logs/"
     else:
         log_error("The input parameter is incorrect.")
@@ -74,11 +74,13 @@ def get_log_conf_path(name):
     for conf_path in log_conf_paths:
         if not os.path.exists(conf_path):
             continue
-        with open(conf_path, "r", encoding="utf8") as conf_f:
+        with open(conf_path, "r", encoding="utf-8-sig") as conf_f:
             conf_info = conf_f.read()
 
-        log_path_f = re.search(search_re, conf_info)
+        log_path_f = re.search(search_re, conf_info, re.MULTILINE)
         if log_path_f is not None:
-            log_path = log_path_f.groups()[0]
+            value = log_path_f.groups()[0].strip()
+            if value:
+                log_path = value
 
     return log_path
