@@ -768,12 +768,15 @@ path_version_check(){
 
 check_docker_path(){
     docker_path="$1"
-    if [ "${docker_path}" != "/"* ]; then
-        echo "[Oam-Tools] [ERROR]: ERR_NO:${PARAM_INVALID};ERR_DES:Parameter --docker-root \
+    case "${docker_path}" in
+        /*) ;;
+        *)
+            echo "[Oam-Tools] [ERROR]: ERR_NO:${PARAM_INVALID};ERR_DES:Parameter --docker-root \
 must with absolute path that which is start with root directory /. Such as --docker-root=/${docker_path}"
-        exitlog
-        exit 1
-    fi
+            exitlog
+            exit 1
+            ;;
+    esac
     if [ ! -d "${docker_path}" ]; then
         echo "[Oam-Tools] [ERROR]: ERR_NO:${FILE_NOT_EXIST}; The directory:${docker_path} not exist, please create this directory."
         exitlog
@@ -1211,8 +1214,8 @@ do
         ;;
     --docker-root=*)
         is_docker_install=y
-	docker_root=$(echo $1 | cut -d"=" -f2 )
-        check_docker_path ${docker_root}
+	docker_root="${1#*=}"
+        check_docker_path "${docker_root}"
         shift
         ;;
     -*)
