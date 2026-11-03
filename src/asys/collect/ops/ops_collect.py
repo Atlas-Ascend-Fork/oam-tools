@@ -223,7 +223,7 @@ def collect_ops_files_env_var(output_root_path, ops_target_dir):
         env_var.cache_path,
         env_var.work_path,
         os.path.join(env_var.home_path, "atc_data"),
-        env_var.custom_opp_path,
+        *env_var.custom_opp_paths,
         env_var.opp_path,
         env_var.current_path,
     ]:
@@ -361,11 +361,51 @@ def collect_opp_config(output_root_path):
 
 
 def collect_custom_opp_config(output_root_path):
-    custom_opp_path = EnvVarName().custom_opp_path
-    if custom_opp_path is None:
-        log_debug("ASCEND_CUSTOM_OPP_PATH is not set.")
+    """Collect the config JSON files of every configured custom operator package.
+
+    Returns ``True`` unless every configured package failed (a missing
+    package directory or a copy error is logged per package).  A package
+    that ships no ``/config/`` subtree contributes no files and is not an
+    error; when no config file was copied, a warning is logged so the
+    empty result is never silent.
+    """
+    custom_opp_paths = EnvVarName().custom_opp_paths
+    if not custom_opp_paths:
+        log_debug("ASCEND_CUSTOM_OPP_PATH is not set or has no valid path.")
         return False
-    return collect_cfg_json(output_root_path, "", custom_opp_path, "custom_config")
+    if len(custom_opp_paths) > 1:
+        # Several packages may ship identically named config files, so each
+        # tree is stored under its search-order index.  Record the mapping so
+        # an index can be traced back to the package it came from.
+        log_info(
+            "ASCEND_CUSTOM_OPP_PATH search order: "
+            + json.dumps(
+                {str(index): path for index, path in enumerate(custom_opp_paths)}
+            )
+        )
+    collected = False
+    for index, custom_opp_path in enumerate(custom_opp_paths):
+        # Keep the single-package layout unchanged.
+        cfg_dir = "" if len(custom_opp_paths) == 1 else str(index)
+        if collect_cfg_json(
+            output_root_path, cfg_dir, custom_opp_path, "custom_config"
+        ):
+            collected = True
+        else:
+            log_warning(
+                f"Failed to collect custom operator config from {custom_opp_path}."
+            )
+    # A package without a /config/ subtree copies no file yet is not an
+    # error; only an output without any file means nothing was collected.
+    # Count files, not directory entries: collect_cfg_json creates the
+    # per-package directories before copying, so failed copies still
+    # leave empty directories behind.
+    custom_config_root = os.path.join(output_root_path, "dfx", "ops", "custom_config")
+    if not any(files for _, _, files in os.walk(custom_config_root)):
+        log_warning(
+            "No custom operator config was collected from ASCEND_CUSTOM_OPP_PATH."
+        )
+    return collected
 
 
 def collect_ops(output_root_path):

@@ -51,6 +51,11 @@ def collector(monkeypatch):
     driver.EnvVarName = lambda: SimpleNamespace(
         opp_path=os.getenv("ASCEND_OPP_PATH"),
         custom_opp_path=os.getenv("ASCEND_CUSTOM_OPP_PATH"),
+        custom_opp_paths=[
+            path
+            for path in os.getenv("ASCEND_CUSTOM_OPP_PATH", "").split(os.pathsep)
+            if path
+        ],
     )
     for name, module in {
         "common": common,
