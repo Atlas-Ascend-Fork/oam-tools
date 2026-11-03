@@ -122,6 +122,38 @@ def find_one(root, name, explicit=None, stages=None):
     return hits[0] if hits else None
 
 
+def inventory_stage_outcome(returncode, stdout, stderr, inventory_path):
+    """What the pipeline makes of `build_expert_inventory.py`'s exit.
+
+    Returns `("failed", message)` or `("ok", stage_value)`. A non-zero exit is a caller
+    error, never "this model has no experts". Exactly two things produce one: the capture
+    fails the readiness gate (a missing or unverified breakdown — `SystemExit`, rc 1), or
+    `--ep-rank` is impossible for the observed topology (`validate_ep_rank` raises
+    `ValueError`, rc 2). Treating either as a skip is what made the failure invisible: with
+    no inventory file `build_overlay_and_config.py` drops `expertInventory`,
+    `validate_conversion.py` then has nothing to gate, every MoE residency check silently
+    stops running, and the pipeline still exits 0 with a complete-looking report that merely
+    lacks the expert panel. One mistyped `--ep-rank` must not be able to buy that.
+
+    GroupedMatmul shapes that disagree on the local expert count are deliberately NOT such an
+    exit. `observed_local_experts()` reports the disagreement in `residency_evidence` and
+    returns `None`, and the script still writes an honest inventory in which every routed
+    expert is `residency_unresolved` (rc 0). Failing the run there would throw away a capture
+    that can still say "unknown" — the rule this fix exists to enforce is that unknown is not
+    absent, and only a caller mistake that leaves nothing trustworthy to write stops the run.
+
+    Exit 0 with no file is the only legitimate skip: a dense model declares no experts, and
+    the script prints why it wrote nothing.
+    """
+    lines = (stdout or "").strip().splitlines()
+    if returncode:
+        return "failed", ((stderr or stdout or "").strip()[-800:] or
+                          f"build_expert_inventory.py exited {returncode} with no message")
+    if os.path.isfile(inventory_path):
+        return "ok", (lines[-1] if lines else "ok")
+    return "ok", "skipped: " + (lines[-1] if lines else "no inventory written")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -266,9 +298,13 @@ def main():
     if args.ep_rank is not None:
         inventory_cmd += ["--ep-rank", str(args.ep_rank)]
     r = run(inventory_cmd)
-    stages["expert_inventory"] = (
-        (r.stdout.strip().splitlines()[-1] if r.stdout else "ok") if r.returncode == 0
-        else f"skipped: {(r.stderr or r.stdout)[-200:]}")
+    outcome, detail = inventory_stage_outcome(
+        r.returncode, r.stdout, r.stderr, inventory_path)
+    if outcome == "failed":
+        die("failed", "expert_inventory", detail, stages=stages,
+            hint="build_expert_inventory.py refused to write an inventory; --ep-rank must be "
+                 "omitted or a possible rank of the observed topology (0..moe_ep_size-1)")
+    stages["expert_inventory"] = detail
 
     r = run([sys.executable, os.path.join(S2, "build_architecture_graph.py"),
              "--analysis", analysis_fact, "--performance", perf_fact,
@@ -311,7 +347,12 @@ def main():
              "--out", facts, "--graph", graph, "--attribution", attribution])
     stages["conversion_validation"] = "passed" if r.returncode == 0 else "failed"
     if r.returncode:
-        die("failed", "conversion_validation", r.stdout[-1200:], stages=stages)
+        # stdout carries the PASS/FAIL list, but a validator that dies before printing it
+        # (an unexpected exception on malformed input) leaves stdout empty, and dropping
+        # stderr reported a failure with an empty message. Fall back to it instead.
+        die("failed", "conversion_validation",
+            r.stdout[-1200:] if r.stdout.strip() else (r.stderr or "")[-1200:],
+            stages=stages)
 
     # --- Stage 3: assemble the interactive report -----------------------------------------
     if not trace:

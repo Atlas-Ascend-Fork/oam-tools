@@ -130,8 +130,12 @@ def test_shared_aggregate_does_not_bypass_routed_residency(
     assert inventory["expert_parallelism"]["ep_rank"] is None
     if invalid_routed_identity:
         routed = next(e for e in inventory["experts"] if e["kind"] == "routed")
+        # The mutation must move the count out of whichever bucket the routed expert really
+        # sat in. With no observed EP topology and no rank that is `residency_unresolved`, not
+        # `remote_ep_shard`; hardcoding the latter drove a counter negative.
+        prior_state = routed["data_state"]
         routed["data_state"] = "fused_measured"
-        inventory["counts"]["remote_ep_shard"] -= 1
+        inventory["counts"][prior_state] -= 1
         inventory["counts"]["fused_measured"] += 1
         inventory["counts"]["resident_on_profiled_rank"] += 1
     actual_counts = Counter(expert["data_state"] for expert in inventory["experts"])

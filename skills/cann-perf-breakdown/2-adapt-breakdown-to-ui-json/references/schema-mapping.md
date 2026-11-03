@@ -134,7 +134,8 @@ Not a per-expert breakdown — a statement of what the capture can and cannot sa
 ```
 declared            routed / shared / total / experts_per_token / source_refs
 expert_parallelism  moe_ep_size  local_routed_experts  residency_evidence
-                    ep_rank  resident_expert_indices  identity_note
+                    ep_rank  ep_rank_source  ep_rank_validation
+                    resident_expert_indices  identity_note  note
 measurability       separable_per_expert  reason  what_would_be_needed
 counts              declared_total  resident_on_profiled_rank
                     individually_measured  fused_measured
@@ -148,12 +149,48 @@ experts[]           expert_id  expert_index  kind  data_state  local_slot
 `data_state` is `measured` (one declared shared expert with attributed kernels),
 `fused_measured` (routed group kernels or aggregate nodes covering multiple shared
 experts; individual `time_us` is null), `remote_ep_shard` (another EP rank, time
-unknown), `residency_unresolved` (count known, identity not), or `source_only`
+unknown; asserted only when `ep_rank_validation` is `observed_topology`), `residency_unresolved`
+(global identity not established — rank, observed topology, or both missing), or `source_only`
 (declared in the source, no kernel attributed in this capture; `time_us` null).
+
 `counts` has one bucket per `data_state`, so the five sum to the listed experts —
 the partition `validate_conversion.py` checks, per bucket as well as in total: each
 tally is compared against the `data_state` the listed experts actually carry, so a
 count moved between buckets to repair the sum still fails.
+
+`ep_rank_validation` says whether the supplied `ep_rank` could be placed in an
+observed topology: `observed_topology`, `unverified_without_topology`, or
+`not_provided`. Only the first permits `resident_expert_indices` and any
+`remote_ep_shard` entry. `--ep-rank` is rejected (non-zero exit, no inventory)
+when negative or at/beyond the observed `moe_ep_size`.
+
+`expert_id` and `expert_index` are one pairing, not two facts: the generator
+writes `routed/<i>` with `expert_index <i>`, one entry per declared index
+`0..n_routed_experts-1`. `validate_conversion.py` checks that bijection before
+any window arithmetic, because every window check places an expert by its
+`expert_index` — a duplicated, skipped, or re-paired index would relabel the
+wrong expert while keeping every `counts` bucket balanced.
+
+`identity_note` and each unresolved expert's `reason` are both derived from one
+classification of the capture — resolved, rank missing, topology missing, both
+missing, no declared routed-expert count (`n_routed_experts` missing or 0),
+a stacked weight whose leading dimension is 0, or a declared count that is not
+a multiple of the local one — so a single inventory can never
+explain itself two contradictory ways. The note is the line the CLI prints and
+the UI reads, which is why it may not collapse a case the per-expert `reason`
+distinguishes, and why a case with no divisibility operands of its own may not
+borrow the "not a multiple" wording.
+
+That rejection is a failure of the run, not a skipped stage: `run_pipeline.py`
+stops instead of continuing without an inventory, because continuing would drop
+`expertInventory` from the overlay, leave the conversion validator nothing to
+gate, and still exit 0 with a report that merely lacks the expert panel.
+
+Disagreeing `GroupedMatmul` shapes are not a rejection. The layers then do not
+share one EP topology, so no single local count is right: `residency_evidence`
+records the disagreement, `local_routed_experts` stays null and every routed
+expert is `residency_unresolved` — still an honest inventory, written with exit
+0, because "unknown" is a result this run can report and must not be thrown away.
 
 `moe_ep_size` comes from the stacked expert weight's leading dimension in the
 `GroupedMatmul` inputs. Declared totals come from the manifest facts with their
@@ -285,3 +322,8 @@ Verified by `validate_conversion.py` before handing off:
   unattributed equals the raw kernel count.
 - No `source_only_structure` entry appears in performance data.
 - Every graph `backendNodeId` resolves to an analysis node.
+- Expert residency: `resident_expert_indices` is honoured only when
+  `ep_rank_validation` is `observed_topology`, and is then re-derived from
+  `ep_rank` / `local_routed_experts` / `moe_ep_size` and cross-checked against
+  every routed `data_state`. Otherwise no routed expert may be labelled
+  resident or `remote_ep_shard`.

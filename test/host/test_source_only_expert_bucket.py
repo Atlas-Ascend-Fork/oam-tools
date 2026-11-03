@@ -329,14 +329,16 @@ def test_cli_summary_keeps_the_bucket_split_last(
     summary = [line for line in lines if line.startswith("individually measured")]
     assert len(summary) == 1, lines
     # All five buckets on that one line, so no informational line has to follow it.
-    # `--ep-rank` turns the 16 resident slots into fused measurements; without it they stay
-    # residency_unresolved, which is the pre-existing behaviour this PR does not touch.
+    # `--ep-rank` turns the 16 resident slots into fused measurements. Without it no
+    # expert may be called remote (#276): asserting the complement would claim the
+    # other 240 ran elsewhere when this rank may own any window, so all 256 routed
+    # stay residency_unresolved.
     resolved = ep_rank is not None
     for expected in (
         "individually measured 0",
         "fused 16" if resolved else "fused 0",
-        "residency unresolved 0" if resolved else "residency unresolved 16",
-        "remote 240",
+        "residency unresolved 0" if resolved else "residency unresolved 256",
+        "remote 240" if resolved else "remote 0",
         "source-only 1",
     ):
         assert expected in summary[0], summary[0]
@@ -345,8 +347,9 @@ def test_cli_summary_keeps_the_bucket_split_last(
     assert not [line for line in lines if line.startswith("source-only ")], lines
 
     if ep_rank is None:
-        # Pre-existing behaviour, untouched: the actionable hint stays the last line.
-        assert lines[-1].startswith("NOTE the capture does not record ep_rank"), lines
+        # The actionable hint stays the last line; since #276 it reuses `identity_note`
+        # rather than restating the case in a second hardcoded sentence.
+        assert lines[-1].startswith("NOTE The capture does not record ep_rank"), lines
         assert lines[-2] == summary[0], lines
     else:
         assert lines[-1] == summary[0], lines

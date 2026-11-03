@@ -294,8 +294,8 @@ measurements, and they must not be conflated:
 |---|---|
 | `measured` | one declared shared expert with attributed kernels and a separable duration |
 | `fused_measured` | routed experts in a measured group, or multiple shared experts covered by aggregate nodes; individual `time_us` is null |
-| `remote_ep_shard` | executes on another expert-parallel rank; time **unknown**, not zero |
-| `residency_unresolved` | resident count known, global identity not — see below |
+| `remote_ep_shard` | executes on another expert-parallel rank; asserted only when both the observed topology and a valid `--ep-rank` are present; time **unknown**, not zero |
+| `residency_unresolved` | global identity not established — the rank, the observed topology, or both are missing; see below |
 | `source_only` | declared in the source but no kernel was attributed to it in this capture; `time_us` is null, not zero |
 
 `counts` carries one bucket per `data_state`, `source_only` included, so the five
@@ -322,12 +322,39 @@ the fused duration by token share would produce numbers the hardware never
 measured — a validator check rejects any per-expert `time_us` on a non-`measured`
 expert for exactly this reason.
 
-**Residency identity needs the rank.** Rank *r* owns
-`[r*local, (r+1)*local)`, and msprof has no reason to record `ep_rank`. Without
-`--ep-rank` the resident *count* is known but the *identities* are not: defaulting
-to rank 0 would assert experts 0–15 ran when the capture may be rank 5's
-(80–95). So those entries report `residency_unresolved` and no expert is claimed
-resident. Pass `--ep-rank` to resolve.
+**Residency identity needs the rank *and* the topology.** Rank *r* owns
+`[r*local, (r+1)*local)`, so naming a resident expert takes two independent
+observations: `local`, from the stacked expert weight's leading dimension, and
+`ep_rank`, which msprof has no reason to record and which must therefore be
+supplied. Missing either one leaves every routed expert `residency_unresolved`.
+
+Do not resolve the missing half by complement. Without `--ep-rank`, defaulting to
+rank 0 would assert experts 0–15 ran when the capture may be rank 5's (80–95);
+labelling the *rest* `remote_ep_shard` is the same fabrication mirrored — with 4
+declared and 2 observed locally, calling indices 2–3 remote is false for a rank-1
+capture, where those two are exactly the residents. Likewise a supplied
+`--ep-rank` over a capture with no observed `GroupedMatmul` shape resolves
+nothing, so no expert may be called remote there either. `ep_rank_validation`
+records which case applies (`observed_topology` / `unverified_without_topology` /
+`not_provided`). An impossible rank is rejected rather than honoured: a negative
+value, or one at or beyond the observed `moe_ep_size`, exits non-zero without
+writing an inventory.
+
+Disagreeing `GroupedMatmul` shapes are *not* a rejection. Two kernels whose
+stacked expert weights carry different leading dimensions mean the layers do not
+share one EP topology, so no single local count is right: the disagreement goes
+into `residency_evidence`, `local_routed_experts` stays null and every routed
+expert is `residency_unresolved` — an honest inventory, still written with exit 0.
+"Unknown" is a result this run can report, so it must not be discarded as an
+error. Only two things exit non-zero: a capture that fails the readiness gate,
+and an impossible `--ep-rank`.
+
+That non-zero exit is a failure, not a skip. `run_pipeline.py` stops the run
+instead of carrying on: with no inventory file the overlay drops
+`expertInventory`, the conversion validator then has nothing to gate, every MoE
+residency check silently stops running, and the pipeline would still exit 0 with
+a complete-looking report that merely lacks the expert panel. Exit 0 *with no
+inventory file* is the only legitimate skip — a model that declares no experts.
 
 Never let a non-compute node win default selection. A sampler-window node's wall
 clock is not compute time: set `time_us: null` and keep the span in a separate

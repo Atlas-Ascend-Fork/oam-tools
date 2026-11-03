@@ -62,6 +62,18 @@ STATE_BUCKET_TO_DATA_STATE = {
 }
 
 
+#: `data_state` values that claim the expert's weights were on the profiled rank. `measured`
+#: is reachable for shared experts only; a routed expert is fused inside one GroupedMatmul,
+#: so the generator can only label it `fused_measured` / `remote_ep_shard` /
+#: `residency_unresolved` — `routed_state_problems` rejects the rest.
+LOCAL_RESIDENCY_STATES = ("measured", "fused_measured")
+
+#: The only `ep_rank_validation` value under which an identity may be asserted. A missing key
+#: (an inventory written before the field existed) is not a fourth value: it leaves residency
+#: unverified, exactly like `unverified_without_topology` and `not_provided`.
+RESOLVED_RANK_VALIDATION = "observed_topology"
+
+
 def jload(path):
     with open(path) as handle:
         return json.load(handle)
@@ -90,6 +102,155 @@ def collect(node, out, key="node_id"):
         for item in node:
             collect(item, out, key)
     return out
+
+
+def _positive_int(value):
+    """True for a real positive count — `True` is an `int` in Python but is not a count."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def resident_window_problems(parallelism, declared_routed):
+    """Why a claimed resident window is not the one this capture could have observed.
+
+    Returns one string per inconsistency, empty when the window follows from the arithmetic.
+    Rank r owns `[r * local, (r + 1) * local)`, so `resident_expert_indices` is fully
+    redundant with `ep_rank` / `local_routed_experts` / `moe_ep_size` / the declared count:
+    a window that disagrees with them was not derived from the capture, and every identity
+    downstream of it is fabricated.
+
+    Every number read off the inventory is type-checked before it is compared, because the
+    input this function guards against is a hand-edited or foreign inventory: `moe_ep_size`
+    left as the string `"2"` used to raise `TypeError` on `ep_rank >= ep_size` before the
+    result-printing loop ran, so the validator died with empty stdout and the operator saw
+    an empty failure message instead of the inconsistency. A malformed count is now reported
+    as a problem like any other.
+    """
+    indices = parallelism.get("resident_expert_indices")
+    ep_rank = parallelism.get("ep_rank")
+    local = parallelism.get("local_routed_experts")
+    ep_size = parallelism.get("moe_ep_size")
+    if not (isinstance(indices, list) and len(indices) == 2
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in indices)):
+        return [f"resident_expert_indices must be a [first, last] pair, got {indices!r}"]
+    low, high = indices
+    problems = []
+    if not (isinstance(ep_rank, int) and not isinstance(ep_rank, bool) and ep_rank >= 0):
+        problems.append(f"ep_rank {ep_rank!r} is not a possible rank")
+    if not _positive_int(local):
+        problems.append(f"local_routed_experts {local!r} is not a positive count")
+    if ep_size is not None and not _positive_int(ep_size):
+        problems.append(f"moe_ep_size {ep_size!r} is not a positive count")
+    if high < low:
+        problems.append(f"resident_expert_indices {indices} is not an ascending range")
+    if problems:
+        # The arithmetic below needs all three numbers to be real counts, so stop here
+        # rather than raise on a malformed one or report noise on top of it.
+        return problems
+    if ep_size is not None and ep_rank >= ep_size:
+        problems.append(f"ep_rank {ep_rank} is outside moe_ep_size {ep_size}")
+    if _positive_int(declared_routed):
+        if declared_routed % local:
+            problems.append(f"{declared_routed} declared routed experts are not a multiple of "
+                            f"the {local} observed locally, so moe_ep_size is not derivable")
+        elif ep_size != declared_routed // local:
+            problems.append(f"moe_ep_size {ep_size!r} contradicts {declared_routed} declared / "
+                            f"{local} local = {declared_routed // local}")
+        if high >= declared_routed:
+            problems.append(f"resident window {indices} exceeds the {declared_routed} declared "
+                            "routed experts")
+    elif ep_size is None:
+        problems.append("neither moe_ep_size nor a declared routed count places the window in "
+                        "a topology")
+    expected = [ep_rank * local, ep_rank * local + local - 1]
+    if indices != expected:
+        problems.append(f"rank {ep_rank} holding {local} local experts owns {expected}, "
+                        f"not {indices}")
+    # Bounded by construction (at most 4 problems, joined under ~270 characters), so this
+    # one is NOT truncated like `routed_state_problems` below: every line here names a
+    # distinct contradiction, and the last one — the window the rank would actually own —
+    # is the only message that tells the operator what the correct value is. Truncating
+    # here printed 3 contradictions plus "(1 more)" and dropped exactly that line.
+    return problems
+
+
+def routed_state_problems(routed_experts):
+    """Routed experts labelled `measured` / `source_only` — states only a shared expert
+    can carry. Checked unconditionally: a resolved window is not what makes these states
+    wrong, so the unresolved branch must not let them through either.
+
+    Truncated like `window_state_problems`: a wholesale relabelling (the failure mode this
+    guards) lists every routed expert, and the untruncated `"; ".join` of 256 of them made
+    the FAIL line ~24k characters — longer than the whole stdout, so the pipeline's
+    `stdout[-1200:]` window kept only a mid-list fragment with no check name in it.
+    """
+    problems = [
+        f"{expert.get('expert_id')} is a routed expert yet labelled "
+        f"{expert.get('data_state')}, a state only a shared expert can carry"
+        for expert in routed_experts
+        if expert.get("data_state") in ("measured", "source_only")
+    ]
+    return problems[:3] + ([f"({len(problems) - 3} more)"] if len(problems) > 3 else [])
+
+
+def window_state_problems(routed_experts, indices):
+    """Routed experts whose `data_state` disagrees with an already-consistent window."""
+    low, high = indices
+    problems = []
+    for expert in routed_experts:
+        identity = expert.get("expert_id")
+        state = expert.get("data_state")
+        index = expert.get("expert_index")
+        inside = isinstance(index, int) and low <= index <= high
+        if state == "residency_unresolved":
+            problems.append(f"{identity} stays residency_unresolved although the resident "
+                            f"window {indices} is resolved")
+        elif inside and state == "remote_ep_shard":
+            problems.append(f"{identity} is inside the resident window {indices} yet labelled "
+                            "remote_ep_shard")
+        elif not inside and state in LOCAL_RESIDENCY_STATES:
+            problems.append(f"{identity} is outside the resident window {indices} yet labelled "
+                            f"{state}")
+    return problems[:3] + ([f"({len(problems) - 3} more)"] if len(problems) > 3 else [])
+
+
+def routed_identity_problems(routed_experts, declared_routed):
+    """Routed experts whose id / index pairing is not the one the generator establishes.
+
+    The generator writes `routed/{i}` with `expert_index i` for `i` in `0..declared-1`, a
+    bijection. Every residency check downstream consumes `expert_index` to place an expert
+    inside or outside the window, so a hand-edited list that duplicates an index, skips one,
+    or pairs an id with another expert's index relabels the wrong expert while keeping the
+    per-state totals — the counts partition stays balanced and the swap passes unnoticed.
+    """
+    problems = []
+    seen = set()
+    for expert in routed_experts:
+        identity = expert.get("expert_id")
+        index = expert.get("expert_index")
+        if not isinstance(index, int) or isinstance(index, bool):
+            problems.append(f"{identity} carries expert_index {index!r}, not an index")
+            continue
+        if index in seen:
+            problems.append(f"{identity} reuses expert_index {index}")
+        seen.add(index)
+        if identity != f"routed/{index}":
+            problems.append(f"{identity} is paired with expert_index {index}")
+    if _positive_int(declared_routed):
+        expected = set(range(declared_routed))
+        if seen != expected:
+            missing = sorted(expected - seen)[:3]
+            extra = sorted(seen - expected)[:3]
+            problems.append(
+                f"the routed expert indices are not 0..{declared_routed - 1} "
+                f"(missing e.g. {missing}, unexpected e.g. {extra})")
+    # The per-expert entries are unbounded (one per duplicated / re-paired expert), so they
+    # are truncated — but the summary of the bijection as a whole is what an operator fixing
+    # the file needs first, so it is lifted out of the truncated tail and emitted first,
+    # where `(N more)` cannot swallow it. Lifted, not prepended on top of the full list:
+    # a list short enough not to truncate would otherwise print the summary twice.
+    summary = ([problems.pop()]
+               if problems and problems[-1].startswith("the routed expert indices") else [])
+    return summary + problems[:3] + ([f"({len(problems) - 3} more)"] if len(problems) > 3 else [])
 
 
 def main():
@@ -410,6 +571,59 @@ def main():
                   "without ep_rank, no expert identity is asserted as resident",
                   f"indices={parallelism.get('resident_expert_indices')}, "
                   f"routed_fused={routed_fused}")
+
+        # The mirror of the check above, and the reason `resident_expert_indices` cannot
+        # vouch for itself: it is the very claim under test, so a stale or hand-edited
+        # inventory can carry a window the capture never observed and then derive both the
+        # residents and the "remote" complement from it. Only `ep_rank_validation` records
+        # whether the observed topology backed the rank, so resolution is decided by that
+        # field and the window is then re-derived from rank / local count / ep_size. With no
+        # observed topology the complement is not knowable either — declaring 4 and observing
+        # 2 locally does not make indices 2-3 remote, a rank-1 capture holds exactly those
+        # two — so no routed expert may be called resident or remote.
+        rank_validation = parallelism.get("ep_rank_validation")
+        resolved = rank_validation == RESOLVED_RANK_VALIDATION
+        routed = [e for e in experts if e.get("kind") == "routed"]
+        claimed_resident = [e["expert_id"] for e in routed
+                            if e.get("data_state") in LOCAL_RESIDENCY_STATES]
+        claimed_remote = [e["expert_id"] for e in routed
+                          if e.get("data_state") == "remote_ep_shard"]
+        # Before any window arithmetic: the window checks place an expert by its
+        # `expert_index`, so an index that is duplicated, missing, or paired with another
+        # expert's id would relabel the wrong expert while keeping every bucket balanced.
+        identity_problems = routed_identity_problems(routed, declared.get("routed_experts"))
+        check(not identity_problems,
+              "routed experts pair routed/<i> with expert_index i, one per declared index",
+              "; ".join(identity_problems))
+        # Wrong under every window, so checked before either branch below.
+        impossible_states = routed_state_problems(routed)
+        check(not impossible_states,
+              "no routed expert carries a shared-expert-only data_state",
+              "; ".join(impossible_states))
+        if resolved:
+            window_problems = resident_window_problems(parallelism, declared.get("routed_experts"))
+            check(not window_problems,
+                  "the resident window follows from ep_rank, local_routed_experts and moe_ep_size",
+                  "; ".join(window_problems))
+            if not window_problems:
+                state_problems = window_state_problems(
+                    routed, parallelism["resident_expert_indices"])
+                check(not state_problems,
+                      "every routed expert's data_state agrees with the resident window",
+                      "; ".join(state_problems))
+        else:
+            detail = (f"ep_rank_validation="
+                      f"{rank_validation!r}"
+                      if "ep_rank_validation" in parallelism else
+                      "the inventory carries no ep_rank_validation, so it predates the "
+                      "residency contract; regenerate it with the current "
+                      "build_expert_inventory.py")
+            check(parallelism.get("resident_expert_indices") is None
+                  and not claimed_resident and not claimed_remote,
+                  "without an observed topology, no expert is asserted remote or resident",
+                  f"indices={parallelism.get('resident_expert_indices')}, "
+                  f"routed_resident={claimed_resident[:3]}, "
+                  f"routed_remote={claimed_remote[:3]}, {detail}")
 
     failures = [c for c in checks if not c["ok"]]
     for item in checks:

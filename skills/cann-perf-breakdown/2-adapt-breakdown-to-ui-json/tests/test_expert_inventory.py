@@ -106,12 +106,14 @@ def test_shared_expert_is_genuinely_measured():
 def test_without_ep_rank_no_identity_is_claimed():
     """The capture does not record ep_rank; asserting experts 0-15 ran would be a guess.
 
-    Rank 5 owns 80-95. The count is observable from the weight shape, the identity is not.
+    Rank 5 owns 80-95. The count is observable from the weight shape, the identity is not —
+    and neither is its complement, so the other 240 must not be labelled remote either.
     """
     inv = bei.build({}, performance(), attribution(), manifest(), ep_rank=None)
     assert inv["expert_parallelism"]["resident_expert_indices"] is None
     assert inv["counts"]["fused_measured"] == 0
-    assert inv["counts"]["residency_unresolved"] == 16
+    assert inv["counts"]["residency_unresolved"] == 256
+    assert inv["counts"]["remote_ep_shard"] == 0
     assert not any(e["resident_on_profiled_rank"] for e in inv["experts"]
                    if e["kind"] == "routed")
 
@@ -172,6 +174,10 @@ def test_no_grouped_kernel_leaves_residency_unknown():
     assert inv["expert_parallelism"]["moe_ep_size"] is None
     # Still lists all 257 from the source; none can be claimed resident.
     assert len(inv["experts"]) == 257
+    # A supplied rank without an observed topology resolves nothing: claiming all 256 routed
+    # experts live on other ranks would assert a residency the capture never established.
+    assert inv["counts"]["remote_ep_shard"] == 0
+    assert inv["counts"]["residency_unresolved"] == 256
 
 
 def test_unmeasured_shared_expert_reports_source_only():
