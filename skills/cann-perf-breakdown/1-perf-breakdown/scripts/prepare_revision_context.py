@@ -166,15 +166,15 @@ def _path_parts(path):
 
 
 def _resolve(config, path):
-    parts = _path_parts(path)
+    parts = bc._typed_json_path_parts(path)
     if parts is None:
         return False, None
     current = config
     for part in parts:
-        if isinstance(current, dict) and part in current:
+        if isinstance(current, dict) and isinstance(part, str) and part in current:
             current = current[part]
-        elif isinstance(current, list) and part.isdigit() and int(part) < len(current):
-            current = current[int(part)]
+        elif isinstance(current, list) and isinstance(part, int) and part < len(current):
+            current = current[part]
         else:
             return False, None
     return True, current

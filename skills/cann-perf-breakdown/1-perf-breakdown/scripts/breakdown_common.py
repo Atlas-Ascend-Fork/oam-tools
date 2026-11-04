@@ -142,16 +142,16 @@ def json_path_parts(path):
 
 def resolve_config_path(config, path):
     """Return whether a JSONPath-like locator resolves in ``config``."""
-    parts = json_path_parts(path)
+    parts = _typed_json_path_parts(path)
     if parts is None:
         return False
     current = config
     for part in parts:
-        if isinstance(current, dict) and part in current:
+        if isinstance(current, dict) and isinstance(part, str) and part in current:
             current = current[part]
             continue
-        if isinstance(current, list) and part.isdigit() and int(part) < len(current):
-            current = current[int(part)]
+        if isinstance(current, list) and isinstance(part, int) and part < len(current):
+            current = current[part]
             continue
         return False
     return True
