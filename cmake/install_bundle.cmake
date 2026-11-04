@@ -24,9 +24,11 @@ set(OAM_BUNDLE_BASE_URL
 # 故按"当天或已过周三用本周三，否则用上周三"推算日期拼地址。
 set(OAM_BUNDLE_WEEKLY_BASE_URL
     "https://ascend-cann.obs.cn-north-4.myhuaweicloud.com/CANN")
-# weekly 包取不到时的固定回退版本目录（cann-3rd bucket 同样不开放列举，
-# 无法自动发现最新 weekly.NN，发布新版本时须人工同步此值）。
-set(OAM_BUNDLE_WEEKLY_FALLBACK_VER "weekly.20260909.01")
+# weekly 包取不到时的固定回退包目录（cann-3rd bucket 无更新周包可指，实测
+# 2026-10 月 weekly.NN 均 403；ascend-cann bucket 实测保留 ≥3 周历史目录）。
+# 当前指向上一周期（2026-10-28 周三）的集成包，随时间推移会再度陈旧，
+# 须与原 weekly.NN 相同方式人工同步此值。
+set(OAM_BUNDLE_WEEKLY_FALLBACK_DIR "20261028_newest")
 
 # OBS 上实际存在包的分支白名单。新增 release 线时须在此同步，
 # 并先确认 OBS bucket 下已上传对应的 <branch>/cann-oam-tools-release-<arch>.tar.gz。
@@ -338,13 +340,13 @@ function(oam_install_bundle)
         set(_url "${OAM_BUNDLE_BASE_URL}/${_bundle_branch}/${_release_tar_name}")
 
         # master 分支优先取 ascend-cann bucket 按最近周三日期命名的集成包，
-        # 取不到再回退 cann-3rd 的固定 weekly 版本目录；发布线分支仍走原地址。
+        # 取不到再回退同 bucket 上一周期的固定集成包目录；发布线分支仍走原地址。
         set(_urls "")
         if(_bundle_branch STREQUAL "master")
             oam_recent_wednesday(_wed)
             list(APPEND _urls
                 "${OAM_BUNDLE_WEEKLY_BASE_URL}/${_wed}_newest/${_release_tar_name}|weekly ${_wed}"
-                "${OAM_BUNDLE_BASE_URL}/master/${OAM_BUNDLE_WEEKLY_FALLBACK_VER}/${_release_tar_name}|fallback ${OAM_BUNDLE_WEEKLY_FALLBACK_VER}")
+                "${OAM_BUNDLE_WEEKLY_BASE_URL}/${OAM_BUNDLE_WEEKLY_FALLBACK_DIR}/${_release_tar_name}|fallback ${OAM_BUNDLE_WEEKLY_FALLBACK_DIR}")
         else()
             list(APPEND _urls "${_url}|branch ${_bundle_branch}")
         endif()
