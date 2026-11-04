@@ -62,6 +62,11 @@ def create_out_timestamp_dir():
 
     output_dir = init_output_dir_parent()
     if not os.access(output_dir, os.W_OK):
+        if not os.path.isdir(output_dir):
+            log_error(
+                "asys output root directory does not exist: {}.".format(output_dir)
+            )
+            return RetCode.ARG_NO_EXIST_DIR
         log_error(
             "No write permission to asys output root directory: {}.".format(output_dir)
         )

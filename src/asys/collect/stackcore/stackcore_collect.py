@@ -129,7 +129,7 @@ class ParseStackCore:
         file_line = ""
         if not all_func:
             return file_line
-        for i in range(0, len(all_func), 2):
+        for i in range(0, len(all_func) - 1, 2):
             func_name, func_file = all_func[i], all_func[i + 1]
             if i == 0:
                 file_line += (

@@ -41,7 +41,7 @@ __all__ = ["main"]
 
 
 def _check_args_duplicate():
-    input_args = [arg.split("=")[0] for arg in sys.argv[1:] if "-" in arg.split("=")[0]]
+    input_args = [arg.split("=")[0] for arg in sys.argv[1:] if arg.startswith("-")]
     # remove args duplicate
     args_no_duplicate = set(input_args)
     if len(input_args) > len(args_no_duplicate):

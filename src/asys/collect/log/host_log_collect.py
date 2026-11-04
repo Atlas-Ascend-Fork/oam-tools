@@ -60,6 +60,7 @@ def collect_cann_logs(output_root_dir):
         )
         if not os.path.exists(cann_source):
             log_warning("No file exists in %s/%s" % (env_path_name, log_type))
+            continue
         if ParamDict().get_command() == consts.launch_cmd:
             current_ret = f.collect_dir(cann_source, cann_target, MOVE_MODE)
         else:

@@ -527,7 +527,7 @@ class AsysInfo:
         self.__add_status_memory_info(table_data=table_data, device_id=device_id)
 
         # Delete the key whose value is empty.
-        for key, value in table_data.items():
+        for key, value in list(table_data.items()):
             if not value:
                 table_data.pop(key)
 

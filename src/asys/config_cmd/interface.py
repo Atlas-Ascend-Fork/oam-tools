@@ -35,7 +35,7 @@ def _check_supported_chips(device_obj, device_id, operate):
     aic_res = ALL_SUPPORTED_CHIP_TYPE in aic_supported_chips or any(
         re.search(rf"{i}", chip_info) for i in aic_supported_chips
     )
-    bus_res = ALL_SUPPORTED_CHIP_TYPE in aic_supported_chips or any(
+    bus_res = ALL_SUPPORTED_CHIP_TYPE in bus_supported_chips or any(
         re.search(rf"{i}", chip_info) for i in bus_supported_chips
     )
     return aic_res, bus_res, chip_info
@@ -75,7 +75,8 @@ def restore_stress_detect_config(device_id, device_obj):
         return False
     try:
         ret_code = device_obj.ascend_ml.AmlStressRestore(ctypes.c_int32(device_id))
-    except AttributeError:
+    except (AttributeError, OSError, TypeError, ctypes.ArgumentError) as e:
+        log_error(f"AmlStressRestore raised {type(e).__name__}: {e}")
         ret_code = None
 
     if ret_code != 0:

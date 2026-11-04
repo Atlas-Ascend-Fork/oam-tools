@@ -339,7 +339,9 @@ class CoreDump:
                 continue
             data_list = line.strip("\n").strip(" ").split()
             if "Current thread" in line:
-                crash_info["crash tid"] = re.match(r"(\d+)", data_list[-1])[0]
+                tid_match = re.match(r"(\d+)", data_list[-1])
+                if tid_match:
+                    crash_info["crash tid"] = tid_match.group(1)
                 continue
             if data_list and data_list[0] == "No":
                 log_warning(

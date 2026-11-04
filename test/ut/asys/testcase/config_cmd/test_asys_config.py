@@ -40,6 +40,11 @@ class AsysConfig1:
         return 1
 
 
+class AsysConfigOSError:
+    def AmlStressRestore(self, *_args):
+        raise OSError("mock aml stress restore failure")
+
+
 class TestAsysConfig(AssertTest):
     def setup_method(self):
         ParamDict.clear()
@@ -256,6 +261,26 @@ class TestAsysConfig(AssertTest):
         ParamDict().set_env_type("EP")
         ParamDict().set_args(args)
         self.assertTrue(AsysConfig().run() is False)
+        self.assertTrue(
+            "Configuration unsuccessfully restore, on device 1." in caplog.text
+        )
+
+    def test_asys_config_restore_mode_exception_logged(self, mocker, caplog):
+        args = Namespace(
+            d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
+        )
+        mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfigOSError())
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(
+            DeviceInfo, "get_chip_info", return_value="Ascend 910_9372 V1"
+        )
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(args)
+        self.assertTrue(AsysConfig().run() is False)
+        self.assertTrue("OSError" in caplog.text)
+        self.assertTrue("mock aml stress restore failure" in caplog.text)
         self.assertTrue(
             "Configuration unsuccessfully restore, on device 1." in caplog.text
         )

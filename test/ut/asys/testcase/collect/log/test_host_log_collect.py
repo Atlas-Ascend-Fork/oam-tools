@@ -82,6 +82,7 @@ class TestHostLogCollect(AssertTest):
             modes.append(mode)
             return calls[-1] != "debug"
 
+        mocker.patch("os.path.exists", return_value=True)
         mocker.patch("common.FileOperate.collect_dir", side_effect=collect_dir)
         mocker.patch("params.ParamDict.get_command", return_value=command)
 
@@ -90,3 +91,20 @@ class TestHostLogCollect(AssertTest):
         self.assertTrue(not collect_cann_logs("./"))
         self.assertTrue(calls == ["debug", "run", "security"])
         self.assertTrue(modes == [expected_mode] * 3)
+
+    @pytest.mark.parametrize("command", ["collect", consts.launch_cmd])
+    def test_collect_cann_logs_all_dirs_missing_returns_true(self, mocker, command):
+        calls = []
+
+        def collect_dir(source, target, mode):
+            calls.append(source)
+            return True
+
+        mocker.patch("os.path.exists", return_value=False)
+        mocker.patch("common.FileOperate.collect_dir", side_effect=collect_dir)
+        mocker.patch("params.ParamDict.get_command", return_value=command)
+
+        from collect.log.host_log_collect import collect_cann_logs
+
+        self.assertTrue(collect_cann_logs("./"))
+        self.assertTrue(calls == [])

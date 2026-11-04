@@ -30,6 +30,7 @@ def asys_modules(monkeypatch):
     root = Path(__file__).resolve().parents[5] / "src/asys"
     common = ModuleType("common")
     common.log_error = Mock()
+    common.log_warning = Mock()
     monkeypatch.setitem(sys.modules, "common", common)
 
     def load(name, relative):

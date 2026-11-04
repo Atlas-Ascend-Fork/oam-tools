@@ -20,7 +20,7 @@ import os
 import re
 import sys
 
-from common import log_error
+from common import log_error, log_warning
 
 
 __all__ = ["get_project_conf", "get_ascend_home", "get_log_conf_path"]
@@ -74,8 +74,12 @@ def get_log_conf_path(name):
     for conf_path in log_conf_paths:
         if not os.path.exists(conf_path):
             continue
-        with open(conf_path, "r", encoding="utf-8-sig") as conf_f:
-            conf_info = conf_f.read()
+        try:
+            with open(conf_path, "r", encoding="utf-8-sig", errors="replace") as conf_f:
+                conf_info = conf_f.read()
+        except (OSError, UnicodeDecodeError):
+            log_warning(f"Failed to read log config file: {conf_path}.")
+            continue
 
         log_path_f = re.search(search_re, conf_info, re.MULTILINE)
         if log_path_f is not None:

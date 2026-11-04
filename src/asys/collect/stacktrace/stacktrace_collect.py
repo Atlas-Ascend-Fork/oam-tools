@@ -208,7 +208,7 @@ class AsysStackTrace(AscendTraceDll):
     @staticmethod
     def _get_other_stacktrace_remote_id(current_pid):
         all_remote_id = []
-        cmd = rf"ps -ef | grep -E asys[\.py]{{0\,3}}\ collect | grep stacktrace | grep -v ' {current_pid} '"
+        cmd = rf"ps -ef | grep -E 'asys(\.py)? collect' | grep stacktrace | grep -v ' {current_pid} '"
         ret = popen_run_cmd(cmd).split("\n")
         ret = [i for i in ret if i]
         if not ret:
