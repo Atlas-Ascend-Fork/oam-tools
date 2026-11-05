@@ -8,6 +8,8 @@ Involve the stress test, HBM hardware detection, CPU detection and AI Core STL h
 
 You must run the commands related to comprehensive detection as the  **root**  user on a physical machine.
 
+Run the comprehensive detection commands only when the device is idle (not performing other tasks such as stress tests, training, or inference). Furthermore, multiple comprehensive detection tasks cannot be run in parallel. Otherwise, the detection results may be inaccurate.
+
 <!-- npu="910,310p,310b" id1 -->
 For  Atlas 200I/500 A2 inference products,  Atlas inference products, and  Atlas training products, the comprehensive detection function is not supported.
 <!-- end id1 -->

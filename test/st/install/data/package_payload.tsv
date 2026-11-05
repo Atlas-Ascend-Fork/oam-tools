@@ -519,6 +519,7 @@ f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/compare_result.py
 f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/compare_rule.py
 f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/fusion_op.py
 f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/fusion_rule_parser.py
+f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/model_graph_order_parser.py
 f	0555		tools/operator_cmp/compare/vector_cmp/fusion_manager/quant_filter.py
 d	0755		tools/operator_cmp/compare/vector_cmp/range_manager
 f	0555		tools/operator_cmp/compare/vector_cmp/range_manager/__init__.py
