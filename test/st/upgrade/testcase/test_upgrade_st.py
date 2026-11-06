@@ -54,12 +54,50 @@ def _output(result):
     return result.stdout + result.stderr
 
 
+def _assert_script_layout(script_dir, optional_bin, phase):
+    """issue #317: script 必须是目录、bin 不得以任何链接形态残留。phase 仅用于失败信息。"""
+    assert script_dir.is_dir(), f"Expected a script directory{phase}: {script_dir}"
+    assert not os.path.lexists(optional_bin), f"Unexpected bin path{phase}: {optional_bin}"
+
+
 _UPGRADE_SCENARIOS = [
     ("--full", "--full"),
     ("--run", "--full"),
     ("--full", "--run"),
     ("--devel", "--full"),
 ]
+
+
+@pytest.mark.parametrize(
+    "script_form, expected_message",
+    [
+        ("regular-file", "Expected a script directory"),
+        ("dangling-bin", "Unexpected bin path"),
+        ("normal-dir", None),
+        ("missing", "Expected a script directory"),
+    ],
+)
+def test_script_layout_guard(tmp_path, script_form, expected_message):
+    # issue #317 回归：同权限普通文件伪装 script 与 bin 悬空软链必须被拒绝，
+    # 正常目录是唯一通过形态（PR #784 检视意见：新增断言需主机侧看护）。
+    info = tmp_path / "cann/share/info/oam_tools"
+    script_dir = info / "script"
+    optional_bin = info / "bin"
+    if script_form == "regular-file":
+        info.mkdir(parents=True)
+        script_dir.touch(mode=0o750)
+    elif script_form == "dangling-bin":
+        info.mkdir(parents=True)
+        script_dir.mkdir()
+        optional_bin.symlink_to(info / "missing-target")
+    elif script_form == "normal-dir":
+        info.mkdir(parents=True)
+        script_dir.mkdir()
+    if expected_message is None:
+        _assert_script_layout(script_dir, optional_bin, "")
+        return
+    with pytest.raises(AssertionError, match=expected_message):
+        _assert_script_layout(script_dir, optional_bin, "")
 
 
 class TestUpgrade:
@@ -76,9 +114,9 @@ class TestUpgrade:
         script_dir = Path(install_dir) / "cann/share/info/oam_tools/script"
         optional_bin = script_dir.parent / "bin"
         expected_mode = 0o755 if os.geteuid() == 0 else 0o750
+        _assert_script_layout(script_dir, optional_bin, "")
         initial_mode = stat.S_IMODE(script_dir.stat().st_mode)
         owner_before = (script_dir.stat().st_uid, script_dir.stat().st_gid)
-        assert not optional_bin.exists()
         assert initial_mode == expected_mode
 
         r2 = _run(run_package, install_dir, upgrade_type)
@@ -89,9 +127,9 @@ class TestUpgrade:
         assert _ERROR_KW not in out, (
             f"Upgrade '{first_type}→{upgrade_type}' output contains {_ERROR_KW!r}:\n{out}"
         )
+        _assert_script_layout(script_dir, optional_bin, " after upgrade")
         assert stat.S_IMODE(script_dir.stat().st_mode) == initial_mode
         assert (script_dir.stat().st_uid, script_dir.stat().st_gid) == owner_before
-        assert not optional_bin.exists()
 
     def test_upgrade_with_optional_bin(self, run_package, install_dir):
         r1 = _run(run_package, install_dir, "--run")
