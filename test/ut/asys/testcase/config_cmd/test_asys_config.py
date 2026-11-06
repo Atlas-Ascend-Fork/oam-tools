@@ -59,6 +59,7 @@ class TestAsysConfig(AssertTest):
         )
 
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B1 V1")
@@ -85,6 +86,7 @@ class TestAsysConfig(AssertTest):
             d=None, get=True, restore=False, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B2 V1")
@@ -115,6 +117,7 @@ class TestAsysConfig(AssertTest):
             subparser_name="config",
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B3 V1")
@@ -138,6 +141,7 @@ class TestAsysConfig(AssertTest):
             subparser_name="config",
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
@@ -158,6 +162,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=True, restore=False, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -179,6 +184,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=True, restore=False, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -208,6 +214,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=True, restore=False, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -237,6 +244,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig0())
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -252,6 +260,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig1())
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -270,6 +279,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfigOSError())
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(
@@ -290,6 +300,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig1())
         mocker.patch("os.getuid", return_value=1000)
         mocker.patch.object(
@@ -309,6 +320,7 @@ class TestAsysConfig(AssertTest):
             d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
         )
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig1())
         mocker.patch("os.getuid", return_value=0)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910 V1")
@@ -331,9 +343,53 @@ class TestAsysConfig(AssertTest):
         )
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=False)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(args)
         self.assertTrue(AsysConfig().run() is False)
         self.assertTrue(
             "The config command cannot be executed on VMs and docker." in caplog.text
         )
+
+    def test_asys_config_virt_tool_missing_error(self, mocker, caplog):
+        # A bare machine with a simplified OS (or a container without systemd)
+        # has no systemd-detect-virt binary: that must be a precise error, not
+        # the misleading "cannot be executed on VMs and docker".
+        args = Namespace(
+            d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
+        )
+        mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig1())
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(
+            DeviceInfo, "get_chip_info", return_value="Ascend 910_9361 V1"
+        )
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=False)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(args)
+        self.assertTrue(AsysConfig().run() is False)
+        self.assertTrue("The systemd-detect-virt command does not exist" in caplog.text)
+        self.assertTrue(
+            "The config command cannot be executed on VMs and docker."
+            not in caplog.text
+        )
+
+    def test_asys_config_no_device_error(self, mocker, caplog):
+        # devices_num == 0 used to return False silently while an out-of-range
+        # device_id got a precise message; the zero-device machine needs its
+        # own hint too.
+        args = Namespace(
+            d=1, get=False, restore=True, stress_detect=True, subparser_name="config"
+        )
+        mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysConfig1())
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(
+            DeviceInfo, "get_chip_info", return_value="Ascend 910_9361 V1"
+        )
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=0)
+        mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(args)
+        self.assertTrue(AsysConfig().run() is False)
+        self.assertTrue("No available device found." in caplog.text)

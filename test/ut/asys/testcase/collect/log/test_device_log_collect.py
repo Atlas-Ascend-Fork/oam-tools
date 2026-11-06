@@ -21,6 +21,8 @@
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
 
+import os
+
 from testcase.conftest import AssertTest
 
 from collect.log import collect_device_logs
@@ -61,6 +63,40 @@ class TestDeviceLogCollect(AssertTest):
         )
         mocker.patch("common.FileOperate.collect_dir", return_value=False)
         self.assertTrue(not collect_device_logs("./", "./output"))
+
+    def test_collect_device_firmware_skips_app_and_os_dirs(self, mocker):
+        # The firmware feature is "device-": with a plain startswith it also
+        # captured device-app/device-os and archived them twice (once here,
+        # once in their own collect_* pass).
+        from collect.log.device_log_collect import collect_device
+
+        collected = []
+
+        def fake_collect_dir(source, target, _mode):
+            collected.append((source, target))
+            return True
+
+        def fake_list_dir(path):
+            if path.endswith(os.path.join("dev-os-0", "debug")):
+                return ["device-0", "device-app-140561", "device-os"]
+            if path.endswith("slog"):
+                return ["dev-os-0"]
+            return []
+
+        mocker.patch("common.FileOperate.list_dir", side_effect=fake_list_dir)
+        mocker.patch("common.FileOperate.collect_dir", side_effect=fake_collect_dir)
+        self.assertTrue(collect_device("./", "./output", ["debug"], "device-"))
+
+        firmware_sources = [s for s, _t in collected]
+        self.assertTrue(
+            os.path.join(".", "slog", "dev-os-0", "debug", "device-0")
+            in firmware_sources
+        )
+        self.assertTrue(
+            all(
+                "device-app" not in s and "device-os" not in s for s in firmware_sources
+            )
+        )
 
     def test__device_log_collect_host_driver(self, mocker):
         mocker.patch("collect.log.device_log_collect.collect_slogd", return_value=True)

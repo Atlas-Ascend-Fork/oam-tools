@@ -95,7 +95,7 @@ class TestCommon(AssertTest):
 
     @pytest.mark.parametrize("file_path", [None, ""])
     def test_append_write_file_invalid_path(self, file_path):
-        self.assertTrue(FileOperate.append_write_file(file_path, "info") is None)
+        self.assertTrue(FileOperate.append_write_file(file_path, "info") is False)
 
     def test_create_out_dir_no_write_permission(self, mocker, caplog):
         mocker.patch.object(ParamDict, "get_command", return_value="collect")

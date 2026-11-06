@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from common import log_error, log_warning, log_info, log_debug
 from common.const import RetCode, UNKNOWN, ScreenResult
 from common.const import HBM_MIN_TIMEOUT, CPU_MIN_TIMEOUT, DETECT_MAX_TIMEOUT
-from common.cmd_run import run_linux_cmd
+from common.cmd_run import check_command, run_linux_cmd
 from common import AsysDiagnoseSupportedChip, DeviceInfo, ChipHandler
 from common.file_operate import FileOperate as f
 from params.param_dict import ParamDict
@@ -141,6 +141,13 @@ class AsysDiagnose:
 
     def _check_support(self, run_mode):
         # check VMs and docker
+        if not check_command("systemd-detect-virt"):
+            log_error(
+                "The systemd-detect-virt command does not exist, "
+                "physical machine with a simplified OS or container without systemd "
+                "cannot be detected. Install systemd and try again."
+            )
+            return False
         if not run_linux_cmd("systemd-detect-virt", "none"):
             log_error("The diagnose command cannot be executed on VMs and docker.")
             return False
@@ -187,6 +194,7 @@ class AsysDiagnose:
                 force=True,
             )
         if self.devices_num == 0:
+            log_error("No available device found.")
             return False
         return True
 
@@ -287,7 +295,12 @@ class AsysDiagnose:
                     else ScreenResult.WARN.value
                 )
 
-        if ScreenResult.WARN.value in ret.values():
+        # HBM mode stores [result, ecc_count] pairs while the other modes store
+        # bare result strings, so normalize before the membership comparison.
+        if any(
+            (value[0] if isinstance(value, list) else value) == ScreenResult.WARN.value
+            for value in ret.values()
+        ):
             log_warning("Diagnosis results have failed, please analyze aml logs")
         self.finish_flag = True
         t.join()

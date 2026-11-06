@@ -61,6 +61,7 @@ class TestAsysConfig(AssertTest):
         )
         mocker.patch("os.getuid", return_value=0)
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value=chip_type)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         ParamDict().set_env_type("EP")

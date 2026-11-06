@@ -171,7 +171,12 @@ def timeout_decorator(timeout, raise_on_error=False):
             p.join(timeout)
             if p.is_alive():
                 p.terminate()
-                p.join()
+                p.join(timeout)
+                if p.is_alive():
+                    # SIGTERM can be ignored or blocked by the child; kill it
+                    # so the decorator cannot hang forever on a stubborn worker.
+                    p.kill()
+                    p.join()
                 raise TimeoutError()
             # The callable runs in a child process, so its exception never
             # reaches this frame. Without this check a failure looks exactly

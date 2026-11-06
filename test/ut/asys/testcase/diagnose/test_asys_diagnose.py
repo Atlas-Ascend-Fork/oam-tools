@@ -150,6 +150,47 @@ class TestAsysDiagnose(AssertTest):
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
 
+    def test_diagnose_check_support_no_device_logs_error(self, mocker, caplog):
+        # devices_num == 0 must log "No available device found." instead of
+        # returning False silently; cpu_detect keeps _check_support past the
+        # VM/opp checks so the zero-device branch is the one that fires.
+        diagnose = object.__new__(AsysDiagnose)
+        diagnose.finish_flag = False
+        diagnose.device_obj = DeviceInfo()
+        diagnose.devices_num = 0
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("os.getuid", return_value=0)
+        self.assertTrue(not diagnose._check_support("cpu_detect"))
+        self.assertTrue("No available device found." in caplog.text)
+
+    def test_diagnose_virt_tool_missing_error(self, mocker, caplog):
+        # A bare machine with a simplified OS (or a container without systemd)
+        # has no systemd-detect-virt binary: that must be a precise error, not
+        # the misleading "cannot be executed on VMs and docker".
+
+        class Args:
+            subparser_name = "diagnose"
+            r = "stress_detect"
+            d = 0
+            output = False
+            timeout = None
+
+        mocker.patch("drv.LoadSoType.get_ascend_ml", return_value=AsysDiagnose0())
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
+        mocker.patch("os.getuid", return_value=0)
+        mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B2 V1")
+        mocker.patch("os.path.isfile", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=False)
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(Args())
+        self.assertTrue(AsysDiagnose().run() is False)
+        self.assertTrue("The systemd-detect-virt command does not exist" in caplog.text)
+        self.assertTrue(
+            "The diagnose command cannot be executed on VMs and docker."
+            not in caplog.text
+        )
+
     def test_diagnose_1p(self, mocker, tmp_path):
         self.assertTrue(True)
 
@@ -166,6 +207,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B3 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         info_log = mocker.spy(asys_diagnose, "log_info")
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
@@ -192,6 +234,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -217,6 +260,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -242,6 +286,7 @@ class TestAsysDiagnose(AssertTest):
         )
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -264,6 +309,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -288,6 +334,7 @@ class TestAsysDiagnose(AssertTest):
         )
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -312,6 +359,7 @@ class TestAsysDiagnose(AssertTest):
         )
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -337,6 +385,7 @@ class TestAsysDiagnose(AssertTest):
         )
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -362,6 +411,7 @@ class TestAsysDiagnose(AssertTest):
         )
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -382,6 +432,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B1 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -408,6 +459,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B2 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         if res:
@@ -500,6 +552,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
@@ -524,6 +577,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B1 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
@@ -548,6 +602,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B2 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         try:
@@ -576,6 +631,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         try:
@@ -605,6 +661,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run())
@@ -630,6 +687,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B4 V1")
         mocker.patch("os.path.isfile", return_value=False)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run())
@@ -699,6 +757,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value=chip_info)
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
 
@@ -864,6 +923,7 @@ class TestAsysDiagnose(AssertTest):
             lambda: FakeSupportedChip(),
         )
         monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose, "check_command", lambda *_args: True)
         monkeypatch.setattr(asys_diagnose.os, "getuid", lambda: 0)
         monkeypatch.setattr(AsysDiagnose, "wait_view", lambda _self: None)
         monkeypatch.setattr(
@@ -904,6 +964,61 @@ class TestAsysDiagnose(AssertTest):
         assert diagnose.hardware_detect("cpu_detect") is False
         assert "Unknown is not supported." in caplog.text
 
+    @pytest.mark.parametrize(
+        ["run_mode", "results", "expect_warn"],
+        [
+            # HBM mode stores [result, ecc_count] pairs: the warn membership
+            # check must normalize the value or the aml-log hint never fires.
+            ("hbm_detect", {0: ["Warn", "0"]}, True),
+            ("hbm_detect", {0: ["Pass", "3"]}, False),
+            ("stress_detect", {0: "Warn"}, True),
+            ("stress_detect", {0: "Pass"}, False),
+        ],
+    )
+    def test_hardware_detect_warn_hint_fires_in_hbm_mode(
+        self, monkeypatch, caplog, run_mode, results, expect_warn
+    ):
+        """The "please analyze aml logs" hint must also fire for HBM results."""
+
+        class FakeHandler:
+            def run_diagnose(self, _device_obj, _devices, _mode):
+                return dict(results)
+
+        # stress_detect gates on opp_kernel files; the point of this test is the
+        # warn membership check, so route every mode through cpu-style checks by
+        # asserting on stress results via the same _check_support bypass.
+        monkeypatch.setattr(AsysDiagnose, "_check_support", lambda _self, _mode: True)
+        monkeypatch.setattr(
+            asys_diagnose.ChipHandler, "get_handler", lambda *_args: FakeHandler()
+        )
+        monkeypatch.setattr(
+            asys_diagnose,
+            "AsysDiagnoseSupportedChip",
+            lambda: type(
+                "S",
+                (),
+                {
+                    "get_supported_chip_info": staticmethod(
+                        lambda i: (True, "Ascend 910B1 V1")
+                    )
+                },
+            )(),
+        )
+        monkeypatch.setattr(asys_diagnose, "check_command", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose.os, "getuid", lambda: 0)
+        monkeypatch.setattr(AsysDiagnose, "wait_view", lambda _self: None)
+        monkeypatch.setattr(AsysDiagnose, "print_save", lambda *_args: None)
+        monkeypatch.setattr(ParamDict, "get_arg", lambda _self, _key: False)
+
+        diagnose = object.__new__(AsysDiagnose)
+        diagnose.finish_flag = False
+        diagnose.device_obj = DeviceInfo()
+        diagnose.devices_num = 1
+
+        assert diagnose.hardware_detect(run_mode) is True
+        assert ("please analyze aml logs" in caplog.text) is expect_warn
+
     def test_diagnose_aicore_stl_950_pass(self, mocker, capsys):
         """aicore_stl_detect on Ascend950 with a passing device."""
         self.assertTrue(True)
@@ -923,6 +1038,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -949,6 +1065,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -972,6 +1089,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B1 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
@@ -999,6 +1117,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 960DT V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is True)
@@ -1025,6 +1144,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 960PR V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
@@ -1050,6 +1170,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         self.assertTrue(AsysDiagnose().run() is False)
@@ -1076,6 +1197,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         warning_log = mocker.spy(asys_diagnose, "log_warning")
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
@@ -1102,6 +1224,7 @@ class TestAsysDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         ParamDict().set_args(Args())
         diag = AsysDiagnose()

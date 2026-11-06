@@ -20,7 +20,7 @@ import os
 
 from common import log_error
 from common import AsysConfigSupportedChip, get_device
-from common.cmd_run import run_linux_cmd
+from common.cmd_run import check_command, run_linux_cmd
 from params import ParamDict
 from config_cmd.interface import get_stress_detect_config, restore_stress_detect_config
 
@@ -35,6 +35,13 @@ class AsysConfig:
 
     def _check_support(self):
         # not support VMs and docker
+        if not check_command("systemd-detect-virt"):
+            log_error(
+                "The systemd-detect-virt command does not exist, "
+                "physical machine with a simplified OS or container without systemd "
+                "cannot be detected. Install systemd and try again."
+            )
+            return False
         if not run_linux_cmd("systemd-detect-virt", "none"):
             log_error("The config command cannot be executed on VMs and docker.")
             return False
@@ -46,6 +53,7 @@ class AsysConfig:
         # without device
         devices_num = self.device_obj.get_device_count()
         if devices_num == 0:
+            log_error("No available device found.")
             return False
         # device_id out of range
         if self.device_id >= devices_num:

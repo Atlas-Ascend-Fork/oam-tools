@@ -18,6 +18,7 @@
 
 import os
 import itertools
+import re
 
 from common import FileOperate as f
 from common import log_warning, log_error
@@ -36,8 +37,16 @@ def collect_device(source_root_dir, output_root_dir, log_types, feature):
         "device-app": "application",
         "device-os": "system",
         "device-": "firmware",
-        "event": "system"
+        "event": "system",
     }
+
+    # The firmware dirs are exactly "device-<id>"; a plain startswith(feature)
+    # would also capture device-app and device-os, archiving them twice.
+    def feature_match(name):
+        if feature == "device-":
+            return re.fullmatch(r"device-\d+", name) is not None
+        return name.startswith(feature)
+
     ret = True
     for dev_os_id, log_type in itertools.product(dev_os_dirs, log_types):
         device_type_path = os.path.join(slog_path, dev_os_id, log_type)
@@ -45,15 +54,31 @@ def collect_device(source_root_dir, output_root_dir, log_types, feature):
         if not device_dirs:
             continue
         for device_dir in device_dirs:
-            if not device_dir.startswith(feature):
+            if not feature_match(device_dir):
                 continue
             device_source = os.path.join(slog_path, dev_os_id, log_type, device_dir)
             if log_type:
-                device_target = os.path.join(output_root_dir, "dfx", "log", "device",
-                                             dev_os_id, target_dict[feature], log_type, device_dir)
+                device_target = os.path.join(
+                    output_root_dir,
+                    "dfx",
+                    "log",
+                    "device",
+                    dev_os_id,
+                    target_dict[feature],
+                    log_type,
+                    device_dir,
+                )
             else:
-                device_target = os.path.join(output_root_dir, "dfx", "log", "device",
-                                             dev_os_id, target_dict[feature], "debug", device_dir)
+                device_target = os.path.join(
+                    output_root_dir,
+                    "dfx",
+                    "log",
+                    "device",
+                    dev_os_id,
+                    target_dict[feature],
+                    "debug",
+                    device_dir,
+                )
             ret = ret and f.collect_dir(device_source, device_target, MOVE_MODE)
     return ret
 
@@ -65,7 +90,9 @@ def collect_messages(source_root_dir, output_root_dir):
         return False
     ret = True
     for dev_os_id in dev_os_dirs:
-        message_target = os.path.join(output_root_dir, "dfx", "log", "device", dev_os_id, "system", "message")
+        message_target = os.path.join(
+            output_root_dir, "dfx", "log", "device", dev_os_id, "system", "message"
+        )
         message_source = os.path.join(message_dir, dev_os_id)
         ret = ret and f.collect_dir(message_source, message_target, MOVE_MODE)
     return ret
@@ -89,10 +116,14 @@ def collect_host_driver(source_root_dir, output_root_dir):
     if not host_driver_dirs:
         return False
     ret = True
-    host_driver_log_target = os.path.join(output_root_dir, "dfx", "log", "host", "driver")
+    host_driver_log_target = os.path.join(
+        output_root_dir, "dfx", "log", "host", "driver"
+    )
     for host_driver_log in host_driver_dirs:
         host_driver_log_source = os.path.join(host_driver_path, host_driver_log)
-        ret = ret and f.collect_file_to_dir(host_driver_log_source, host_driver_log_target, MOVE_MODE)
+        ret = ret and f.collect_file_to_dir(
+            host_driver_log_source, host_driver_log_target, MOVE_MODE
+        )
     f.remove_dir(host_driver_path)
     return ret
 
@@ -106,7 +137,9 @@ def collect_slogd(source_root_dir, output_root_dir):
     for slog_dir in slog_dirs:
         slogd_log_source = os.path.join(slog_path, slog_dir, "slogd")
         if f.check_dir(slogd_log_source):
-            slogd_log_target = os.path.join(output_root_dir, "dfx", "log", "device", slog_dir, "slogd")
+            slogd_log_target = os.path.join(
+                output_root_dir, "dfx", "log", "device", slog_dir, "slogd"
+            )
             ret = ret and f.collect_dir(slogd_log_source, slogd_log_target, MOVE_MODE)
     return ret
 
@@ -114,7 +147,7 @@ def collect_slogd(source_root_dir, output_root_dir):
 def collect_device_app(source_root_dir, output_root_dir):
     log_types = ["debug", "run", "security"]
     feature = "device-app"
-    return collect_device(source_root_dir, output_root_dir, log_types, feature) 
+    return collect_device(source_root_dir, output_root_dir, log_types, feature)
 
 
 def collect_device_os(source_root_dir, output_root_dir):
@@ -137,7 +170,9 @@ def collect_event(source_root_dir, output_root_dir):
 
 def collect_device_logs(source_root_dir, output_root_dir):
     if not source_root_dir:
-        log_error("msnpureport output directory: {} is not exist".format(source_root_dir))
+        log_error(
+            "msnpureport output directory: {} is not exist".format(source_root_dir)
+        )
         return False
     err = 0  # err equals to zero denotes no errors
     message_ret = collect_messages(source_root_dir, output_root_dir)
@@ -159,7 +194,7 @@ def collect_device_logs(source_root_dir, output_root_dir):
     slogd_ret = collect_slogd(source_root_dir, output_root_dir)
     if not slogd_ret:
         log_warning("Collect device slogd logs failed.")
-        err += 1   
+        err += 1
     device_app_ret = collect_device_app(source_root_dir, output_root_dir)
     if not device_app_ret:
         log_warning("Collect device device_app logs failed.")

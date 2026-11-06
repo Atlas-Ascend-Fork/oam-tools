@@ -395,12 +395,56 @@ class TestFileOperate(AssertTest):
     def test_append_write_file_failed(self, mocker, caplog):
         mocker.patch("os.path.exists", return_value=False)
         mocker.patch.object(f, "create_dir", return_value=False)
-        f.append_write_file(self.test_file_path, "test_info")
+        self.assertTrue(f.append_write_file(self.test_file_path, "test_info") is False)
         self.assertTrue("failed in write file" in caplog.text)
 
     @pytest.mark.parametrize("file_path", [None, ""])
     def test_append_write_file_invalid_path(self, file_path):
-        self.assertTrue(f.append_write_file(file_path, "test_info") is None)
+        self.assertTrue(f.append_write_file(file_path, "test_info") is False)
+
+    def test_write_file_open_failure_is_logged(self, mocker, caplog):
+        # Disk full / read-only mount / permission denied raise OSError: without
+        # the try/except they crashed the three asys_info dump points. The
+        # failure must also reach the caller as False so task_out_collect can
+        # report the collection as failed instead of silently succeeding.
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch(
+            "builtins.open",
+            side_effect=PermissionError("mock read-only mount"),
+        )
+        self.assertTrue(f.write_file(self.test_file_path, "test_info") is False)
+        self.assertTrue(
+            'Write file: "{}" failed'.format(self.test_file_path) in caplog.text
+        )
+
+    def test_append_write_file_open_failure_is_logged(self, mocker, caplog):
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch(
+            "builtins.open",
+            side_effect=OSError("mock disk full"),
+        )
+        self.assertTrue(f.append_write_file(self.test_file_path, "test_info") is False)
+        self.assertTrue(
+            'Append file: "{}" failed'.format(self.test_file_path) in caplog.text
+        )
+
+    def test_write_file_open_failure_returns_false(self, mocker):
+        # Both write_file and append_write_file must return False when open
+        # fails, so callers can branch on the failure signal.
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch("builtins.open", side_effect=OSError(28, "No space left"))
+        self.assertTrue(f.write_file(self.test_file_path, "test_info") is False)
+        self.assertTrue(f.append_write_file(self.test_file_path, "test_info") is False)
+
+    def test_write_file_returns_true_on_success(self, tmp_path):
+        cur_dir = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            self.assertTrue(f.write_file("test_file", "test_info") is True)
+            self.assertTrue(f.append_write_file("test_file", "_append") is True)
+            self.assertTrue(f.read_file("test_file") == "test_info_append")
+        finally:
+            os.chdir(cur_dir)
 
     @pytest.mark.parametrize("mode, res", [("m", True), ("c", True), ("b", False)])
     def test_collect_file_to_dir(self, mode, res, mocker, caplog):

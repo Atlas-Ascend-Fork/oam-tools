@@ -147,9 +147,12 @@ class AsysLaunch:
                 f.create_dir(dir_path)
             user_cmd_path = os.path.join(dir_path, "user_cmd")
             screen_print_path = os.path.join(dir_path, "screen.txt")
-            f.write_file(user_cmd_path, self.user_cmd)
-            f.write_file(screen_print_path, self.console_output)
-            log_debug("Collect user cmd and task print successfully.")
+            user_cmd_ret = f.write_file(user_cmd_path, self.user_cmd)
+            screen_print_ret = f.write_file(screen_print_path, self.console_output)
+            if user_cmd_ret and screen_print_ret:
+                log_debug("Collect user cmd and task print successfully.")
+            else:
+                log_error("Collect user cmd and task print failed.")
 
         collect_task_output_info()
         task_collector = AsysCollect()

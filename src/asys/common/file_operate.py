@@ -107,8 +107,10 @@ class FileOperate:
 
     @staticmethod
     def write_file(file_path, info):
+        """Write info to file. Returns True on success, False on any failure
+        (empty path, directory creation failure, or OSError while writing)."""
         if not file_path:
-            return
+            return False
         file_dir = os.path.split(file_path)[0]
         if (
             file_dir
@@ -118,14 +120,21 @@ class FileOperate:
             log_error(
                 'Create path directory: "{}" failed in write file.'.format(file_dir)
             )
-            return
-        with open(file_path, mode="w", encoding=ENCODE_UTF_8) as f:
-            f.write(info)
+            return False
+        try:
+            with open(file_path, mode="w", encoding=ENCODE_UTF_8) as f:
+                f.write(info)
+        except OSError as e:
+            log_error('Write file: "{}" failed, error: {}.'.format(file_path, e))
+            return False
+        return True
 
     @staticmethod
     def append_write_file(file_path, info):
+        """Append info to file. Returns True on success, False on any failure
+        (empty path, directory creation failure, or OSError while writing)."""
         if not file_path:
-            return
+            return False
         file_dir = os.path.split(file_path)[0]
         if (
             file_dir
@@ -135,9 +144,14 @@ class FileOperate:
             log_error(
                 'Create path directory: "{}" failed in write file.'.format(file_dir)
             )
-            return
-        with open(file_path, mode="a", encoding=ENCODE_UTF_8) as f:
-            f.write(info)
+            return False
+        try:
+            with open(file_path, mode="a", encoding=ENCODE_UTF_8) as f:
+                f.write(info)
+        except OSError as e:
+            log_error('Append file: "{}" failed, error: {}.'.format(file_path, e))
+            return False
+        return True
 
     @staticmethod
     def is_dep_row(row):

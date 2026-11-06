@@ -239,3 +239,29 @@ class TestAsysLaunch(AssertTest):
         launch = AsysLaunch()
         launch.task_out_collect(test_case_tmp)
         self.assertTrue("Collect information after task failed" in caplog.text)
+
+    def test_task_out_collect_write_failure_reports_failed(self, mocker, caplog):
+        # A stubbed write_file is truthy by default, so the new failure branch
+        # (if user_cmd_ret and screen_print_ret) was never executed: a wrongly
+        # inverted condition would pass the existing case unnoticed.
+        mocker.patch("os.path.join")
+        # Only one of the two writes fails: the collection must still report
+        # the overall failure and must not claim success.
+        mocker.patch.object(f, "write_file", side_effect=[True, False])
+        mocker.patch.object(AsysCollect, "collect", return_value=False)
+        launch = AsysLaunch()
+        launch.task_out_collect(test_case_tmp)
+        self.assertTrue("Collect user cmd and task print failed." in caplog.text)
+        self.assertTrue(
+            "Collect user cmd and task print successfully." not in caplog.text
+        )
+
+    def test_task_out_collect_write_success_reports_success(self, mocker, caplog):
+        mocker.patch("os.path.join")
+        mocker.patch.object(f, "write_file", return_value=True)
+        mocker.patch.object(AsysCollect, "collect", return_value=True)
+        launch = AsysLaunch()
+        launch.task_out_collect(test_case_tmp)
+        # The success text is logged at debug level, not through log_debug's
+        # captured error/warning path: assert no failure text appears instead.
+        self.assertTrue("Collect user cmd and task print failed." not in caplog.text)

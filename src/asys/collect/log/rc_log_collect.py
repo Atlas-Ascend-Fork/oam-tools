@@ -17,6 +17,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import re
 
 from params import ParamDict
 from common import consts
@@ -30,7 +31,11 @@ __all__ = ["collect_rc_logs"]
 
 def collect_messages(output_root_dir):
     message_root_dir = os.path.join(os.sep, "var", "log")
-    message_file_name = "syslog" if f.check_file(os.path.join(message_root_dir, "syslog")) else "messages"
+    message_file_name = (
+        "syslog"
+        if f.check_file(os.path.join(message_root_dir, "syslog"))
+        else "messages"
+    )
     message_source = os.path.join(message_root_dir, message_file_name)
     message_target = os.path.join(output_root_dir, "dfx", "log", "message")
     return f.collect_file_to_dir(message_source, message_target, COPY_MODE)
@@ -47,16 +52,23 @@ def collect_stackcore(output_root_dir):
     for stackcore_path, _, stackcore_files in stackcore_source_dirs:
         for stackcore_file in stackcore_files:
             stackcore_source_name = os.path.join(stackcore_path, stackcore_file)
-            if ParamDict().get_command() == consts.launch_cmd and \
-                    f".{str(ParamDict().get_task_pid())}." not in stackcore_file:
+            if (
+                ParamDict().get_command() == consts.launch_cmd
+                and f".{str(ParamDict().get_task_pid())}." not in stackcore_file
+            ):
                 continue
-            ret = ret and f.collect_file_to_dir(stackcore_source_name,
-                                                stackcore_path.replace(coredump_path, stackcore_target), COPY_MODE)
+            ret = ret and f.collect_file_to_dir(
+                stackcore_source_name,
+                stackcore_path.replace(coredump_path, stackcore_target),
+                COPY_MODE,
+            )
     return ret
 
 
 def collect_install(output_root_dir):
-    install_source = os.path.join(os.sep, "var", "log", "ascend_seclog", "ascend_install.log")
+    install_source = os.path.join(
+        os.sep, "var", "log", "ascend_seclog", "ascend_install.log"
+    )
     install_target = os.path.join(output_root_dir, "dfx", "log", "install")
     return f.collect_file_to_dir(install_source, install_target, COPY_MODE)
 
@@ -71,6 +83,16 @@ def collect_device_os(slog_path, output_root_dir):
     ret = True
     log_types = ["debug", "run", "security"]
     task_pid = ParamDict().get_task_pid()
+
+    def is_device_app_dir(name):
+        # collect: task_pid is None, take every device-app dir; launch:
+        # task_pid is the subprocess pid, take exactly "device-app-<pid>".
+        # A plain endswith(str(task_pid)) would also capture other pids whose
+        # decimal representation ends with the same digits.
+        if task_pid is None:
+            return name.startswith("device-app")
+        return name == f"device-app-{task_pid}"
+
     for log_type in log_types:
         dev_os_path = os.path.join(slog_path, log_type)
         device_os_dirs = f.list_dir(dev_os_path)
@@ -79,17 +101,30 @@ def collect_device_os(slog_path, output_root_dir):
             return False
         for device_os_dir_name in device_os_dirs:
             if device_os_dir_name == "device-os":
-                device_os_log_source = os.path.join(slog_path, log_type, device_os_dir_name)
-                device_os_log_target = os.path.join(output_root_dir, "dfx", "log", "system",
-                                                    log_type, device_os_dir_name)
-                ret = ret and f.collect_dir(device_os_log_source, device_os_log_target, COPY_MODE)
-            # collect: task_pid is None; launch: task_pid is subprocess pid.
-            elif (task_pid is None and device_os_dir_name.startswith("device-app")) or \
-                    device_os_dir_name.endswith(str(task_pid)):
-                device_os_log_source = os.path.join(slog_path, log_type, device_os_dir_name)
-                device_os_log_target = os.path.join(output_root_dir, "dfx", "log", "cann",
-                                                    log_type, device_os_dir_name)
-                ret = ret and f.collect_dir(device_os_log_source, device_os_log_target, COPY_MODE)
+                device_os_log_source = os.path.join(
+                    slog_path, log_type, device_os_dir_name
+                )
+                device_os_log_target = os.path.join(
+                    output_root_dir,
+                    "dfx",
+                    "log",
+                    "system",
+                    log_type,
+                    device_os_dir_name,
+                )
+                ret = ret and f.collect_dir(
+                    device_os_log_source, device_os_log_target, COPY_MODE
+                )
+            elif is_device_app_dir(device_os_dir_name):
+                device_os_log_source = os.path.join(
+                    slog_path, log_type, device_os_dir_name
+                )
+                device_os_log_target = os.path.join(
+                    output_root_dir, "dfx", "log", "cann", log_type, device_os_dir_name
+                )
+                ret = ret and f.collect_dir(
+                    device_os_log_source, device_os_log_target, COPY_MODE
+                )
     return ret
 
 
@@ -100,11 +135,17 @@ def collect_device_id(slog_path, output_root_dir):
         return False
     ret = True
     for dev_os_id in dev_os_dirs:
-        if "device-" not in dev_os_id:
+        # The firmware dirs are exactly "device-<id>"; a plain substring check
+        # would also capture device-os, archiving it twice (firmware + system).
+        if not re.fullmatch(r"device-\d+", dev_os_id):
             continue
         device_id_log_source = os.path.join(slog_path, dev_os_id)
-        device_id_log_target = os.path.join(output_root_dir, "dfx", "log", "firmware", dev_os_id)
-        ret = ret and f.collect_dir(device_id_log_source, device_id_log_target, COPY_MODE)
+        device_id_log_target = os.path.join(
+            output_root_dir, "dfx", "log", "firmware", dev_os_id
+        )
+        ret = ret and f.collect_dir(
+            device_id_log_source, device_id_log_target, COPY_MODE
+        )
     return ret
 
 
@@ -113,7 +154,7 @@ def collect_rc_logs(output_root_dir):
     for func in all_func:
         ret = func(output_root_dir)
         if not ret:
-            msg_name = func.__name__.split('_')[-1]
+            msg_name = func.__name__.split("_")[-1]
             log_warning("Collect {} logs failed.".format(msg_name))
 
     slog_path = get_log_conf_path("slog")

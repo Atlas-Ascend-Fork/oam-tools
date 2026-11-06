@@ -121,6 +121,7 @@ class TestDiagnose(AssertTest):
         )
         mocker.patch("os.getuid", return_value=0)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch.object(DeviceInfo, "get_ecc_isolated_page", return_value=-1)
         mocker.patch.object(DeviceInfo, "clear_ecc_isolated", return_value=-1)
@@ -155,6 +156,7 @@ class TestDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch("os.path.isfile", return_value=True)
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         self.assertTrue(asys.main())
 
@@ -185,6 +187,7 @@ class TestDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch.object(LoadSoType, "get_env_type", return_value="EP")
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
 
         self.assertTrue(asys.main())
@@ -220,6 +223,7 @@ class TestDiagnose(AssertTest):
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 950 V1")
         mocker.patch.object(LoadSoType, "get_env_type", return_value="EP")
         mocker.patch("diagnose.asys_diagnose.run_linux_cmd", return_value=True)
+        mocker.patch("diagnose.asys_diagnose.check_command", return_value=True)
         ParamDict().set_env_type("EP")
 
         self.assertTrue(not asys.main())

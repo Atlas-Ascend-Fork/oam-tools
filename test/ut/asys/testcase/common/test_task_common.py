@@ -17,6 +17,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import signal
 import time
 
 import pytest
@@ -99,3 +100,18 @@ class TestTaskCommon(AssertTest):
 
         with pytest.raises(TimeoutError):
             slow()
+
+    @pytest.mark.skipif(os.name != "posix", reason="timeout worker uses fork")
+    def test_timeout_terminates_a_sigterm_ignoring_worker(self):
+        # A child that ignores SIGTERM used to hang the decorator forever:
+        # p.join() after terminate() had no timeout and no kill() fallback.
+        # signal.SIGKILL cannot be caught, so the kill() fallback must fire
+        # and TimeoutError must still reach the caller.
+
+        @timeout_decorator(0.2)
+        def stubborn():
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            time.sleep(30)
+
+        with pytest.raises(TimeoutError):
+            stubborn()

@@ -18,12 +18,13 @@
 
 import os
 import re
+import shlex
 import subprocess
 import stat
 from threading import Thread, Lock
 
 from common import FileOperate as f
-from common import log_error, log_warning
+from common import log_error, log_warning, log_debug
 from common.cmd_run import check_command, run_linux_cmd
 from common.task_common import out_progress_bar, str_to_hex, is_hexadecimal
 from common.const import ADDR_LEN_HEX
@@ -93,8 +94,17 @@ class ParseStackCore:
             AttributeError,
             subprocess.CalledProcessError,
             UnicodeDecodeError,
-        ):
-            self.warning(so_name, f"{so_name} is not permitted to read.")
+        ) as e:
+            # Keep the warning text stable per so_name: warning() deduplicates
+            # by exact text, and str(e) of a CalledProcessError embeds the full
+            # argv including the per-frame hex address, which would defeat the
+            # dedup and print one warning per stack frame of the same so.
+            # The detailed message still goes to the debug log for diagnosis.
+            log_debug(f"{so_name} cannot be parsed by addr2line, error: {e}.")
+            self.warning(
+                so_name,
+                f"{so_name} cannot be parsed by addr2line, error: {type(e).__name__}.",
+            )
             return []
 
     @staticmethod
@@ -177,7 +187,7 @@ class ParseStackCore:
             self.warning(so_name, warning_info)
             file_lines[index] = line.replace(line_num, "###")
             return False
-        if run_linux_cmd(f"{self.__readelf} -h {binary_path} | grep EXEC"):
+        if run_linux_cmd(f"{self.__readelf} -h {shlex.quote(binary_path)} | grep EXEC"):
             address = str_to_hex(stack_addr)
         else:
             address = str_to_hex(stack_addr) - str_to_hex(delta_addr)

@@ -315,6 +315,7 @@ class TestAsysConfig(AssertTest):
         )
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
         mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=False)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
         ParamDict().set_env_type("EP")
         self.assertTrue(asys.main() is False)
         self.assertTrue(
