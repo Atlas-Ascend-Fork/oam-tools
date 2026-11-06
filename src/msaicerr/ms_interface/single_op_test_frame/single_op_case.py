@@ -26,12 +26,15 @@ from ms_interface.aic_error_info import AicErrorInfo
 from ms_interface.dsmi_interface import DSMIInterface
 import numpy as np
 from ms_interface import utils
-from ms_interface.single_op_test_frame.common.ascend_tbe_op import (AscendOpKernel, AscendOpKernelRunner,
-                                                                    AscendOpKernelRunnerParam)
+from ms_interface.single_op_test_frame.common.ascend_tbe_op import (
+    AscendOpKernel,
+    AscendOpKernelRunner,
+    AscendOpKernelRunnerParam,
+)
 from ms_interface.run_dirty_ub import run_dirty_ub
 
-class SingleOpCase:
 
+class SingleOpCase:
     def __init__(self, aic_info: AicErrorInfo, op_test: str) -> None:
         self.aic_info = aic_info
         # 生成的用例文件按位置传入 op_test，存下来供需要时取用（也避免参数未使用）
@@ -42,7 +45,7 @@ class SingleOpCase:
         error_strings = [
             "there is an aivec error exception",
             "there is an aicore error exception",
-            "aicore exception"
+            "aicore exception",
         ]
         for s in error_strings:
             if s in content and kernel_name in content:
@@ -90,7 +93,7 @@ class SingleOpCase:
             "device_id": self.aic_info.run_device_id,
             "sub_ptr_addrs": self.aic_info.sub_ptr_addrs,
             "ffts_addrs_num": self.aic_info.ffts_addrs_num,
-            "workspace": self.aic_info.workspace
+            "workspace": self.aic_info.workspace,
         }
         return config
 
@@ -99,12 +102,13 @@ class SingleOpCase:
         # TypeError：config 缺字段时 cce_file 可能是 None，open(None) 即抛该异常，
         # 须与其他读文件失败一样回退默认芯片版本，而不是让用例进程直接退出。
         try:
-            with open(cce_file, 'r', encoding='utf-8') as f:
+            with open(cce_file, "r", encoding="utf-8") as f:
                 content = f.read()
             soc_version_ret = re.findall(r'//.*?(Ascend.*?)"', content)
             if soc_version_ret:
                 utils.print_info_log(
-                    f"get soc_version {soc_version_ret[0]} from cce file {cce_file}")
+                    f"get soc_version {soc_version_ret[0]} from cce file {cce_file}"
+                )
                 if soc_version_ret[0] == "Ascend910B":
                     return "Ascend910B1"
                 elif soc_version_ret[0] == "Ascend310B":
@@ -112,11 +116,11 @@ class SingleOpCase:
                 return soc_version_ret[0]
             else:
                 utils.print_warn_log(
-                    'Can not get soc_version from cce file {cce_file}')
+                    f"Can not get soc_version from cce file {cce_file}"
+                )
                 return "Ascend310"
         except (OSError, TypeError, UnicodeDecodeError, re.error):
-            utils.print_warn_log(
-                'Can not get soc_version from cce file {cce_file}')
+            utils.print_warn_log(f"Can not get soc_version from cce file {cce_file}")
             return "Ascend310"
 
     def get_cce_file(self):
@@ -125,11 +129,9 @@ class SingleOpCase:
         tiling_key = self.aic_info.tiling_key
         cce_file = self.aic_info.cce_file
         if not os.path.exists(cce_file):
-            cce_file = os.path.join(
-                kernel_path, f"{kernel_name}_{tiling_key}.cce")
+            cce_file = os.path.join(kernel_path, f"{kernel_name}_{tiling_key}.cce")
             if not os.path.exists(cce_file):
-                utils.print_warn_log(
-                    f"The cce file:{cce_file} does not exist")
+                utils.print_warn_log(f"The cce file:{cce_file} does not exist")
                 return ""
         return cce_file
 
@@ -139,31 +141,42 @@ class SingleOpCase:
             utils.print_info_log("Does not get cce file !!!")
             return None
 
-        with open(cce_file, 'r', encoding='utf-8') as f:
+        with open(cce_file, "r", encoding="utf-8") as f:
             content = f.read()
         cce_pattern = r"(?<=//\s).+$"
         re_result = re.findall(cce_pattern, content)
         if not re_result:
             utils.print_info_log(
-                "Does not match ccec command, use origin kernel to run single op!")
+                "Does not match ccec command, use origin kernel to run single op!"
+            )
             return None
         cmd = re_result[0].split(" ")
         ccec_file = shutil.which("ccec")
         if not ccec_file:
             # guess where is ccec
-            parent_path = "aarch64-linux" if "aarch64" in platform.machine() else "x86_64-linux"
+            parent_path = (
+                "aarch64-linux" if "aarch64" in platform.machine() else "x86_64-linux"
+            )
             ccec_file_guess = os.path.join(
-                os.sep, "usr", "local", "Ascend", "latest", parent_path, "ccec_compiler", "bin", "ccec")
+                os.sep,
+                "usr",
+                "local",
+                "Ascend",
+                "latest",
+                parent_path,
+                "ccec_compiler",
+                "bin",
+                "ccec",
+            )
             if shutil.which(ccec_file_guess):
                 ccec_file = ccec_file_guess
             else:
                 utils.print_warn_log(
-                    "Cannot find ccec! please add ccec path in env PATH.")
+                    "Cannot find ccec! please add ccec path in env PATH."
+                )
                 return None
-        os.environ['PATH'] = os.path.dirname(
-            ccec_file) + ":" + os.environ["PATH"]
-        rename_o_file = os.path.join(
-            os.getcwd(), kernel_name + "_new.o")
+        os.environ["PATH"] = os.path.dirname(ccec_file) + ":" + os.environ["PATH"]
+        rename_o_file = os.path.join(os.getcwd(), kernel_name + "_new.o")
         cmd[3] = cce_file
         dst_bin_index = cmd.index("-o") + 1
         cmd[dst_bin_index] = rename_o_file
@@ -172,7 +185,7 @@ class SingleOpCase:
 
     @staticmethod
     def read_bin_file(bin_name):
-        with open(bin_name, 'rb') as f:
+        with open(bin_name, "rb") as f:
             data = f.read()
         return data
 
@@ -191,7 +204,8 @@ class SingleOpCase:
             output_info["size"] = np_data.nbytes
             if str(np_data.dtype) == "|V2":
                 utils.print_warn_log(
-                    "np_data.dtype is V2, maybe bfloat16, same size with float16")
+                    "np_data.dtype is V2, maybe bfloat16, same size with float16"
+                )
                 output_info["dtype"] = "float16"
             else:
                 output_info["dtype"] = str(np_data.dtype)
@@ -201,19 +215,25 @@ class SingleOpCase:
 
     @staticmethod
     def run_kernel(data, op_test) -> str:
-        kernel_name = data.get('kernel_name')
-        cce_file = data.get('cce_file')
+        kernel_name = data.get("kernel_name")
+        cce_file = data.get("cce_file")
         if cce_file and os.path.exists(cce_file):
             utils.print_info_log("Generate new kernel by cce_file")
             bin_path = SingleOpCase.update_kernel_by_cce(cce_file, kernel_name)
             if bin_path is None:
-                utils.print_warn_log("update_kernel_by_cce failed, please check cce file.")
+                utils.print_warn_log(
+                    "update_kernel_by_cce failed, please check cce file."
+                )
                 bin_path = data.get("bin_path")
         else:
             bin_path = data.get("bin_path")
         json_path = data.get("json_path")
         tiling_data = data.get("tiling_data")
-        if tiling_data and isinstance(tiling_data, str) and tiling_data.endswith(".bin"):
+        if (
+            tiling_data
+            and isinstance(tiling_data, str)
+            and tiling_data.endswith(".bin")
+        ):
             tiling_data = SingleOpCase.read_bin_file(tiling_data)
         else:
             tiling_data = tiling_data.encode("utf-8")
@@ -228,17 +248,19 @@ class SingleOpCase:
             device_id = 0
 
         op_kernel = AscendOpKernel(bin_path, json_path)
-        ascend_op_param = AscendOpKernelRunnerParam(kernel=op_kernel,
-                                                    inputs=input_data_list,
-                                                    tiling_data=tiling_data,
-                                                    block_dim=block_dim,
-                                                    tiling_key=tiling_key,
-                                                    actual_out_info=output_info_list,
-                                                    bin_list=data.get("bin_file_list"),
-                                                    sub_ptr_addrs=data.get("sub_ptr_addrs"),
-                                                    ffts_addrs_num=data.get("ffts_addrs_num"),
-                                                    workspace=data.get("workspace"),
-                                                    op_test=op_test)
+        ascend_op_param = AscendOpKernelRunnerParam(
+            kernel=op_kernel,
+            inputs=input_data_list,
+            tiling_data=tiling_data,
+            block_dim=block_dim,
+            tiling_key=tiling_key,
+            actual_out_info=output_info_list,
+            bin_list=data.get("bin_file_list"),
+            sub_ptr_addrs=data.get("sub_ptr_addrs"),
+            ffts_addrs_num=data.get("ffts_addrs_num"),
+            workspace=data.get("workspace"),
+            op_test=op_test,
+        )
         with AscendOpKernelRunner(device_id=device_id) as runner:
             ret = runner.run(ascend_op_param)
         return ret
@@ -251,16 +273,17 @@ class SingleOpCase:
             utils.print_warn_log("get soc_version form platform failed!")
             soc_version = None
         if not soc_version:
-            soc_version = SingleOpCase.get_soc_version_from_cce(
-                configs.get("cce_file"))
+            soc_version = SingleOpCase.get_soc_version_from_cce(configs.get("cce_file"))
         if not soc_version:
             # Both DSMI probe and cce file fallback failed. Returning early
             # avoids handing None to run_dirty_ub -> te_set_version, which
             # raises a confusing `TypeError: expected str, bytes or
             # os.PathLike object, not NoneType` from deep inside tbe.
-            err = ("Cannot determine soc_version: DSMI probe failed and "
-                   "cce_file fallback returned no result. Aborting single "
-                   "op case run.")
+            err = (
+                "Cannot determine soc_version: DSMI probe failed and "
+                "cce_file fallback returned no result. Aborting single "
+                "op case run."
+            )
             utils.print_error_log(err)
             return err
         device_id = configs.get("device_id")
@@ -278,4 +301,3 @@ class SingleOpCase:
         ret_str = f"Execute {op_test} SingleOpCase.run_kernel result: \r\n{ret}"
         utils.print_info_log(ret_str)
         return f"{ret_str}"
-
