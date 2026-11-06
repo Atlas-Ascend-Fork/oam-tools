@@ -137,7 +137,17 @@ def test_generated_ranges_take_priority_over_statistical_candidate_metadata(tmp_
     }
     path = tmp_path / "segments.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
-    assert _map(path)["trace_instances"][0]["op_range"] == [0, 1]
+    assert _map(path) == {
+        "trace_instances": [
+            {
+                "instance_id": "layer_unknown_iter_0",
+                "model_layer_index": "unknown",
+                "invocation_index": 0,
+                "op_range": [0, 1],
+            }
+        ],
+        "execution_counts": {"unknown": 1},
+    }
 
 
 def test_empty_segment_artifact_stays_empty(tmp_path):
