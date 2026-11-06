@@ -258,11 +258,18 @@
         vi /etc/sudoers
         ```
 
-        删除文件内如下内容：
+        在文件中搜索 /usr/bin/msprof_data_collection.sh，找到由本脚本生成的如下形式规则行：
+
+        ```text
+        {安装用户名} ALL=(ALL:ALL) NOPASSWD:/usr/bin/msprof_data_collection.sh get-version perf,...,/usr/bin/msprof_data_collection.sh iotop {PID模式}
+        ```
+
+        删除该行时，从行首的{安装用户名}开始，到行尾全部删除。该行中的多个命令由脚本根据perf、ltrace、iotop、PID位数和/proc/sys/kernel/pid_max动态生成，不同环境可能不同，不能只删除其中部分命令。紧随其后的Defaults env_reset是独立配置行，不是该规则的一部分，应与其他既有sudoers配置一并保留。
+
+        保存文件后，执行以下命令检查 sudoers 语法：
 
         ```sh
-        huawei ALL=(ALL:ALL) NOPASSWD:/usr/bin/msprof_data_collection.sh get-version perf,/usr/bin/msprof_data_collection.sh get-version ltrace,/usr/bin/msprof_data_collection.sh get-version iotop,/usr/bin/msprof_data_collection.sh pkill perf,/usr/bin/msprof_data_collection.sh pkill ltrace,/usr/bin/msprof_data_collection.sh pkill iotop,/usr/bin/msprof_data_collection.sh perf [0-9],/usr/bin/msprof_data_collection.sh ltrace [0-9],/usr/bin/msprof_data_collection.sh iotop [0-9],/usr/bin/msprof_data_collection.sh perf [1-9][0-9],/usr/bin/msprof_data_collection.sh ltrace [1-9][0-9],/usr/bin/msprof_data_collection.sh iotop [1-9][0-9],/usr/bin/msprof_data_collection.sh perf [1-9][0-9][0-9],/usr/bin/msprof_data_collection.sh ltrace [1-9][0-9][0-9],/usr/bin/msprof_data_collection.sh iotop [1-9][0-9][0-9],/usr/bin/msprof_data_collection.sh perf [1-9][0-9][0-9][0-9],/usr/bin/msprof_data_collection.sh ltrace [1-9][0-9][0-9][0-9],/usr/bin/msprof_data_collection.sh iotop [1-9][0-9][0-9][0-9],/usr/bin/msprof_data_collection.sh perf [1-9][0-9][0-9][0-9][0-9],/usr/bin/msprof_data_collection.sh ltrace [1-9][0-9][0-9][0-9][0-9],/usr/bin/msprof_data_collection.sh iotop [1-9][0-9][0-9][0-9][0-9]
-        Defaults env_reset
+        visudo -c
         ```
 
     3. 执行以下命令取消“/etc/sudoers”文件的写权限：
