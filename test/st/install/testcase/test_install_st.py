@@ -83,26 +83,15 @@ def _assert_clean_log(result, operation):
     )
 
 
-class TestInstall:
-    @pytest.mark.parametrize("install_type", ["--full", "--run", "--devel"])
-    def test_install(self, run_package, install_dir, install_type):
-        result = _run(run_package, install_dir, install_type)
-        out = _output(result)
-
-        assert result.returncode == 0, (
-            f"'{install_type}' install exited {result.returncode}:\n{out}"
-        )
-        _assert_clean_log(result, f"'{install_type}' install")
-
-
 class TestInstallArtefacts:
     @staticmethod
-    def test_install_full(run_package, install_dir):
-        result = _run(run_package, install_dir, "--full")
+    @pytest.mark.parametrize("install_type", ["--full", "--run", "--devel"])
+    def test_install_artefacts(run_package, install_dir, install_type):
+        result = _run(run_package, install_dir, install_type)
         assert result.returncode == 0, (
-            f"'--full' install exited {result.returncode}:\n{_output(result)}"
+            f"'{install_type}' install exited {result.returncode}:\n{_output(result)}"
         )
-        _assert_clean_log(result, "'--full' install")
+        _assert_clean_log(result, f"'{install_type}' install")
 
         info_dir = os.path.join(install_dir, "cann", "share", "info", "oam_tools")
         assert os.path.isdir(info_dir), f"Missing oam_tools info dir: {info_dir}"
