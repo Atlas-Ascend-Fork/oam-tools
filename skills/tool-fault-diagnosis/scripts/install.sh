@@ -16,7 +16,7 @@
 # ----------------------------------------------------------------------------
 set -euo pipefail
 
-REPO_URL="${TOOL_FAULT_DIAGNOSIS_SKILLS_REPO:-https://gitcode.com/cann-agent/skills.git}"
+REPO_URL="${TOOL_FAULT_DIAGNOSIS_SKILLS_REPO:-https://gitcode.com/cann/oam-tools.git}"
 TMPDIR="$(mktemp -d)"
 
 cleanup() {

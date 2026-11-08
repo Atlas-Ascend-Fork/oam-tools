@@ -120,31 +120,31 @@ flowchart TB
 安装到 Codex：
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann-agent/skills/raw/main/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codex
+curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codex
 ```
 
 安装到 Claude Code：
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann-agent/skills/raw/main/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target claude
+curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target claude
 ```
 
 安装到 OpenCode：
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann-agent/skills/raw/main/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target opencode
+curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target opencode
 ```
 
 安装到 CodeFuse：
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann-agent/skills/raw/main/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codefuse
+curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codefuse
 ```
 
 CodeFuse 默认全局安装到 `~/.codefuse/fuse/skills`。安装到当前项目时使用：
 
 ```bash
-curl -fsSL https://raw.gitcode.com/cann-agent/skills/raw/main/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codefuse --dest .codefuse/skills
+curl -fsSL https://raw.gitcode.com/cann/oam-tools/raw/master/skills/tool-fault-diagnosis/scripts/install.sh | bash -s -- --target codefuse --dest .codefuse/skills
 ```
 
 本地已有仓库时，从仓库根目录执行：
