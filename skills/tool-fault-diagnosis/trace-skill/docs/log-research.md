@@ -5,7 +5,7 @@ This note records the official log-source reference and the read-only assessment
 ## Primary Reference
 
 - Huawei Ascend official log reference: <https://www.hiascend.com/document/detail/zh/canncommercial/latest/maintenref/logreference/logreference_0001.html>
-- Repository log model and examples: [`skills/tool-fault-diagnosis/eval-skill/references/log-spec.md`](../skills/tool-fault-diagnosis/eval-skill/references/log-spec.md)
+- Repository log model and examples: [`skills/tool-fault-diagnosis/eval-skill/references/log-spec.md`](../../eval-skill/references/log-spec.md)
 
 ## Official Classification
 
