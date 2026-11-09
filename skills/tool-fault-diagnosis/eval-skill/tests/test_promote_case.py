@@ -56,6 +56,52 @@ class PromoteCaseTests(unittest.TestCase):
             self.assertFalse((root / "cases.md").exists())
             self.assertIn("PCASE-001", pending.read_text(encoding="utf-8"))
 
+    def test_dry_run_promote_preserves_case_libraries(self):
+        for has_main in (False, True):
+            with self.subTest(has_main=has_main):
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    pending = root / "cases-pending.md"
+                    pending.write_text(
+                        "## PCASE-001：Public candidate\n"
+                        "- 验证状态：待验证\n\n---\n\n"
+                        "## PCASE-002：Retained candidate\n"
+                        "- 验证状态：待验证\n",
+                        encoding="utf-8",
+                    )
+                    main = root / "cases.md"
+                    if has_main:
+                        main.write_text(
+                            "# Retained cases\n\n## CASE-007：Retained reference\n",
+                            encoding="utf-8",
+                        )
+                    before_pending = pending.read_bytes()
+                    before_main = main.read_bytes() if has_main else None
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            str(SCRIPT),
+                            "--promote",
+                            "PCASE-001",
+                            "--cases-dir",
+                            str(root),
+                            "--dry-run",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(pending.read_bytes(), before_pending)
+                    if has_main:
+                        self.assertEqual(main.read_bytes(), before_main)
+                    else:
+                        self.assertFalse(main.exists())
+                    self.assertIn("[DRY-RUN]", result.stdout)
+                    self.assertIn("CASE-008" if has_main else "CASE-001", result.stdout)
+                    self.assertIn("验证状态：已验证修复有效", result.stdout)
+                    self.assertIn("转正日期：", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

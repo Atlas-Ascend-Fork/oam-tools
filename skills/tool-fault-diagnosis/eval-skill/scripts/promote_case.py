@@ -265,7 +265,9 @@ def append_case(target: Path, block: str, header: str = "") -> None:
     target.write_text(new, encoding="utf-8")
 
 
-def do_promote(case_ref: str, cases_dir: Path, conf: dict | None = None) -> None:
+def do_promote(
+    case_ref: str, cases_dir: Path, conf: dict | None = None, dry_run: bool = False
+) -> None:
     """把候选案例从 cases-pending.md 转正到 cases.md"""
     pending_path = cases_dir / PENDING_FILE
     cases_path = cases_dir / CASES_FILE
@@ -320,6 +322,13 @@ def do_promote(case_ref: str, cases_dir: Path, conf: dict | None = None) -> None
         print(f"[STOP] 候选案例含疑似敏感信息（{labels}），请先脱敏后转正。", file=sys.stderr)
         sys.exit(3)
 
+    if dry_run:
+        print(f"\n[DRY-RUN] {case_ref} → {new_id}，目标文件：{cases_path}")
+        print("-" * 60)
+        print(promoted)
+        print("-" * 60)
+        return
+
     append_case(cases_path, promoted)
     pending_path.write_text("\n---\n".join(b for b in rest).rstrip() + "\n", encoding="utf-8")
     print(f"[DONE] {case_ref} → {new_id}，已写入 {cases_path}")
@@ -351,7 +360,7 @@ def main():
 
     if args.promote:
         conf = json.loads(read_text(args.confidence)) if args.confidence else None
-        do_promote(args.promote, args.cases_dir, conf)
+        do_promote(args.promote, args.cases_dir, conf, dry_run=args.dry_run)
         return
 
     if args.check:
