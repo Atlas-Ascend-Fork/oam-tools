@@ -309,6 +309,10 @@ class TestCollectStackAtrace(AssertTest):
             "collect.stacktrace.stacktrace_collect.popen_run_cmd", return_value=cmd_ret
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         args = Namespace(
             subparser_name="collect",
@@ -341,6 +345,10 @@ class TestCollectStackAtrace(AssertTest):
             return_value=["12345", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         args = Namespace(
             subparser_name="collect",
@@ -377,6 +385,10 @@ class TestCollectStackAtrace(AssertTest):
             return_value=[],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         args = Namespace(
             subparser_name="collect",
@@ -413,6 +425,10 @@ class TestCollectStackAtrace(AssertTest):
             return_value=["34567"],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         args = Namespace(
             subparser_name="collect",
@@ -477,6 +493,10 @@ class TestCollectStackAtrace(AssertTest):
             return_value=False,
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         args = Namespace(
             subparser_name="collect",
@@ -504,6 +524,10 @@ class TestCollectStackAtrace(AssertTest):
             return_value=True,
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("time.sleep", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = ut_root_path + "/data/test/"
@@ -563,6 +587,12 @@ class TestCollectStackAtrace(AssertTest):
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.popen_run_cmd", return_value="./test"
         )
+        # lsof now runs through the shell-free list runner; a truthy ok flag
+        # means "file still open" so the wait loop keeps polling to timeout.
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.run_cmd_list",
+            return_value=(True, "lsof output"),
+        )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_exists_bin_file_num",
             return_value=6,
@@ -571,6 +601,52 @@ class TestCollectStackAtrace(AssertTest):
         os.environ["ASCEND_WORK_PATH"] = ut_root_path + "/data/"
         ret = AsysStackTrace()._wait_bin_file_generate(5)
         self.assertTrue(not ret)
+
+    def test_wait_bin_file_never_lsofs_a_missing_file(self, mocker, tmp_path):
+        # Fewer bin files than the baseline (cleanup/rotation beat the signal)
+        # must keep polling; reaching lsof with no file name at all raised
+        # TypeError inside subprocess.run and crashed the whole collect.
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_exists_bin_file_num",
+            return_value=1,
+        )
+        lsof_calls = []
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.run_cmd_list",
+            side_effect=lambda *a, **k: lsof_calls.append(a) or (False, ""),
+        )
+        mocker.patch("time.sleep", return_value=True)
+        stacktrace = AsysStackTrace.__new__(AsysStackTrace)
+        stacktrace.timeout = 1
+        stacktrace.trace_work_path = str(tmp_path)
+
+        ret = stacktrace._wait_bin_file_generate(5)
+
+        self.assertTrue(ret is None)
+        self.assertTrue(lsof_calls == [])
+
+    def test_wait_bin_file_returns_when_no_longer_open(self, mocker, tmp_path):
+        # count grows -> newest file picked -> lsof says closed -> returned.
+        bin_file = tmp_path / "stackcore_tracer_35_12345_1.bin"
+        bin_file.write_text("", encoding="utf-8")
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_exists_bin_file_num",
+            side_effect=[1],
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._get_last_bin_file_name",
+            return_value=str(bin_file),
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.run_cmd_list",
+            return_value=(False, ""),
+        )
+        stacktrace = AsysStackTrace.__new__(AsysStackTrace)
+        stacktrace.timeout = 2
+
+        ret = stacktrace._wait_bin_file_generate(0)
+
+        self.assertTrue(ret == str(bin_file))
 
     def test_clear_dfx_log_remove_log_files(self, mocker):
         mocker.patch(

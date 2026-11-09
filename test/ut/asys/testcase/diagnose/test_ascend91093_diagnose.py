@@ -36,9 +36,12 @@ class FakeDevice:
     failing_devices report a genuine fault.
     """
 
-    def __init__(self, unresolvable=(), failing_devices=(), master_map=None):
+    def __init__(
+        self, unresolvable=(), failing_devices=(), master_map=None, crashing_devices=()
+    ):
         self.unresolvable = set(unresolvable)
         self.failing_devices = set(failing_devices)
+        self.crashing_devices = set(crashing_devices)
         self.master_map = master_map or {}
         self.detected = []
 
@@ -53,6 +56,8 @@ class FakeDevice:
         return self.master_map.get(phyid, phyid)
 
     def get_ecc_isolated_page(self, device_id):
+        if device_id in self.crashing_devices:
+            raise RuntimeError("mock inner crash before any result is written")
         return 0
 
     @property
@@ -151,3 +156,37 @@ class TestAscend91093Diagnose(AssertTest):
         self.assertTrue(ret[0] != ret[1])
         self.assertTrue(ret[0] == ["Pass", "0"])
         self.assertTrue(ret[1] == ["Warn", "0"])
+
+    def test_diagnose_91093_crashed_thread_falls_back_to_warn_hbm(self):
+        """A detection thread that raises writes the hbm-shaped WARN result.
+
+        hbm_detect reports [result, ecc_count], so the crash fallback has to
+        keep that shape or the reporting stage fails to parse it. The crash
+        is injected at get_ecc_isolated_page, which sits outside run_hbm's
+        own try block.
+        """
+        device = FakeDevice(unresolvable={0}, crashing_devices={0})
+
+        ret = Ascend91093Handler.run_diagnose(device, [0], "hbm_detect")
+
+        self.assertTrue(ret[0] == ["Warn", "0"])
+
+    def test_diagnose_91093_crashed_thread_falls_back_to_warn_cpu(self, mocker):
+        """The same crash in cpu_detect writes the scalar WARN result.
+
+        cpu_detect reports a plain string; a list-shaped fallback made
+        set(devices_ret) raise TypeError: unhashable type 'list' in the
+        reporting stage.
+        """
+        device = FakeDevice(unresolvable={0})
+
+        def crash(*_args, **_kwargs):
+            raise RuntimeError("mock inner crash before any result is written")
+
+        mocker.patch(
+            "common.ascend910_93.ascend91093_handler.interface.run_cpu",
+            side_effect=crash,
+        )
+        ret = Ascend91093Handler.run_diagnose(device, [0], "cpu_detect")
+
+        self.assertTrue(ret[0] == "Warn")

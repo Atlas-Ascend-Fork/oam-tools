@@ -21,7 +21,8 @@ import re
 import shlex
 import subprocess
 import stat
-from threading import Thread, Lock
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 from common import FileOperate as f
 from common import log_error, log_warning, log_debug
@@ -31,6 +32,12 @@ from common.const import ADDR_LEN_HEX
 
 
 class ParseStackCore:
+    # Unbounded per-line threads multiplied by per-file threads could exhaust
+    # the process; a bounded pool caps the thread count (hang protection for
+    # the addr2line/readelf subprocess itself is tracked by #399).
+    PARSE_LINE_WORKERS = 32
+    PARSE_FILE_WORKERS = 8
+
     def __init__(self, symbol, file=None):
         self.file = file
         self.symbol_path = symbol
@@ -247,7 +254,7 @@ class ParseStackCore:
         self.set_maps_addr_binary_path(file_lines)
 
         start_up = False
-        threads = []
+        parse_tasks = []
         if self.file:
             count = len(file_lines)
         for index, line in enumerate(file_lines):
@@ -267,14 +274,13 @@ class ParseStackCore:
             _, stack_addr, delta_addr, _ = line.split()[:4]
             if not (is_hexadecimal(stack_addr) and is_hexadecimal(delta_addr)):
                 continue
-            t = Thread(
-                target=self.parse_line, args=(index, line, file_lines), daemon=True
-            )
-            t.start()
-            threads.append(t)
-        # wait for all threads to end.
-        for t in threads:
-            t.join()
+            parse_tasks.append((index, line, file_lines))
+        # This bounds the per-line concurrency only; it does NOT protect
+        # against a hung addr2line (subprocess has no timeout), which still
+        # blocks the pool shutdown. That hang protection is tracked by #399.
+        with ThreadPoolExecutor(max_workers=self.PARSE_LINE_WORKERS) as line_pool:
+            for task in parse_tasks:
+                line_pool.submit(self.parse_line, *task)
         file_lines = self.file_lines_add_stack_num(file_lines)
         return self.write_res_file(stackcore_file, file_lines)
 
@@ -292,8 +298,8 @@ class ParseStackCore:
         if not self.check_tool_exists():
             return False
         num = 0
-        threads = []
         results = []
+        file_tasks = []
         for dirs, _, files in stackcore_dirs:
             for file in files:
                 if not file.endswith(".txt"):
@@ -302,15 +308,13 @@ class ParseStackCore:
                     continue
                 stackcore_file = os.path.join(dirs, file)
                 num += 1
-                t = Thread(
-                    target=self.save_file_result,
-                    args=(stackcore_file, count, num, results),
-                    daemon=True,
+                file_tasks.append((stackcore_file, num))
+        # This bounds the per-file concurrency only; a hung worker still
+        # blocks the pool shutdown (subprocess timeout is tracked by #399).
+        with ThreadPoolExecutor(max_workers=self.PARSE_FILE_WORKERS) as file_pool:
+            for stackcore_file, file_num in file_tasks:
+                file_pool.submit(
+                    self.save_file_result, stackcore_file, count, file_num, results
                 )
-                t.start()
-                threads.append(t)
-        # wait for all threads to end.
-        for t in threads:
-            t.join()
         out_progress_bar(count, count)
         return any(results)

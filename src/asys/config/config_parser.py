@@ -16,6 +16,8 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 
+import csv
+import configparser
 import os
 from typing import NamedTuple
 
@@ -60,8 +62,29 @@ class AsysConfigParser:
         self.dep_file_path = os.path.join(get_project_conf(), "dependent_package.csv")
         self.ini_file_path = os.path.join(get_project_conf(), "asys.ini")
 
+    # Sentinel distinguishing "the read raised and was logged" (READ_FAILED)
+    # from "the read succeeded but returned nothing usable" (empty csv/txt).
+    READ_FAILED = object()
+
+    def __read_dep_file(self, file_path):
+        """Read dependent_package.csv; a broken file must not kill every asys
+        subcommand, because parse() here is a mandatory step of main()."""
+        try:
+            return f.read_file(file_path)
+        except (
+            OSError,
+            UnicodeDecodeError,
+            csv.Error,
+            configparser.Error,
+            IndexError,
+        ) as e:
+            log_error(f"Read the dependencies file: {file_path} failed, {e}.")
+            return self.READ_FAILED
+
     def __parse_deps(self):
-        dep_info = f.read_file(self.dep_file_path)
+        dep_info = self.__read_dep_file(self.dep_file_path)
+        if dep_info is self.READ_FAILED:
+            return RetCode.READ_FILE_FAILED
         if not dep_info:
             log_error(f"Read the dependencies file: {self.dep_file_path} failed.")
             return RetCode.READ_FILE_FAILED
@@ -69,17 +92,55 @@ class AsysConfigParser:
         ParamDict().set_deps(dep_info)
         return RetCode.SUCCESS
 
+    def __read_ini_file(self, file_path):
+        """Read asys.ini; same tolerance rule as __read_dep_file.
+
+        Note: ConfigParser.read() swallows a missing or unreadable file and
+        returns an empty parser, so the OSError branches here mainly cover
+        the other file types read by f.read_file; a missing ini is detected
+        by the existence check below instead.
+        """
+        try:
+            return f.read_file(file_path)
+        except (
+            OSError,
+            UnicodeDecodeError,
+            csv.Error,
+            configparser.Error,
+            IndexError,
+        ) as e:
+            log_error(f"Read the config file: {file_path} failed, {e}.")
+            return self.READ_FAILED
+
     def __parse_ini(self):
-        ini_parser = f.read_file(self.ini_file_path)
+        # A missing/unreadable ini must not pass silently through
+        # ConfigParser.read()'s internal exception swallowing.
+        if not os.path.isfile(self.ini_file_path):
+            log_error(f"Read the config file: {self.ini_file_path} failed.")
+            return RetCode.READ_FILE_FAILED
+        ini_parser = self.__read_ini_file(self.ini_file_path)
+        if ini_parser is self.READ_FAILED:
+            return RetCode.READ_FILE_FAILED
         if not ini_parser:
             log_error(f"Read the config file: {self.ini_file_path} failed.")
             return RetCode.READ_FILE_FAILED
 
         command = ParamDict().get_command()
-        if command not in ini_parser.sections():
-            log_debug(f"No ini conf items for command: {command}.")
-            return RetCode.SUCCESS
-        k_v_pairs = ini_parser.items(command)
+        try:
+            if command not in ini_parser.sections():
+                log_debug(f"No ini conf items for command: {command}.")
+                return RetCode.SUCCESS
+            k_v_pairs = ini_parser.items(command)
+        except (
+            configparser.Error,
+            OSError,
+            UnicodeDecodeError,
+            IndexError,
+        ) as e:
+            # items() interpolates values, so a stray '%' in the ini raises
+            # InterpolationSyntaxError here rather than during read().
+            log_error(f"Read the config file: {self.ini_file_path} failed, {e}.")
+            return RetCode.READ_FILE_FAILED
         for conf_k, conf_v in k_v_pairs:
             info_item = ASYS_INI_VALUE_MAP.get(conf_k)
             if info_item is None:

@@ -45,9 +45,10 @@ class AsysConfig:
         if not run_linux_cmd("systemd-detect-virt", "none"):
             log_error("The config command cannot be executed on VMs and docker.")
             return False
-        # restore mode only support root
+        # The whole config command is root-only; the comment and the error
+        # text below must stay in sync with this behavior.
         if os.getuid() != 0:
-            log_error("The config --restore command must be executed as the root user.")
+            log_error("The config command must be executed as the root user.")
             return False
 
         # without device

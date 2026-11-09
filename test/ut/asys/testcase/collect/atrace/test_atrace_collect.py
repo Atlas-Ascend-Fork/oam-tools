@@ -167,7 +167,7 @@ class TestAtraceCollect(AssertTest):
             "data/atrace/trace_17965_17965_20240302100542653636/stackcore_tracer_35_12345_2024.bin",
         )
         parse_trace = ParseTrace(is_file=True)
-        mocker.patch.object(parse_trace, "parse_ctrl_head")
+        mocker.patch.object(parse_trace, "parse_ctrl_head", return_value=(0, 0, 0))
         mocker.patch.object(parse_trace, "parse_struct_segment", return_value=dict())
         with open(data_file, "rb") as fp:
             try:

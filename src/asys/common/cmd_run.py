@@ -29,6 +29,7 @@ from common.log import log_debug, log_warning
 __all__ = [
     "run_command",
     "run_cmd_output",
+    "run_cmd_list",
     "check_command",
     "run_linux_cmd",
     "popen_run_cmd",
@@ -318,6 +319,45 @@ def real_time_output(command, output=True, timeout=None) -> bool:
             return False
         _raise_reader_error(reader_errors)
     return process.returncode == 0
+
+
+def run_cmd_list(cmd_list, cwd=None, timeout=None) -> tuple:
+    """Run a command from an argument list, without any shell interpolation.
+
+    The string-command helpers above pass their cmd through ``bash -c``, so
+    injection safety depends on every caller quoting its own fragments. A
+    caller holding attacker-influenced fragments (a file name from disk, a
+    pid) should come here instead: the list form keeps each argument intact
+    no matter which characters it contains.
+
+    The optional timeout matches the contract of the other runners: on
+    expiry the whole process group is killed and (False, "") is returned,
+    so a hung lsof scanning a stuck mount cannot wedge the caller.
+    """
+    try:
+        ret = _run_timed(
+            cmd_list,
+            timeout=timeout,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            env=os.environ,
+        )
+    except subprocess.TimeoutExpired:
+        _log_timeout(cmd_list, timeout)
+        return False, ""
+    except (OSError, ValueError) as error:
+        log_debug("Run command: {0} failed, {1}".format(cmd_list, error))
+        return False, ""
+    if ret.returncode == 0:
+        return True, ret.stdout
+    log_debug(
+        "Run command: {0} failed, ret_code={1}, ret_err={2}".format(
+            cmd_list, ret.returncode, ret.stderr
+        )
+    )
+    return False, ret.stderr
 
 
 def popen_run_cmd(command, timeout=None):

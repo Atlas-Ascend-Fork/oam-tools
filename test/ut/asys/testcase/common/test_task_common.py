@@ -82,7 +82,7 @@ class TestTaskCommon(AssertTest):
     @pytest.mark.skipif(os.name != "posix", reason="timeout worker uses fork")
     def test_timeout_worker_success_returns_none(self, tmp_path):
         # The callable runs in a child process, so it reports through the
-        # filesystem rather than through memory.
+        # filesystem rather than through the queue (its return value is None).
         marker = tmp_path / "ran"
 
         @timeout_decorator(5)
@@ -91,6 +91,27 @@ class TestTaskCommon(AssertTest):
 
         assert okay() is None
         assert marker.exists()
+
+    @pytest.mark.skipif(os.name != "posix", reason="timeout worker uses fork")
+    def test_timeout_worker_returns_the_child_value(self):
+        # The queue carries the return value back; joining before draining
+        # deadlocked on payloads over the 64 KiB pipe buffer (the child's
+        # feeder thread blocks on put until the parent consumes).
+        payload = "x" * (2 * 1024 * 1024)
+
+        @timeout_decorator(5)
+        def big():
+            return payload
+
+        assert big() == payload
+
+    @pytest.mark.skipif(os.name != "posix", reason="timeout worker uses fork")
+    def test_timeout_worker_small_payload_round_trip(self):
+        @timeout_decorator(5)
+        def small():
+            return {"status": "ok", "count": 3}
+
+        assert small() == {"status": "ok", "count": 3}
 
     @pytest.mark.skipif(os.name != "posix", reason="timeout worker uses fork")
     def test_timeout_worker_still_reports_a_timeout(self):

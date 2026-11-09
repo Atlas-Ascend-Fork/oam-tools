@@ -37,6 +37,7 @@ from common import (
     popen_run_cmd,
     real_time_output,
     run_command,
+    run_cmd_list,
     run_cmd_output,
     run_linux_cmd,
 )
@@ -184,6 +185,14 @@ class TestCmdRunTimeout(AssertTest):
 
     def test_popen_run_cmd_timeout_returns_empty(self):
         self.assertTrue(popen_run_cmd(self.SLEEP, timeout=0.2) == "")
+
+    def test_run_cmd_list_timeout_returns_failure_pair(self):
+        # run_cmd_list is the shell-free runner; its timeout contract matches
+        # the other runners: process group killed, (False, "") returned.
+        self.assertTrue(run_cmd_list(["sleep", "30"], timeout=0.2) == (False, ""))
+
+    def test_run_cmd_list_round_trip(self):
+        self.assertTrue(run_cmd_list(["echo", "list-ok"]) == (True, "list-ok\n"))
 
     def test_real_time_output_timeout_returns_false(self):
         self.assertTrue(

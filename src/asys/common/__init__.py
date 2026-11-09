@@ -23,6 +23,7 @@ from common.file_operate import FileOperate
 from common.cmd_run import (
     run_command,
     run_cmd_output,
+    run_cmd_list,
     run_linux_cmd,
     popen_run_cmd,
     real_time_output,
@@ -55,6 +56,7 @@ __all__ = [
     "FileOperate",
     "run_command",
     "run_cmd_output",
+    "run_cmd_list",
     "run_linux_cmd",
     "popen_run_cmd",
     "real_time_output",

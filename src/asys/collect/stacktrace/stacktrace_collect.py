@@ -20,7 +20,13 @@ import os
 import re
 import time
 
-from common import log_error, popen_run_cmd, log_warning, log_info
+from common import (
+    log_error,
+    popen_run_cmd,
+    log_warning,
+    log_info,
+    run_cmd_list,
+)
 from common import FileOperate as f
 from common.file_operate import COPY_MODE
 from common.const import (
@@ -34,6 +40,9 @@ from collect.stacktrace import AscendTraceDll
 from drv import EnvVarName
 
 EVERY_ROUND_TIME = 0.5
+# lsof scans /proc/*/fd: a stuck mount (NFS/FUSE) or a D-state process can
+# block it indefinitely, so each probe gets its own wall-clock budget.
+LSOF_TIMEOUT = 5
 
 
 class AsysStackTrace(AscendTraceDll):
@@ -103,6 +112,18 @@ class AsysStackTrace(AscendTraceDll):
         return
 
     def _get_bin_file_path(self, all_exists_bin):
+        for bin_file_path in self._iter_bin_files():
+            if bin_file_path in all_exists_bin:
+                continue
+            return bin_file_path
+
+    def _iter_bin_files(self):
+        """Yield the stackcore .bin files of the remote pid below the work path.
+
+        The names come straight from disk, where anyone able to write the
+        atrace directory could have planted shell syntax, so the enumeration
+        must stay pure Python instead of an ``ls | awk`` piped into a shell.
+        """
         for path, _, files in os.walk(os.path.abspath(self.trace_work_path)):
             for file in files:
                 if not (
@@ -110,27 +131,24 @@ class AsysStackTrace(AscendTraceDll):
                     and file.endswith(".bin")
                 ):
                     continue
-                bin_file_path = os.path.join(path, file)
-                if bin_file_path in all_exists_bin:
-                    continue
-                return bin_file_path
+                yield os.path.join(path, file)
 
     def _get_exists_bin_file_num(self):
-        cmd = (
-            f"ls -lt {os.path.abspath(self.trace_work_path)}/trace_*/stackcore_event_{self.remote_id}_*/"
-            f"stackcore_tracer_35_{self.remote_id}_*.bin | wc -l"
-        )
-        ret = popen_run_cmd(cmd).replace("\n", "")
-        if not ret.isdigit():
-            return 0
-        return int(ret)
+        return sum(1 for _ in self._iter_bin_files())
 
     def _get_last_bin_file_name(self):
-        cmd = (
-            f"ls -lt {os.path.abspath(self.trace_work_path)}/trace_*/stackcore_event_{self.remote_id}_*/"
-            f"stackcore_tracer_35_{self.remote_id}_*.bin | head -n 1 | awk '{{print $9}}'"
-        )
-        return popen_run_cmd(cmd).replace("\n", "")
+        newest_file = None
+        newest_mtime = None
+        for bin_file_path in self._iter_bin_files():
+            try:
+                mtime = os.path.getmtime(bin_file_path)
+            except OSError:
+                # The file vanished between the walk and the stat; a removed
+                # candidate must not crash the wait loop.
+                continue
+            if newest_mtime is None or mtime > newest_mtime:
+                newest_file, newest_mtime = bin_file_path, mtime
+        return newest_file
 
     def _wait_bin_file_generate(self, exists_bin_file_num):
         bin_file_name = None
@@ -142,10 +160,21 @@ class AsysStackTrace(AscendTraceDll):
                     continue
                 if current_bin_file_num > exists_bin_file_num:
                     bin_file_name = self._get_last_bin_file_name()
+                    if not bin_file_name:
+                        time.sleep(EVERY_ROUND_TIME)
+                        continue
                     log_info("bin file generated, awaiting stack trace completion.")
                     continue
+                # Fewer files than the baseline (cleanup/rotation beat the
+                # signal): keep polling, never lsof the stale/missing name.
+                time.sleep(EVERY_ROUND_TIME)
+                continue
 
-            if popen_run_cmd(f"lsof {bin_file_name}"):
+            # The file name comes straight from disk, so it goes to lsof as
+            # an argument list — no shell interpolation path to escape. The
+            # bounded timeout keeps one hung lsof (stuck mount, D-state
+            # process) from wedging the whole wait loop.
+            if run_cmd_list(["lsof", bin_file_name], timeout=LSOF_TIMEOUT)[0]:
                 time.sleep(EVERY_ROUND_TIME)
                 continue
             return bin_file_name
@@ -192,6 +221,28 @@ class AsysStackTrace(AscendTraceDll):
             log_error("The remote parameter must be set to the PID of the process.")
             return False
         return True
+
+    def _check_remote_id_alive(self):
+        """Re-check the pid right before the signal leaves.
+
+        Between the interactive Y/N and here the validated pid may have
+        exited and been reused; sigqueue would then deliver the fatal
+        signal 35 to an unrelated process. /proc/<pid>/stat carries the
+        process start time (field 22), which stays stable for the life of
+        the process, so a reused pid is caught by comparing it.
+        """
+        try:
+            with open(f"/proc/{self.remote_id}/stat", "r", encoding="utf-8") as stat_f:
+                stat_info = stat_f.read()
+            # The comm field can contain spaces and parentheses, so the
+            # fields after it are counted from the last ')'.
+            start_time = stat_info[stat_info.rfind(")") + 1 :].split()[19]
+        except (OSError, IndexError, UnicodeDecodeError):
+            log_error(
+                f"The process {self.remote_id} exited before the signal was sent."
+            )
+            return None
+        return start_time
 
     def _get_all_tid_of_process(self, current_pid):
         cmd = (
@@ -276,6 +327,9 @@ class AsysStackTrace(AscendTraceDll):
 
         if not self._check_remote_id_validity():
             return False
+        start_time = self._check_remote_id_alive()
+        if start_time is None:
+            return False
         log_warning(
             f"This command sends signal 35 to the process:{self.remote_id}. "
             "If the process is executed to disable signal receiving through the environment variable "
@@ -293,6 +347,18 @@ class AsysStackTrace(AscendTraceDll):
             return False
 
         exists_bin_num = self._get_exists_bin_file_num()
+
+        # The interactive pause and the checks above widen the TOCTOU window:
+        # validate the pid one last time (still alive and the same process,
+        # i.e. not recycled) immediately before signal 35 leaves, since it is
+        # fatal to any process without a registered handler.
+        current_start_time = self._check_remote_id_alive()
+        if current_start_time is None or current_start_time != start_time:
+            log_error(
+                f"The process {self.remote_id} exited before the signal was sent."
+            )
+            return False
+
         signal_ret = self.send_signal_to_pid(self.is_all_task, self.remote_id)
         if not signal_ret:
             return False

@@ -97,9 +97,6 @@ def trace_show_mode(mode, value):
 class ParseTrace:
     def __init__(self, is_file=False):
         self.is_file = is_file
-        self.real_time = 0
-        self.tz_offset = 0
-        self.cpu_freq = 0
 
     def error(self, msg):
         if self.is_file:
@@ -190,12 +187,13 @@ class ParseTrace:
         )
 
         # Obtains the realTime and minutestWest information.
-        self.tz_offset = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT32)
-        self.real_time = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
+        tz_offset = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT32)
+        real_time = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
         if str(version) == "3":
-            self.cpu_freq = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
+            cpu_freq = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
             self.get_res_data(fp, 8)
         else:
+            cpu_freq = 0
             # reserve 16byte
             self.get_res_data(fp, 16)
         # record current location
@@ -212,6 +210,7 @@ class ParseTrace:
             self.warning(
                 f"The {trace_file_name} data is incomplete, which may cause data loss."
             )
+        return tz_offset, real_time, cpu_freq
 
     def parse_struct_segment(self, fp):
         """
@@ -280,13 +279,13 @@ class ParseTrace:
         """
         This is a data parsing function that returns the parsed txt string.
         """
-        self.parse_ctrl_head(fp, trace_file)
+        tz_offset, real_time, cpu_freq = self.parse_ctrl_head(fp, trace_file)
         struct_dict = self.parse_struct_segment(fp)
         if not struct_dict:
             raise ValueError(
                 "Failed to parse the data, check whether the file is complete."
             )
-        offset_time_ns = self.time_zone_calculation(self.tz_offset)
+        offset_time_ns = self.time_zone_calculation(tz_offset)
         _, msg_txt_size, msg_num, _ = self.get_struct_data(
             fp, 4, TRACE_STRUCT_FIELD_TYPE_UINT32
         )
@@ -301,18 +300,14 @@ class ParseTrace:
             if busy:
                 self.get_res_data(fp, msg_txt_size)
                 continue
-            if self.cpu_freq != 0:
+            if cpu_freq != 0:
                 time_str = datetime.fromtimestamp(
-                    (
-                        self.real_time
-                        + (cycle / self.cpu_freq) * FREQ_GHZ_TO_KHZ
-                        + offset_time_ns
-                    )
+                    (real_time + (cycle / cpu_freq) * FREQ_GHZ_TO_KHZ + offset_time_ns)
                     / NS_TO_S
                 )
             else:
                 time_str = datetime.fromtimestamp(
-                    (self.real_time + cycle + offset_time_ns) / NS_TO_S
+                    (real_time + cycle + offset_time_ns) / NS_TO_S
                 )
             time_str = time_str.strftime("%Y-%m-%d %H:%M:%S.%f")
             # data

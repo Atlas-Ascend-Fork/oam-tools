@@ -311,8 +311,7 @@ class TestAsysConfig(AssertTest):
         ParamDict().set_args(args)
         self.assertTrue(AsysConfig().run() is False)
         self.assertTrue(
-            "The config --restore command must be executed as the root user."
-            in caplog.text
+            "The config command must be executed as the root user." in caplog.text
         )
 
     def test_asys_config_chip_error(self, mocker, caplog):

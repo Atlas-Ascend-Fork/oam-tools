@@ -307,7 +307,7 @@ class TestAnalyze(AssertTest):
         atrace_file = os.path.join(test_case_tmp, "test.bin")
         with open(atrace_file, "wb") as fp:
             fp.write("1".encode())
-        mocker.patch.object(ParseTrace, "parse_ctrl_head")
+        mocker.patch.object(ParseTrace, "parse_ctrl_head", return_value=(0, 0, 0))
         mocker.patch.object(ParseTrace, "parse_struct_segment", return_value={})
         sys.argv = [
             CONF_SRC_PATH,

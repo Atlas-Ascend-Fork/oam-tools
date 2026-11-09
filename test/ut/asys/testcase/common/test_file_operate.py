@@ -138,6 +138,33 @@ class TestFileOperate(AssertTest):
         mocker.patch("shutil.copytree")
         self.assertTrue(f.copy_dir("./test_src", "./test_dst"))
 
+    def test_copy_dir_into_existing_target_keeps_going(self, tmp_path, mocker):
+        # The asys output tree is created before collect runs, so copy_dir
+        # regularly meets an existing target; copytree without dirs_exist_ok
+        # raised FileExistsError and crashed the whole collection.
+        source = tmp_path / "src"
+        target = tmp_path / "dst"
+        source.mkdir()
+        target.mkdir()
+        (source / "a.txt").write_text("a", encoding="utf-8")
+
+        self.assertTrue(f.copy_dir(str(source), str(target)))
+        self.assertTrue((target / "a.txt").read_text(encoding="utf-8") == "a")
+
+    def test_copy_dir_copytree_oserror_returns_false(self, tmp_path, mocker, caplog):
+        # A read failure under the source tree surfaces as OSError from
+        # copytree; copy_dir must report False instead of propagating it.
+        source = tmp_path / "src"
+        target = tmp_path / "dst"
+        source.mkdir()
+        mocker.patch(
+            "shutil.copytree",
+            side_effect=PermissionError(13, "Permission denied"),
+        )
+
+        self.assertTrue(not f.copy_dir(str(source), str(target)))
+        self.assertTrue("Permission denied" in caplog.text)
+
     def test_copy_dir_failed(self, mocker):
         mocker.patch("shutil.copytree")
         mocker.patch("os.path.exists", return_value=False)

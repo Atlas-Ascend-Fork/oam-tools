@@ -682,6 +682,10 @@ class TestCollect(AssertTest):
             return_value=True,
         )
         mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
+        mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._wait_bin_file_generate",
             return_value=".",
         )
@@ -706,6 +710,10 @@ class TestCollect(AssertTest):
             return_value=AsysTrace(),
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
         sys.argv = [CONF_SRC_PATH, "collect", "-r=stacktrace", "--all"]
@@ -746,6 +754,10 @@ class TestCollect(AssertTest):
             return_value=["123456", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
         sys.argv = [
@@ -773,6 +785,10 @@ class TestCollect(AssertTest):
             return_value=["12345", "34567"],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
         sys.argv = [
@@ -804,6 +820,10 @@ class TestCollect(AssertTest):
             return_value=["34567"],
         )
         mocker.patch("os.kill", return_value=True)
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
         sys.argv = [
@@ -863,6 +883,10 @@ class TestCollect(AssertTest):
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_validity",
             return_value=True,
         )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
@@ -896,6 +920,10 @@ class TestCollect(AssertTest):
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_validity",
             return_value=True,
         )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
         os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/ascend/"
@@ -911,18 +939,33 @@ class TestCollect(AssertTest):
         self.assertTrue("Send signal failed." in caplog.text)
 
     def test_collect_stacktrace_bin_file_timeout(self, mocker, caplog):
+        # The timeout scenario is "signal sent but no new bin file appears":
+        # the sigqueue stub must succeed WITHOUT creating a file, so the
+        # baseline count never grows and _wait_bin_file_generate times out.
+        # (The old ls glob never matched this layout, so count was 0 either
+        # way; the pure-Python enumeration now really counts the files.)
+        class AsysTraceNoFile:
+            def sigqueue(self, *_args):
+                return 0
+
+            def AtraceStackcoreParse(self, *_args):
+                return 0
+
         mocker.patch(
             "collect.stacktrace.interface.LoadSoType.get_ascend_trace",
-            return_value=AsysTrace(),
+            return_value=AsysTraceNoFile(),
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_validity",
             return_value=True,
         )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
         mocker.patch("os.kill", return_value=True)
         mocker.patch("time.sleep", return_value=True)
         mocker.patch("collect.stacktrace.stacktrace_collect.input", return_value="y")
-        os.environ["ASCEND_WORK_PATH"] = st_root_path + "/data/asys_test_dir/"
         sys.argv = [
             CONF_SRC_PATH,
             "collect",
@@ -1044,6 +1087,10 @@ class TestCollect(AssertTest):
             return_value=True,
         )
         mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
+        )
+        mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._wait_bin_file_generate",
             return_value=".",
         )
@@ -1083,6 +1130,10 @@ class TestCollect(AssertTest):
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_validity",
             return_value=True,
+        )
+        mocker.patch(
+            "collect.stacktrace.stacktrace_collect.AsysStackTrace._check_remote_id_alive",
+            return_value="12345",
         )
         mocker.patch(
             "collect.stacktrace.stacktrace_collect.AsysStackTrace._wait_bin_file_generate",

@@ -27,15 +27,29 @@ __all__ = ["get_project_conf", "get_ascend_home", "get_log_conf_path"]
 
 
 def get_project_conf():
-    project_conf_path = os.path.join(os.path.dirname(sys.argv[0]), "conf")
-    project_path = os.path.abspath(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    )
-    if not os.path.exists(project_conf_path):
-        project_conf_path = os.path.join(project_path, "conf")
-    if not os.path.exists(project_conf_path):
-        project_conf_path = os.path.join(project_path, "asys/conf")
-    return project_conf_path
+    candidate_paths = [
+        os.path.join(os.path.dirname(sys.argv[0]), "conf"),
+        # project_path when running from the installed layout ...
+        os.path.join(
+            os.path.abspath(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            ),
+            "conf",
+        ),
+        # ... and src/asys/conf when running from the source tree.
+        os.path.join(
+            os.path.abspath(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            ),
+            "asys/conf",
+        ),
+    ]
+    for project_conf_path in candidate_paths:
+        if os.path.exists(project_conf_path):
+            return project_conf_path
+    # All candidates missing: keep the historical return value (the last
+    # candidate) so the callers' "read failed" path reports a concrete path.
+    return candidate_paths[-1]
 
 
 def get_ascend_home():

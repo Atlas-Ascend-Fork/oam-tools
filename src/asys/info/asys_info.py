@@ -17,6 +17,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import csv
 import re
 import sys
 
@@ -186,9 +187,15 @@ class AsysInfo:
     @staticmethod
     def __software_set_dep(table_data):
         dependent_packet = []
-        dep_info = f.read_file(
-            os.path.join(get_project_conf(), "dependent_package.csv")
-        )
+        try:
+            dep_info = f.read_file(
+                os.path.join(get_project_conf(), "dependent_package.csv")
+            )
+        except (OSError, csv.Error, IndexError, UnicodeDecodeError) as e:
+            # Same tolerance as read_config: one unreadable csv must not
+            # take the software report and the collect chain down.
+            log_error(f"Read the dependent_package.csv failed, {e}.")
+            return
         for item in dep_info:
             # Same predicate as ParamDict.set_deps, so both readers of
             # dependent_package.csv agree on what a usable row is.

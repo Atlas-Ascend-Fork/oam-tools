@@ -19,6 +19,25 @@
 from threading import Thread
 from common.device import DeviceInfo
 import common.interface as interface
+from common.const import ScreenResult
+
+
+def _safe_target_func(target_func, device_id, device_obj, ret, fallback_value):
+    """Run one detection, keeping the WARN contract even on an inner crash.
+
+    A thread that dies (e.g. on a read of ParamDict or an ecc page query
+    outside the try blocks) leaves its key missing from ret, and the merge
+    below used to index that key directly, crashing the whole diagnosis.
+    The fallback keeps the result shape the reporting stage expects for the
+    run mode: hbm_detect reports [result, ecc_count], other modes a scalar.
+    """
+    try:
+        target_func(device_id, device_obj, ret)
+    except Exception as e:  # noqa: BLE001  # a diagnose thread must never take the CLI down
+        interface.log_error(
+            f"Detect device {device_id} failed with {type(e).__name__}: {e}"
+        )
+        ret[device_id] = fallback_value
 
 
 class Ascend91093Handler(DeviceInfo):
@@ -42,8 +61,10 @@ class Ascend91093Handler(DeviceInfo):
         )
         if run_mode == "hbm_detect":
             _target_func = interface.run_hbm
+            _fallback_value = [ScreenResult.WARN.value, "0"]
         elif run_mode == "cpu_detect":
             _target_func = interface.run_cpu
+            _fallback_value = ScreenResult.WARN.value
         else:
             return interface.run_diagnose(device_obj, diagnose_devices, run_mode)
 
@@ -60,7 +81,9 @@ class Ascend91093Handler(DeviceInfo):
                 # own and report its own result, instead of silently reusing
                 # the result of an unrelated device.
                 t = Thread(
-                    target=_target_func, args=(device_id, device_obj, ret), daemon=True
+                    target=_safe_target_func,
+                    args=(_target_func, device_id, device_obj, ret, _fallback_value),
+                    daemon=True,
                 )
                 t.start()
                 threads.append(t)
@@ -69,7 +92,9 @@ class Ascend91093Handler(DeviceInfo):
             if master_id not in master_ids:
                 # new thread
                 t = Thread(
-                    target=_target_func, args=(device_id, device_obj, ret), daemon=True
+                    target=_safe_target_func,
+                    args=(_target_func, device_id, device_obj, ret, _fallback_value),
+                    daemon=True,
                 )
                 t.start()
                 threads.append(t)
@@ -82,6 +107,10 @@ class Ascend91093Handler(DeviceInfo):
 
         ret_logic_id = {}
         for device_id in diagnose_devices:
-            ret_logic_id[device_id] = ret[detected_by[device_id]]
+            # A detection thread that failed to write any result (the crash
+            # is logged by _safe_target_func) must not take the whole
+            # diagnosis down; report WARN with the mode's result shape for
+            # the affected device instead.
+            ret_logic_id[device_id] = ret.get(detected_by[device_id], _fallback_value)
 
         return ret_logic_id

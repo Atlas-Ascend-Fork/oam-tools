@@ -225,7 +225,16 @@ class FileOperate:
         if real_target.startswith(real_source + os.path.sep):
             log_error("The output directory cannot be in the data directory.")
             return False
-        shutil.copytree(source_dir_path, target_dir_path)
+        try:
+            # The caller creates the timestamped output dir first, so the
+            # target usually exists; re-copying into it must not crash the
+            # whole collection with FileExistsError.
+            shutil.copytree(source_dir_path, target_dir_path, dirs_exist_ok=True)
+        except OSError as e:
+            log_error(
+                f"Copy directory {source_dir_path} to {target_dir_path} failed, {e}"
+            )
+            return False
         return True
 
     @staticmethod
