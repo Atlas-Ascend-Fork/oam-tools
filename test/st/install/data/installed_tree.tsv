@@ -267,6 +267,9 @@ f	0750	0755		tools/ascend_system_advisor/asys/collect/trace/__init__.py
 f	0750	0755		tools/ascend_system_advisor/asys/collect/trace/trace_collect.py
 d	0750	0755		tools/ascend_system_advisor/asys/common
 f	0750	0755		tools/ascend_system_advisor/asys/common/__init__.py
+d	0750	0755		tools/ascend_system_advisor/asys/common/ascend350
+f	0640	0644		tools/ascend_system_advisor/asys/common/ascend350/ascend350.cmake
+f	0750	0755		tools/ascend_system_advisor/asys/common/ascend350/ascend350_handler.py
 d	0750	0755		tools/ascend_system_advisor/asys/common/ascend910B
 f	0640	0644		tools/ascend_system_advisor/asys/common/ascend910B/ascend910B.cmake
 f	0750	0755		tools/ascend_system_advisor/asys/common/ascend910B/ascend910B_handler.py

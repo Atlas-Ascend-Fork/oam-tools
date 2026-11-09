@@ -348,7 +348,7 @@ class Command(enum.Enum):
         KEY_ARGS: [Arg.DIS_RUN, Arg.DEVICE, Arg.TIMEOUT, Arg.OUTPUT],
         KEY_HELP: "Diagnoses the hardware status of the device. It has diagnostic capabilities for "
         "component, stress_detect, hbm_detect, cpu_detect and aicore_stl_detect. "
-        "The detect diagnostic only supports Ascend series chips: 910B, 910_93, 950, 960. ",
+        "The detect diagnostic only supports Ascend series chips: 910B, 910_93, 950, 960, 350. ",
     }
     HEALTH = {
         KEY_NAME: "health",

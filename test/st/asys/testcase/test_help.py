@@ -169,7 +169,7 @@ position
                         diagnostic capabilities for component, stress_detect,
                         hbm_detect, cpu_detect and aicore_stl_detect. The detect
                         diagnostic only supports Ascend series chips: 910B,
-                        910_93, 950, 960.
+                        910_93, 950, 960, 350.
     health              Diagnoses the health status of the device.
     info                Collects the software and hardware information of the
                         host and device.
