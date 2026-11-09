@@ -18,6 +18,14 @@ mkdir -p ~/.codex/skills
 cp -a oam-tools/skills/cann-perf-breakdown ~/.codex/skills/
 ```
 
+Python 依赖一项（第 1 阶段 `1-perf-breakdown` 的 runtime YAML 解析需要）：
+
+```bash
+pip3 install "PyYAML>=5.4"
+```
+
+运行前的依赖探测与缺依赖时的处置见 `1-perf-breakdown/SKILL.md` 的「环境前置检查」节（依赖只在阶段 1）。
+
 调用：`使用 $cann-perf-breakdown 工作流，输入目录为 <采集目录>，输出目录为 <输出目录>。`
 
 ## 快速入口

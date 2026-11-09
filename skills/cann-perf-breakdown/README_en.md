@@ -18,6 +18,14 @@ mkdir -p ~/.codex/skills
 cp -a oam-tools/skills/cann-perf-breakdown ~/.codex/skills/
 ```
 
+One Python dependency (stage 1 `1-perf-breakdown` needs it for runtime YAML parsing):
+
+```bash
+pip3 install "PyYAML>=5.4"
+```
+
+For the dependency probe and missing-dependency handling at run time, see the "Environment Pre-check" section of `1-perf-breakdown/SKILL.md` (the dependency belongs to stage 1 only).
+
 Invoke: `Use the $cann-perf-breakdown workflow with <capture-directory> as the input directory and <output-directory> as the output directory.`
 
 ## Quick start

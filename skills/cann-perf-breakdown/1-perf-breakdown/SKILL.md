@@ -25,6 +25,16 @@ description: |
 
 ---
 
+## 环境前置检查（每次会话首次使用本 Skill 时，先于一切 Mode 判定）
+
+```bash
+python3 -c "import yaml" || pip3 install "PyYAML>=5.4"
+```
+
+- 依赖只有 PyYAML 这一项，供本阶段（1-perf-breakdown）的 runtime YAML 解析（`extract_model_manifest.py` / `detect_trace_scope.py`）使用；其余脚本只依赖标准库。
+- 探测失败（返回非 0 且报 `No module named 'yaml'`）时：先自行安装；无外网或安装失败时，**停止一切 runtime YAML 相关步骤**（checkpoint 判定、trace scope），向用户转述安装命令并说明「`--checkpoint-config` 可绕过 runtime YAML」，不得继续对 runtime YAML 做任何文本扫描式替代。
+- 此检查失败不影响 Mode 判定与不读 YAML 的脚本；但 runtime YAML 相关步骤在依赖就绪前不可执行。
+
 ## 入口分派（Mode 判定）
 
 启动时检查工作目录，按以下优先级判定模式：

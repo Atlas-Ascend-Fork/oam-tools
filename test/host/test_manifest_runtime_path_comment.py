@@ -69,7 +69,6 @@ RUNTIME_CASES = [
     pytest.param("weights", '"{w}" # selected checkpoint', id="double_quoted_comment"),
     pytest.param("weights", "'{w}' # selected", id="single_quoted_comment"),
     pytest.param("weights", "{w} # selected", id="plain_scalar_comment"),
-    pytest.param("weights", '"{w}"\t# tab separated', id="tab_before_comment"),
     pytest.param("weights", '"{w}" # a # b', id="comment_containing_hash"),
     pytest.param("weights", '"{w}" # say "hi"', id="comment_containing_quotes"),
     # A '#' inside quotes is content, never a comment.
@@ -146,6 +145,20 @@ def test_comment_never_changes_which_checkpoint_is_read(
     assert report["declared_model_path"] == weights.as_posix()
 
 
+def test_a_tab_separated_comment_is_refused_like_pyyaml(bundle, tmp_path):
+    """A tab before an inline comment is PyYAML's ScannerError, now surfaced as such.
+
+    The hand-built reader accepted this shape as a frozen deviation ("inert tabs");
+    PyYAML refuses it, and PyYAML's verdict is the specification after the switch.
+    An explicitly named runtime config turns the refusal into rc=2 so the user sees
+    it instead of a silently wrong manifest.
+    """
+    model, weights, runtime = bundle(value='"{w}"\t# tab separated')
+    proc, _report = _run(tmp_path, model, runtime)
+    assert proc.returncode == 2
+    assert "cannot start any token" in proc.stderr
+
+
 def test_missing_checkpoint_reports_the_clean_path_not_the_comment(bundle, tmp_path):
     """A genuinely absent checkpoint still falls back, but the gap must be diagnosable.
 
@@ -208,36 +221,3 @@ def test_nested_declaration_under_a_mapping_key(bundle, tmp_path):
     assert proc.returncode == 0, proc.stderr
     assert report["num_main_layers"] == 14
     assert report["declared_model_path"] == weights.as_posix()
-
-
-@pytest.mark.parametrize(
-    "raw,expected",
-    [
-        pytest.param('"/ckpt"', '"/ckpt"', id="no_comment"),
-        pytest.param('"/ckpt" # selected', '"/ckpt"', id="double_quoted"),
-        pytest.param("'/ckpt' # selected", "'/ckpt'", id="single_quoted"),
-        pytest.param("/ckpt # selected", "/ckpt", id="plain_scalar"),
-        pytest.param("/ckpt\t# selected", "/ckpt", id="tab_separated"),
-        pytest.param('"/ckpt" # a # b', '"/ckpt"', id="only_first_hash_opens"),
-        pytest.param("/ckpt#v2", "/ckpt#v2", id="hash_needs_leading_space"),
-        pytest.param('"/ckpt#v2"', '"/ckpt#v2"', id="hash_inside_quotes"),
-        pytest.param('"/ckpt dir"', '"/ckpt dir"', id="space_inside_quotes"),
-        pytest.param("# only a comment", "", id="value_is_entirely_a_comment"),
-        pytest.param("   ", "", id="blank"),
-        pytest.param('"/ckpt"   ', '"/ckpt"', id="trailing_spaces"),
-        # Invalid YAML: the helper must not invent a path, the caller trims as before.
-        pytest.param('"/ckpt', '"/ckpt', id="unterminated_double_quote"),
-        pytest.param(
-            '"/ckpt # still open', '"/ckpt # still open', id="unterminated_with_hash"
-        ),
-        pytest.param("'it''s /ckpt' # x", "'it''s /ckpt'", id="doubled_single_quote"),
-    ],
-)
-def test_strip_inline_comment_boundaries(raw, expected):
-    """Unit-level table for the helper: comments out, quoted content kept verbatim."""
-    sys.path.insert(0, str(SCRIPT.parent))
-    try:
-        import extract_model_manifest
-    finally:
-        sys.path.pop(0)
-    assert extract_model_manifest.strip_inline_comment(raw) == expected

@@ -44,6 +44,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import adapters  # noqa: E402
 from adapters.base import (find_config_class, extract_init_defaults, scan_evidence,  # noqa: E402
                            UNKNOWN)
+import breakdown_common as bc  # noqa: E402
+
+
+#: Directories that never hold a capture's own provenance. A stale YAML under `.git/` or a
+#: test fixture is not a declaration about the run being analysed, so it must not be able to
+#: nominate a checkpoint.
+_PROVENANCE_SKIP_DIRS = frozenset({
+    '.git', '__pycache__', 'node_modules', '.pytest_cache', 'tests', 'fixtures'})
 
 
 def read(path):
@@ -61,45 +69,6 @@ def _sha256_file(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def strip_inline_comment(raw):
-    """Drop a YAML inline comment from a scalar value, honouring quotes.
-
-    ``model_path: "/ckpt" # selected`` is a path followed by a comment, not a path that
-    contains one. The previous ``strip('"\\'')`` only trimmed quote characters off both
-    ends, so a trailing comment blocked the tail strip while the leading quote was still
-    removed, leaving ``/ckpt" # selected`` -- a directory that cannot exist. The
-    checkpoint was then silently missed and the layer count fell back to the source
-    default (issue #310).
-
-    Inside quotes both ``#`` and spaces are content; in a plain scalar ``#`` opens a
-    comment only after whitespace, so ``/ckpt#v2`` and ``/ckpt dir`` stay intact.
-    """
-    text = raw.strip()
-    quote = text[:1]
-    if quote in ('"', "'"):
-        index = 1
-        while index < len(text):
-            char = text[index]
-            if char == '\\' and quote == '"':
-                index += 2
-                continue
-            if char == quote:
-                # A doubled single quote is an escaped quote, not the terminator.
-                if quote == "'" and text[index + 1:index + 2] == "'":
-                    index += 2
-                    continue
-                return text[:index + 1]
-            index += 1
-        # Unterminated quote is not valid YAML: hand the text back untouched and let the
-        # caller's existing quote trim decide, instead of guessing where the path ends.
-        return text
-    for index, char in enumerate(text):
-        if char == '#' and (index == 0 or text[index - 1] in ' \t'):
-            # The whitespace that opens the comment is a separator, not part of the path.
-            return text[:index].rstrip()
-    return text
 
 
 def _validate_checkpoint_numeric_types(adapter, values, path):
@@ -121,7 +90,8 @@ def _validate_checkpoint_numeric_types(adapter, values, path):
                 f'got {type(value).__name__}: {path}')
 
 
-def find_weights_config(model_dir, runtime_config=None, checkpoint_config=None):
+def find_weights_config(model_dir, runtime_config=None, checkpoint_config=None,
+                        notices=None):
     """Resolve the checkpoint config.json a runtime YAML points at.
 
     Python default args describe the family, not the deployed checkpoint: LongCat's
@@ -129,6 +99,15 @@ def find_weights_config(model_dir, runtime_config=None, checkpoint_config=None):
     weights. The checkpoint config.json is the real source of truth, so when it is
     reachable it must win, and when it is not the caller has to know that the numbers
     came from a fallback.
+
+    The YAML is *parsed*, not text-scanned. A `model_path:` line inside a `description: |`
+    block scalar, inside a non-current `---` document, or shadowed by a later duplicate key
+    declares nothing; only real keys in the current document count.
+
+    ``notices`` receives one string per YAML that could not be parsed or that declared
+    something ambiguous; the caller turns them into evidence_gaps. A file the user named
+    explicitly is different: it raises, because silently dropping the one input the user
+    pointed at is how a wrong manifest ends up looking authoritative.
 
     Returns (config_json_path_or_None, declared_model_path_or_None).
     """
@@ -140,32 +119,46 @@ def find_weights_config(model_dir, runtime_config=None, checkpoint_config=None):
         return selected, os.path.dirname(selected)
     if not model_dir or not os.path.isdir(model_dir):
         return None, None
-    declared = None
-    if runtime_config:
+    explicit = bool(runtime_config)
+    if explicit:
         yaml_paths = [runtime_config] if os.path.isfile(runtime_config) else []
     else:
         yaml_paths = []
-        for root, _dirs, files in os.walk(model_dir):
+        for root, dirs, files in os.walk(model_dir):
+            # Never let a stale copy under .git/ or a test fixture nominate the checkpoint.
+            dirs[:] = [d for d in dirs if d not in _PROVENANCE_SKIP_DIRS]
             yaml_paths.extend(
                 os.path.join(root, fn) for fn in sorted(files)
                 if fn.endswith(('.yaml', '.yml')))
+    declared = []
     for yaml_path in yaml_paths:
-        for line in read(yaml_path).splitlines():
-                stripped = line.strip()
-                if not stripped.startswith('model_path:'):
-                    continue
-                value = strip_inline_comment(stripped.split(':', 1)[1]).strip('"\'')
-                if not value:
-                    continue
-                declared = declared or value
-                candidate = os.path.join(value, 'config.json')
-                if os.path.isfile(candidate):
-                    return candidate, value
+        origin = (os.path.relpath(yaml_path, model_dir)
+                  if not explicit else yaml_path)
+        try:
+            document = bc.load_yaml_subset_file(yaml_path)
+        except bc.YamlSubsetError as exc:
+            message = f'{origin}: runtime YAML 无法解析（{exc}）'
+            if explicit:
+                raise ValueError(message) from exc
+            if notices is not None:
+                notices.append(message + '；该文件中的 model_path 声明未被采信')
+            continue
+        for value in bc.collect_yaml_values(document, 'model_path'):
+            declared.append((origin, value))
+    resolved, chosen, conflict = bc.resolve_declared_paths(
+        declared, lambda value: os.path.isfile(os.path.join(value, 'config.json')))
+    if conflict:
+        if explicit and runtime_config:
+            raise ValueError(f'{runtime_config}: {conflict}')
+        if notices is not None:
+            notices.append(conflict)
+    if resolved:
+        return os.path.join(resolved, 'config.json'), resolved
     # A checkpoint vendored next to the source needs no YAML to be authoritative.
     local = os.path.join(model_dir, 'config.json')
     if os.path.isfile(local):
         return local, model_dir
-    return None, declared
+    return None, chosen
 
 
 def find_source_files(model_dir):
@@ -214,9 +207,10 @@ def build_manifest(config_path, modeling_path, model_name, base_dir, model_dir=N
     # The checkpoint config.json, when reachable, overrides Python defaults for every
     # key it declares. Merge before extraction so layer counts and MoE boundaries are
     # derived from the deployed values rather than the family defaults.
+    yaml_notices = []
     weights_config_path, declared_weights_path = find_weights_config(
         model_dir, runtime_config=runtime_config,
-        checkpoint_config=checkpoint_config)
+        checkpoint_config=checkpoint_config, notices=yaml_notices)
     weights_values = {}
     if weights_config_path:
         try:
@@ -238,6 +232,10 @@ def build_manifest(config_path, modeling_path, model_name, base_dir, model_dir=N
     facts, layer_groups, prediction_modules, num_main, gaps = adapter.extract(
         config_tree, modeling_tree, config_defaults, base_dir,
         config_path or 'unknown', modeling_path or 'unknown')
+    # A YAML that could not be read is missing evidence about the checkpoint, and must show
+    # up as a gap: an unparsed runtime config that silently contributed nothing is exactly
+    # how a source-default layer count gets reported as a proven one.
+    gaps.extend(yaml_notices)
 
     source_of_truth = []
     for p in (config_path, modeling_path):
@@ -335,10 +333,6 @@ def build_manifest(config_path, modeling_path, model_name, base_dir, model_dir=N
             f'部署时可能被覆盖。结论按 tier={provenance["tier"]} 标注，不据此判定拆解错误')
     return manifest
 
-
-#: Directories that never hold a capture's own provenance.
-_PROVENANCE_SKIP_DIRS = frozenset({
-    '.git', '__pycache__', 'node_modules', '.pytest_cache', 'tests', 'fixtures'})
 
 #: Files that record a config value printed by a real load, in preference order. A value
 #: transcribed from a run of `Config(**json.load(open('config.json')))` is checkpoint evidence
@@ -504,10 +498,16 @@ def main():
     model_name = args.model_name or (os.path.basename(os.path.normpath(args.model_dir))
                                      if args.model_dir else 'unknown')
 
-    manifest = build_manifest(config_path, modeling_path, model_name, base_dir,
-                              model_dir=args.model_dir, capture_dir=args.capture_dir,
-                              runtime_config=args.runtime_config,
-                              checkpoint_config=args.checkpoint_config)
+    try:
+        manifest = build_manifest(config_path, modeling_path, model_name, base_dir,
+                                  model_dir=args.model_dir, capture_dir=args.capture_dir,
+                                  runtime_config=args.runtime_config,
+                                  checkpoint_config=args.checkpoint_config)
+    except ValueError as exc:
+        # The file the user pointed at cannot be honoured. Falling back to whatever the
+        # walk happens to find would report a different checkpoint as if it were this one.
+        sys.stderr.write(f'错误: {exc}\n')
+        sys.exit(2)
 
     text = json.dumps(manifest, indent=2, ensure_ascii=False)
     if args.output:
