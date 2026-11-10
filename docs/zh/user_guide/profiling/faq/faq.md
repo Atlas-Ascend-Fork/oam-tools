@@ -24,7 +24,7 @@ msprof命令返回非0退出码，命令行提示应用退出、导出失败或�
 
 **故障原因**
 
-- 应用以非0退出，msprof会中止后续导出并返回非0退出码。
+- 应用以非0退出时，msprof会记录告警并继续执行导出和分析；应用自身退出码不直接决定msprof退出码。
 - 应用在msprof工具采集的同时调用aclprofInit或aclprofStart配置API采集，返回错误码100042，两种Profiling配置不能并存。
 - timeline或summary导出子进程以非0退出，msprof会返回非0退出码，不会把失败掩盖为成功。
 

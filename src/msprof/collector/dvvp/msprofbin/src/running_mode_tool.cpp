@@ -60,7 +60,7 @@ using namespace Collector::Dvvp::DynProf;
 
 bool IsAppProcessUsage(const std::string& processUsage) { return processUsage == "App" || processUsage == "app"; }
 
-bool IsSignalTerminationStatus(int32_t waitStatus) { return WIFSIGNALED(waitStatus); }
+bool IsSignalTerminationStatus(uint32_t waitStatus) { return WIFSIGNALED(waitStatus); }
 
 RunningMode::RunningMode(std::string preCheckParams, std::string modeName, SHARED_PTR_ALIA<ProfileParams> params)
     : isQuit_(false),
@@ -515,7 +515,6 @@ int32_t RunningMode::WaitRunningProcess(std::string processUsage)
     int32_t exitCode = 0;
     int32_t ret = PROFILING_SUCCESS;
     static const int32_t SLEEP_INTEVAL_US = 1000000;
-
     for (;;) {
         ret = analysis::dvvp::common::utils::Utils::WaitProcess(taskPid_, isExited, exitCode, false);
         if (ret != PROFILING_SUCCESS) {
@@ -525,29 +524,25 @@ int32_t RunningMode::WaitRunningProcess(std::string processUsage)
             return ret;
         }
         if (isExited) {
-            const int32_t waitStatus = exitCode;
+            const uint32_t waitStatus = static_cast<uint32_t>(exitCode);
             const bool terminatedBySignal = IsSignalTerminationStatus(waitStatus);
-            if (WIFEXITED(waitStatus)) {
-                exitCode = WEXITSTATUS(waitStatus);
-            } else if (terminatedBySignal) {
-                exitCode = WTERMSIG(waitStatus);
-            }
+            const int32_t realExitCode = terminatedBySignal ? WTERMSIG(waitStatus) : WEXITSTATUS(waitStatus);
             MSPROF_EVENT(
                 "%s process %d exited, wait status:%d, exit code:%d", processUsage.c_str(),
-                static_cast<int32_t>(taskPid_), waitStatus, exitCode);
+                static_cast<int32_t>(taskPid_), waitStatus, realExitCode);
             if (!isQuit_ && exitCode != 0) {
                 if (terminatedBySignal) {
                     MSPROF_LOGW(
                         "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
-                        exitCode);
+                        realExitCode);
                     CmdLog::CmdWarningLog(
                         "An exception has occurred in process %s, terminated by signal: %d.", processUsage.c_str(),
-                        exitCode);
+                        realExitCode);
                 } else {
                     MSPROF_LOGW(
-                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), realExitCode);
                     CmdLog::CmdWarningLog(
-                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), exitCode);
+                        "An exception has occurred in process %s, exit code: %d.", processUsage.c_str(), realExitCode);
                 }
                 if (IsAppProcessUsage(processUsage)) {
                     CmdLog::CmdWarningLog(
@@ -556,6 +551,8 @@ int32_t RunningMode::WaitRunningProcess(std::string processUsage)
                         "configuration can exist at a time. Check the application output and logs under "
                         "PROF_*/mindstudio_profiler_log/ for details.");
                 }
+            }
+            if (!isQuit_ && realExitCode != 0 && !IsAppProcessUsage(processUsage)) {
                 return PROFILING_FAILED;
             }
             return PROFILING_SUCCESS;

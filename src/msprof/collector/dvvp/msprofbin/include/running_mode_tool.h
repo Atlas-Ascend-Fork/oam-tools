@@ -26,7 +26,7 @@ namespace Dvvp {
 namespace Msprofbin {
 
 bool IsAppProcessUsage(const std::string& processUsage);
-bool IsSignalTerminationStatus(int32_t waitStatus);
+bool IsSignalTerminationStatus(uint32_t waitStatus);
 
 class RunningMode {
 public:

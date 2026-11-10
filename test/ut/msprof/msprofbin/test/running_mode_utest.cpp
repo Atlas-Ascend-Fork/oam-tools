@@ -438,6 +438,16 @@ static int _wait_process_exit_255(int, bool& isExited, int& exitCode, bool)
     return PROFILING_SUCCESS;
 }
 
+static AppMode* _app_mode_for_quit = nullptr;
+
+static int _wait_process_exit_1_when_quit(int, bool& isExited, int& exitCode, bool)
+{
+    isExited = true;
+    exitCode = 1 << 8;
+    _app_mode_for_quit->isQuit_ = true;
+    return PROFILING_SUCCESS;
+}
+
 static int _wait_process_exit_status(int, bool& isExited, int& exitCode, bool)
 {
     isExited = true;
@@ -451,8 +461,6 @@ static int _wait_process_signal_status(int, bool& isExited, int& exitCode, bool)
     exitCode = SIGTERM;
     return PROFILING_SUCCESS;
 }
-
-static AppMode* _app_mode_for_quit = nullptr;
 
 static int _set_quit_and_return_failed()
 {
@@ -485,7 +493,7 @@ TEST_F(RUNNING_MODE_UTEST, WaitRunningProcess)
     EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("a"));
 }
 
-TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessPropagatesNonZeroExitCode)
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessPropagatesNonAppExitCode)
 {
     GlobalMockObject::verify();
     std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
@@ -493,16 +501,42 @@ TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessPropagatesNonZeroExitCode)
     rMode.taskPid_ = 11111;
     rMode.isQuit_ = false;
 
-    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_8));
-    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("Export timeline"));
+    for (const auto& processUsage : {"Analyze", "Parse", "Query", "Export db", "Export summary", "Export timeline"}) {
+        MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_8));
+        EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess(processUsage)) << "processUsage: " << processUsage;
+        GlobalMockObject::verify();
+    }
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessTreatsUserQuitAsSuccess)
+{
     GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    _app_mode_for_quit = &rMode;
+    rMode.taskPid_ = 11111;
+    rMode.isQuit_ = false;
+
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_1_when_quit));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("Export timeline"));
+    GlobalMockObject::verify();
+    _app_mode_for_quit = nullptr;
+}
+
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessContinuesAfterApplicationExitCode)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    rMode.taskPid_ = 11111;
+    rMode.isQuit_ = false;
 
     MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_255));
-    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("App"));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("App"));
     GlobalMockObject::verify();
 }
 
-TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessReportsDecodedExitCode)
+TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessContinuesAfterApplicationExitStatus)
 {
     GlobalMockObject::verify();
     std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
@@ -511,11 +545,11 @@ TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessReportsDecodedExitCode)
     rMode.isQuit_ = false;
 
     MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_exit_status));
-    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("app"));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("app"));
     GlobalMockObject::verify();
 
     MOCKER(Utils::WaitProcess).stubs().will(invoke(_wait_process_signal_status));
-    EXPECT_EQ(PROFILING_FAILED, rMode.WaitRunningProcess("app"));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.WaitRunningProcess("app"));
     GlobalMockObject::verify();
 }
 
@@ -524,7 +558,7 @@ TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessDistinguishesSignalTermination)
     EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(SIGTERM));
     EXPECT_TRUE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(SIGSEGV));
     EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(0));
-    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(255 << 8));
+    EXPECT_FALSE(Collector::Dvvp::Msprofbin::IsSignalTerminationStatus(255U << 8U));
 }
 
 TEST_F(RUNNING_MODE_UTEST, WaitRunningProcessShowsAppConflictHintForDynamicProfiling)
