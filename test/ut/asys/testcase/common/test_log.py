@@ -25,7 +25,7 @@ import threading
 
 import pytest
 
-from common.log import close_log, log_info, log_warning
+from common.log import close_log, log_debug, log_error, log_info, log_warning
 
 
 class RecordHandler(logging.Handler):
@@ -120,17 +120,19 @@ class TestLog:
             second_thread.join(timeout=1)
             logging.disable(original_disable_level)
 
-    def test_debug_log(self, mocker):
-        mocker.patch("logging.debug", return_value=None)
+    @pytest.mark.parametrize(
+        ("log_func", "logging_target"),
+        [
+            (log_debug, "common.log.logging.debug"),
+            (log_info, "common.log.logging.info"),
+            (log_warning, "common.log.logging.warning"),
+            (log_error, "common.log.logging.error"),
+        ],
+    )
+    def test_log_forwards_message(self, mocker, log_func, logging_target):
+        logging_mock = mocker.patch(logging_target)
 
-    def test_info_log(self, mocker):
-        mocker.patch("logging.info", return_value=None)
+        log_func("message")
 
-    def test_warning_log(self, mocker):
-        mocker.patch("logging.warning", return_value=None)
-
-    def test_error_log(self, mocker):
-        mocker.patch("logging.error", return_value=None)
-
-    def test_critical_log(self, mocker):
-        mocker.patch("logging.critical", return_value=None)
+        logging_mock.assert_called_once()
+        assert logging_mock.call_args.args[0] == "message"
