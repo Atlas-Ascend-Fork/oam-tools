@@ -96,8 +96,12 @@ def test_run_isolates_header_state_across_concurrent_files(
     barrier = threading.Barrier(2)
 
     def synchronized_header(self, fp, trace_file):
-        original(self, fp, trace_file)
+        # #400（086b197）合入后 parse_ctrl_head 改为返回
+        # (tz_offset, real_time, cpu_freq)，由 parse_data_segment 解包消费，
+        # 包装器须转发返回值，否则线程内解包 None 抛 TypeError、输出不生成。
+        ret = original(self, fp, trace_file)
         barrier.wait(timeout=30)
+        return ret
 
     monkeypatch.setattr(ParseTrace, "parse_ctrl_head", synchronized_header)
 
@@ -142,8 +146,12 @@ def test_run_isolates_v3_header_state_across_concurrent_files(
     barrier = threading.Barrier(2)
 
     def synchronized_header(self, fp, trace_file):
-        original(self, fp, trace_file)
+        # #400（086b197）合入后 parse_ctrl_head 改为返回
+        # (tz_offset, real_time, cpu_freq)，由 parse_data_segment 解包消费，
+        # 包装器须转发返回值，否则线程内解包 None 抛 TypeError、输出不生成。
+        ret = original(self, fp, trace_file)
         barrier.wait(timeout=30)
+        return ret
 
     monkeypatch.setattr(ParseTrace, "parse_ctrl_head", synchronized_header)
 
