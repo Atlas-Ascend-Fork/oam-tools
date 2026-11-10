@@ -15,6 +15,7 @@
  */
 #include "running_mode_tool.h"
 #include <algorithm>
+#include <iterator>
 #include <chrono>
 #include <sys/wait.h>
 #include "errno/error_code_tool.h"
@@ -57,6 +58,76 @@ using namespace Analysis::Dvvp::Common::Config;
 using namespace Analysis::Dvvp::Common::Platform;
 using namespace analysis::dvvp::common::utils;
 using namespace Collector::Dvvp::DynProf;
+
+namespace {
+// App mode accepts every profiling switch; a file scope table keeps the constructor short while the
+// list itself stays easy to extend next to the other mode definitions.
+const int32_t APP_MODE_WHITE_SET[] = {
+    ARGS_OUTPUT,
+    ARGS_STORAGE_LIMIT,
+    ARGS_APPLICATION,
+    ARGS_ENVIRONMENT,
+    ARGS_DYNAMIC_PROF,
+    ARGS_DYNAMIC_PROF_PID,
+    ARGS_AIC_MODE,
+    ARGS_AIC_METRICS,
+    ARGS_AIV_MODE,
+    ARGS_AIV_METRICS,
+    ARGS_NPU_EVENTS,
+    ARGS_LLC_PROFILING,
+    ARGS_ASCENDCL,
+    ARGS_AI_CORE,
+    ARGS_AIV,
+    ARGS_MODEL_EXECUTION,
+    ARGS_TASK_MEMORY,
+    ARGS_SYS_LOW_POWER,
+    ARGS_RUNTIME_API,
+    ARGS_TASK_TSFW,
+    ARGS_TASK_TIME,
+    ARGS_GE_API,
+    ARGS_AICPU,
+    ARGS_CPU_PROFILING,
+    ARGS_SYS_PROFILING,
+    ARGS_PID_PROFILING,
+    ARGS_HARDWARE_MEM,
+    ARGS_IO_PROFILING,
+    ARGS_INTERCONNECTION_PROFILING,
+    ARGS_DVPP_PROFILING,
+    ARGS_TASK_BLOCK,
+    ARGS_L2_PROFILING,
+    ARGS_AIC_FREQ,
+    ARGS_AIV_FREQ,
+    ARGS_INSTR_PROFILING_FREQ,
+    ARGS_INSTR_PROFILING,
+    ARGS_HCCL,
+    ARGS_SYS_SAMPLING_FREQ,
+    ARGS_PID_SAMPLING_FREQ,
+    ARGS_HARDWARE_MEM_SAMPLING_FREQ,
+    ARGS_MEM_SERVICEFLOW,
+    ARGS_IO_SAMPLING_FREQ,
+    ARGS_DVPP_FREQ,
+    ARGS_CPU_SAMPLING_FREQ,
+    ARGS_INTERCONNECTION_FREQ,
+    ARGS_HOST_SYS,
+    ARGS_PYTHON_PATH,
+    ARGS_MSPROFTX,
+    ARGS_DELAY_PROF,
+    ARGS_DURATION_PROF,
+    ARGS_OP_TYPE,
+    ARGS_EXPORT_TYPE,
+    ARGS_MSTX_DOMAIN_INCLUDE,
+    ARGS_MSTX_DOMAIN_EXCLUDE,
+    ARGS_NTS_METRICS,
+    ARGS_AICORE_SHAPE,
+    ARGS_FTRACE,
+    ARGS_FTRACE_PERIOD,
+    ARGS_FTRACE_BUFSIZE};
+
+std::set<int32_t> BuildAppModeWhiteSet()
+{
+    return std::set<int32_t>(std::begin(APP_MODE_WHITE_SET), std::end(APP_MODE_WHITE_SET));
+}
+} // namespace
 
 bool IsAppProcessUsage(const std::string& processUsage) { return processUsage == "App" || processUsage == "app"; }
 
@@ -655,64 +726,7 @@ AppMode::~AppMode() {}
 AppMode::AppMode(std::string preCheckParams, SHARED_PTR_ALIA<ProfileParams> params)
     : RunningMode(preCheckParams, "app", params)
 {
-    whiteSet_ = {
-        ARGS_OUTPUT,
-        ARGS_STORAGE_LIMIT,
-        ARGS_APPLICATION,
-        ARGS_ENVIRONMENT,
-        ARGS_DYNAMIC_PROF,
-        ARGS_DYNAMIC_PROF_PID,
-        ARGS_AIC_MODE,
-        ARGS_AIC_METRICS,
-        ARGS_AIV_MODE,
-        ARGS_AIV_METRICS,
-        ARGS_NPU_EVENTS,
-        ARGS_LLC_PROFILING,
-        ARGS_ASCENDCL,
-        ARGS_AI_CORE,
-        ARGS_AIV,
-        ARGS_MODEL_EXECUTION,
-        ARGS_TASK_MEMORY,
-        ARGS_SYS_LOW_POWER,
-        ARGS_RUNTIME_API,
-        ARGS_TASK_TSFW,
-        ARGS_TASK_TIME,
-        ARGS_GE_API,
-        ARGS_AICPU,
-        ARGS_CPU_PROFILING,
-        ARGS_SYS_PROFILING,
-        ARGS_PID_PROFILING,
-        ARGS_HARDWARE_MEM,
-        ARGS_IO_PROFILING,
-        ARGS_INTERCONNECTION_PROFILING,
-        ARGS_DVPP_PROFILING,
-        ARGS_TASK_BLOCK,
-        ARGS_L2_PROFILING,
-        ARGS_AIC_FREQ,
-        ARGS_AIV_FREQ,
-        ARGS_INSTR_PROFILING_FREQ,
-        ARGS_INSTR_PROFILING,
-        ARGS_HCCL,
-        ARGS_SYS_LOW_POWER,
-        ARGS_SYS_SAMPLING_FREQ,
-        ARGS_PID_SAMPLING_FREQ,
-        ARGS_HARDWARE_MEM_SAMPLING_FREQ,
-        ARGS_MEM_SERVICEFLOW,
-        ARGS_IO_SAMPLING_FREQ,
-        ARGS_DVPP_FREQ,
-        ARGS_CPU_SAMPLING_FREQ,
-        ARGS_INTERCONNECTION_FREQ,
-        ARGS_HOST_SYS,
-        ARGS_PYTHON_PATH,
-        ARGS_MSPROFTX,
-        ARGS_DELAY_PROF,
-        ARGS_DURATION_PROF,
-        ARGS_OP_TYPE,
-        ARGS_EXPORT_TYPE,
-        ARGS_MSTX_DOMAIN_INCLUDE,
-        ARGS_MSTX_DOMAIN_EXCLUDE,
-        ARGS_NTS_METRICS,
-        ARGS_AICORE_SHAPE};
+    whiteSet_ = BuildAppModeWhiteSet();
 }
 
 int32_t AppMode::ModeParamsCheck()
@@ -754,16 +768,8 @@ int32_t AppMode::RunModeTasks()
     }
 
     if (jobResultDirList_.empty()) {
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
-        if (!params_->delayTime.empty() && static_cast<uint64_t>(duration.count()) <= std::stoull(params_->delayTime)) {
-            MSPROF_LOGW("[App Mode] Before delay time, the app process has exited.");
-            return PROFILING_SUCCESS;
-        }
-        MSPROF_LOGE("[App Mode] Failed to find profiling data");
-        CmdLog::CmdErrorLog("Failed to find profiling data,"
-                            " please check that the application executes AI-related business,"
-                            " or ensure that aclInit/GEInitialize is invoked in the application");
-        return PROFILING_FAILED;
+        const auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - startTime);
+        return ReportEmptyResult(static_cast<uint64_t>(duration.count()));
     }
 
     if (CheckAnalysisEnv() != PROFILING_SUCCESS) {
@@ -771,8 +777,12 @@ int32_t AppMode::RunModeTasks()
         return PROFILING_SUCCESS;
     }
 
-    std::set<std::string>::iterator iter;
-    for (iter = jobResultDirList_.begin(); iter != jobResultDirList_.end(); ++iter) {
+    return ExportAndQueryResults();
+}
+
+int32_t AppMode::ExportAndQueryResults()
+{
+    for (auto iter = jobResultDirList_.begin(); iter != jobResultDirList_.end(); ++iter) {
         jobResultDir_ = *iter;
         if (StartExportTask() != PROFILING_SUCCESS) {
             if (isQuit_) {
@@ -790,6 +800,19 @@ int32_t AppMode::RunModeTasks()
         }
     }
     return PROFILING_SUCCESS;
+}
+
+int32_t AppMode::ReportEmptyResult(uint64_t elapsedSeconds) const
+{
+    if (!params_->delayTime.empty() && elapsedSeconds <= std::stoull(params_->delayTime)) {
+        MSPROF_LOGW("[App Mode] Before delay time, the app process has exited.");
+        return PROFILING_SUCCESS;
+    }
+    MSPROF_LOGE("[App Mode] Failed to find profiling data");
+    CmdLog::CmdErrorLog("Failed to find profiling data,"
+                        " please check that the application executes AI-related business,"
+                        " or ensure that aclInit/GEInitialize is invoked in the application");
+    return PROFILING_FAILED;
 }
 
 void AppMode::SetDefaultParams() const

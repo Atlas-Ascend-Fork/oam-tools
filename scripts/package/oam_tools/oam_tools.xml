@@ -94,6 +94,7 @@
     <file_info value="profiler_bin" copy_type="delivery" src_path="" dst_path="tools/profiler/bin" install_path="tools/profiler/bin" install_mod="550">
         <file value="acp" file_type="shared" optional="true"/>
         <file value="msprof" file_type="shared"/>
+        <file value="ftrace_collector" file_type="shared"/>
     </file_info>
     <block_info dependtree="false" dst_path="" block_conf_path="ascend">
         <block name="EngineeringCommon"/>

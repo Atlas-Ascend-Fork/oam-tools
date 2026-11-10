@@ -543,6 +543,7 @@ d	0750	0755		tools/profiler
 d	0750	0755		tools/profiler/bin
 f	0750	0755		tools/profiler/bin/acp
 f	0750	0755		tools/profiler/bin/msprof
+f	0750	0755		tools/profiler/bin/ftrace_collector
 d	0750	0755		tools/profiler/lib64
 f	0640	0644		tools/profiler/lib64/libascend_profinj.so
 d	0750	0755		tools/profiler/profiler_tool

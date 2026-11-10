@@ -113,6 +113,10 @@ enum MsprofArgsType {
     ARGS_HOST_SYS,
     ARGS_HOST_SYS_PID,
     ARGS_HOST_SYS_USAGE,
+    // host ftrace
+    ARGS_FTRACE,
+    ARGS_FTRACE_PERIOD,
+    ARGS_FTRACE_BUFSIZE,
     ARGS_NTS_METRICS,
     // end
     NR_ARGS
@@ -200,6 +204,10 @@ const OsalStructOption LONG_OPTIONS[] = {
     {"host-sys", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_SYS},
     {"host-sys-pid", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_SYS_PID},
     {"host-sys-usage", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_SYS_USAGE},
+    // host ftrace
+    {"ftrace", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE},
+    {"ftrace-period", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE_PERIOD},
+    {"ftrace-bufsize", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE_BUFSIZE},
     {"nts-metrics", OSAL_REQUIRED_ARG, nullptr, ARGS_NTS_METRICS},
     // end
     {nullptr, OSAL_NO_ARG, nullptr, ARGS_HELP}};
@@ -252,6 +260,11 @@ private:
     int32_t CheckHostSysPidValid(const struct MsprofCmdInfo& cmdInfo);
     int32_t CheckHostSysUsageValid(const struct MsprofCmdInfo& cmdInfo);
     void SetHostSysUsageParam(const std::string& hostSysUsageParam);
+    // host ftrace
+    int32_t CheckFtraceValid(const struct MsprofCmdInfo& cmdInfo);
+    int32_t CheckFtracePeriodValid(const struct MsprofCmdInfo& cmdInfo) const;
+    int32_t CheckFtraceBufsizeValid(const struct MsprofCmdInfo& cmdInfo) const;
+    int32_t ParseFtraceEvents(const std::string& ftraceArgs);
     int32_t MsprofCmdCheckValid(const struct MsprofCmdInfo& cmdInfo, int32_t opt);
     int32_t MsprofCmdCheckValid2(const struct MsprofCmdInfo& cmdInfo, int32_t opt);
     int32_t MsprofFreqCheckValid(const struct MsprofCmdInfo& cmdInfo, int32_t opt);
@@ -339,6 +352,7 @@ private:
     void AddAicpuArgs();
     void AddNtsMetricsArgs();
     void AddHostArgs();
+    void AddFtraceArgs();
     void AddStarsArgs();
     void AddLowPowerArgs();
     void AddAnalysisArgs();

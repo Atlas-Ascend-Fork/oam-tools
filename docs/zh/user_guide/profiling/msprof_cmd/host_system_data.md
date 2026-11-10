@@ -2,7 +2,7 @@
 
 ## 功能说明
 
-msprof支持采集Host侧的系统数据（CPU利用率、CPU频率、内存利用率、磁盘I/O利用率、网络I/O利用率等），并且在采集后可以自动进行性能数据解析和文件落盘。
+msprof支持采集Host侧的系统数据（CPU利用率、CPU频率、内存利用率、磁盘I/O利用率、网络I/O利用率等）以及Host侧调度、中断事件（ftrace），并且在采集后可以自动进行性能数据解析和文件落盘。
 
 ## 命令格式
 
@@ -28,6 +28,9 @@ msprof --output=<path> --sys-devices=<ID> --sys-period=<period> [options]
 |--host-sys-usage|--host-sys和--host-sys-usage二者必选其一| Host侧系统和所有进程的性能数据采集开关，取值包括cpu和mem，可选其中的一项或多项，选多项时用英文逗号隔开。配置该项时如果配置`host-sys-pid`参数，则采集Host侧指定进程的CPU或内存利用率。取值含义如下：<br>- cpu：系统和所有进程的CPU利用率。<br>- mem：系统和所有进程的内存利用率。<br>配置示例：`--host-sys-usage=cpu,mem`。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 |--host-sys-pid|可选| 指定需要采集的Host侧应用程序的pid。依赖AI任务运行时该参数无需配置，且配置无效。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 |--host-sys-usage-freq|可选| CPU利用率、内存利用率的采集频率，范围[1,50]，默认值50，单位Hz。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|--ftrace|可选| Host侧ftrace事件的采集开关，取值为`子系统/事件`形式的字符串，多项时用英文逗号隔开，例如`--ftrace=sched/sched_switch,irq/irq_handler_entry`。采集结果用于将Host侧调度、中断事件与AI任务的性能数据关联分析。<br>**说明**：<br>- 依赖内核tracefs，需要root权限或免密sudo权限（`sudo -n`）执行；两者都不具备、或容器内未挂载tracefs时该参数不生效，采集日志中会给出失败原因。<br>- 同一节点同一时刻只允许一个采集器工作，多任务并发采集时，仅第一个任务能采到ftrace数据。 |
+|--ftrace-period|可选| Host侧ftrace的采集窗口，单位为秒，取值范围[0, 86400]，默认值0。取值为0时表示跟随profiling的生命周期，即从采集开始持续到采集结束；取值为正整数时，从采集开始计时，达到该时长后停止ftrace采集。窗口越长数据量越大，1秒窗口在256核节点上约产生400MB原始数据，建议按需设置。 |
+|--ftrace-bufsize|可选| Host侧ftrace每个CPU的ring buffer大小，单位为KB，取值范围[1024, 4194304]，默认值4096。buffer越大越不容易丢事件，但会占用更多Host侧内核内存。 |
 
 ## 使用示例
 
@@ -35,6 +38,12 @@ msprof --output=<path> --sys-devices=<ID> --sys-period=<period> [options]
 
 ```sh
 msprof --output=/home/projects/output --host-sys=cpu /home/projects/MyApp/out/main
+
+采集Host侧调度和中断事件（ftrace），采集窗口为5秒：
+
+```sh
+msprof --output=/home/projects/output --host-sys=cpu --ftrace=sched/sched_switch,sched/sched_wakeup,irq/irq_handler_entry --ftrace-period=5 /home/projects/MyApp/out/main
+```
 ```
 
 或者：

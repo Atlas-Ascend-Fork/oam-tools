@@ -20,3 +20,4 @@ include(${CMAKE_CURRENT_LIST_DIR}/msprof_find_target.cmake)
 
 add_subdirectory(acp)
 add_subdirectory(msprofbin)
+add_subdirectory(ftrace_collector)

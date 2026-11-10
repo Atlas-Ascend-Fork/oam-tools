@@ -26,6 +26,8 @@
 namespace analysis {
 namespace dvvp {
 namespace message {
+// Default host ftrace ring buffer per CPU, shared by the ctor and the JSON reader.
+constexpr uint32_t FTRACE_DEFAULT_BUFSIZE_KB = 4096;
 using namespace analysis::dvvp::common::config;
 using namespace analysis::dvvp::common::utils;
 const char* const PROFILING_MODE_SAMPLE_BASED = "sample-based";
@@ -201,6 +203,11 @@ struct ProfileParams : public BaseInfo {
     std::string hostAllPidMemProfiling;
     std::string host_network_profiling;
     int host_disk_freq;
+    // host ftrace
+    std::string host_ftrace_profiling;
+    std::string host_ftrace_events;
+    int host_ftrace_period;
+    int host_ftrace_bufsize;
 
     // for parse, query and export
     std::string pythonPath;
@@ -307,6 +314,10 @@ struct ProfileParams : public BaseInfo {
           hostAllPidMemProfiling("off"),
           host_network_profiling("off"),
           host_disk_freq(DEFAULT_PROFILING_INTERVAL_50MS),
+          host_ftrace_profiling("off"),
+          host_ftrace_events(""),
+          host_ftrace_period(0),
+          host_ftrace_bufsize(FTRACE_DEFAULT_BUFSIZE_KB),
           pythonPath(""),
           parseSwitch("off"),
           querySwitch("off"),
@@ -530,6 +541,10 @@ struct ProfileParams : public BaseInfo {
         // host
         SET_VALUE(object, host_sys);
         SET_VALUE(object, host_sys_pid);
+        SET_VALUE(object, host_ftrace_profiling);
+        SET_VALUE(object, host_ftrace_events);
+        SET_VALUE(object, host_ftrace_period);
+        SET_VALUE(object, host_ftrace_bufsize);
         SET_VALUE(object, host_disk_profiling);
         SET_VALUE(object, host_osrt_profiling);
         SET_VALUE(object, host_numa_profiling);
@@ -720,6 +735,10 @@ struct ProfileParams : public BaseInfo {
         // host
         FROM_STRING_VALUE(object, host_sys);
         FROM_INT_VALUE(object, host_sys_pid, HOST_PID_DEFAULT);
+        FROM_STRING_VALUE(object, host_ftrace_profiling);
+        FROM_STRING_VALUE(object, host_ftrace_events);
+        FROM_INT_VALUE(object, host_ftrace_period, 0);
+        FROM_INT_VALUE(object, host_ftrace_bufsize, FTRACE_DEFAULT_BUFSIZE_KB);
         FROM_STRING_VALUE(object, hostSysUsage);
         FROM_INT_VALUE(object, hostProfilingSamplingInterval, DEFAULT_PROFILING_INTERVAL_20MS);
         FROM_STRING_VALUE(object, host_disk_profiling);

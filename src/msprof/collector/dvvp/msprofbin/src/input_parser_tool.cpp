@@ -961,7 +961,7 @@ int32_t InputParser::ProcessOptions(int32_t opt, struct MsprofCmdInfo& cmdInfo)
         ret = MsprofSwitchCheckValid(cmdInfo, opt);
     } else if (opt >= ARGS_AIC_FREQ && opt <= ARGS_EXPORT_MODEL_ID) {
         ret = MsprofFreqCheckValid(cmdInfo, opt);
-    } else if (opt >= ARGS_HOST_SYS && opt <= ARGS_HOST_SYS_USAGE) {
+    } else if (opt >= ARGS_HOST_SYS && opt < NR_ARGS) {
         ret = MsprofHostCheckValid(cmdInfo, opt);
     } else {
         MsprofCmdUsage("");
@@ -2359,6 +2359,15 @@ int32_t InputParser::MsprofHostCheckValid(const struct MsprofCmdInfo& cmdInfo, i
         case ARGS_HOST_SYS_USAGE:
             ret = CheckHostSysUsageValid(cmdInfo);
             break;
+        case ARGS_FTRACE:
+            ret = CheckFtraceValid(cmdInfo);
+            break;
+        case ARGS_FTRACE_PERIOD:
+            ret = CheckFtracePeriodValid(cmdInfo);
+            break;
+        case ARGS_FTRACE_BUFSIZE:
+            ret = CheckFtraceBufsizeValid(cmdInfo);
+            break;
         default:
             break;
     }
@@ -2633,6 +2642,34 @@ void ArgsManager::AddHostArgs()
     argsList_.push_back(hostSysUsageFreq);
 }
 
+void ArgsManager::AddFtraceArgs()
+{
+    // Keep the usage text unconditional on Linux: --help may run before the platform side is
+    // known, and whether the option is usable is decided while parsing it (host side + root
+    // privilege check), not while printing the usage.
+#if (defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER))
+    return;
+#endif
+    Args ftrace = {
+        "ftrace", "Host side ftrace tracepoint list, comma separated subsystem/event pairs, "
+                  "e.g. sched/sched_switch,irq/irq_handler_entry. One collector runs per node and the "
+                  "other processes on the node skip it. Collecting requires root or sudo."};
+    Args ftracePeriod = {
+        "ftrace-period",
+        "The host ftrace collection window in seconds, range 0 to 86400. 0 follows the "
+        "profiling lifetime, so the window ends when this process stops profiling. "
+        "The default value is 0.",
+        "0"};
+    Args ftraceBufsize = {
+        "ftrace-bufsize",
+        "The host ftrace ring buffer size per CPU in KB, range 1024 to 4194304. "
+        "the default value is 4096.",
+        "4096"};
+    argsList_.push_back(ftrace);
+    argsList_.push_back(ftracePeriod);
+    argsList_.push_back(ftraceBufsize);
+}
+
 void ArgsManager::AddDynProfArgs()
 {
     if (!Platform::instance()->CheckIfSupport(PLATFORM_TASK_DYNAMIC)) {
@@ -2698,6 +2735,7 @@ void ArgsManager::AddArgs()
     AddDvvpArgs();
     AddL2Args();
     AddHostArgs();
+    AddFtraceArgs();
     AddStarsArgs();
     AddLowPowerArgs();
     AddDynProfArgs();
@@ -2995,6 +3033,127 @@ void ArgsManager::AddL2Args()
     argsList_.push_back(l2);
     argsList_.push_back(npuEvents);
 }
+namespace {
+constexpr char FTRACE_EVENT_SEPARATOR = ',';
+constexpr char FTRACE_SYSTEM_SEPARATOR = '/';
+constexpr size_t FTRACE_MAX_EVENT_LEN = 128;
+constexpr size_t FTRACE_MAX_EVENTS = 64;
+constexpr int32_t FTRACE_MAX_PERIOD_SEC = 86400;
+constexpr int32_t FTRACE_MIN_BUFSIZE_KB = 1024;
+constexpr int32_t FTRACE_MAX_BUFSIZE_KB = 4194304;
+const std::string FTRACE_ON = "on";
+
+bool IsFtraceNameValid(const std::string& name)
+{
+    if (name.empty() || name.size() > FTRACE_MAX_EVENT_LEN) {
+        return false;
+    }
+    for (char chr : name) {
+        const bool validChar = (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
+                               chr == '_' || chr == '-' || chr == ':';
+        if (!validChar) {
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
+
+int32_t InputParser::ParseFtraceEvents(const std::string& ftraceArgs)
+{
+    std::vector<std::string> events = Utils::Split(ftraceArgs, false, "", std::string(1, FTRACE_EVENT_SEPARATOR));
+    if (events.empty() || events.size() > FTRACE_MAX_EVENTS) {
+        CmdLog::CmdErrorLog(
+            "Argument --ftrace: invalid event count. Please use 'subsystem/event[,subsystem/event...]'.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    std::vector<std::string> normalized;
+    for (const auto& item : events) {
+        if (item.empty()) {
+            continue;
+        }
+        const size_t pos = item.find(FTRACE_SYSTEM_SEPARATOR);
+        if (pos == std::string::npos || pos == 0 || pos + 1 >= item.size()) {
+            CmdLog::CmdErrorLog(
+                "Argument --ftrace: invalid event '%s'. Format must be 'subsystem/event', "
+                "e.g. --ftrace=sched/sched_switch,irq/irq_handler_entry.",
+                item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        const std::string system = item.substr(0, pos);
+        const std::string event = item.substr(pos + 1);
+        if (!IsFtraceNameValid(system) || !IsFtraceNameValid(event)) {
+            CmdLog::CmdErrorLog("Argument --ftrace: invalid characters in event '%s'.", item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        const std::string normalizedEvent = system + FTRACE_SYSTEM_SEPARATOR + event;
+        if (std::find(normalized.begin(), normalized.end(), normalizedEvent) == normalized.end()) {
+            normalized.emplace_back(normalizedEvent);
+        }
+    }
+    if (normalized.empty()) {
+        CmdLog::CmdErrorLog("Argument --ftrace is empty. Please specify at least one tracepoint.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    UtilsStringBuilder<std::string> builder;
+    params_->host_ftrace_events = builder.Join(normalized, std::string(1, FTRACE_EVENT_SEPARATOR));
+    params_->host_ftrace_profiling = FTRACE_ON;
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckFtraceValid(const struct MsprofCmdInfo& cmdInfo)
+{
+    if (Platform::instance()->RunSocSide()) {
+        CmdLog::CmdErrorLog("Not in host side, --ftrace is not supported.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (cmdInfo.args[ARGS_FTRACE] == nullptr) {
+        CmdLog::CmdErrorLog("Argument --ftrace: expected one argument, e.g. --ftrace=sched/sched_switch.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const std::string ftraceArgs = std::string(cmdInfo.args[ARGS_FTRACE]);
+    if (ftraceArgs.empty()) {
+        CmdLog::CmdErrorLog("Argument --ftrace is empty. Please input 'subsystem/event[,subsystem/event...]'.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    return ParseFtraceEvents(ftraceArgs);
+}
+
+int32_t InputParser::CheckFtracePeriodValid(const struct MsprofCmdInfo& cmdInfo) const
+{
+    if (cmdInfo.args[ARGS_FTRACE_PERIOD] == nullptr) {
+        CmdLog::CmdErrorLog("Argument --ftrace-period: expected one argument (seconds, 0 means follow profiling).");
+        return MSPROF_DAEMON_ERROR;
+    }
+    int32_t period = 0;
+    if (!Utils::StrToInt32(period, cmdInfo.args[ARGS_FTRACE_PERIOD]) || period < 0 || period > FTRACE_MAX_PERIOD_SEC) {
+        CmdLog::CmdErrorLog(
+            "Argument --ftrace-period: invalid value '%s'. Range is [0, %d] seconds.", cmdInfo.args[ARGS_FTRACE_PERIOD],
+            FTRACE_MAX_PERIOD_SEC);
+        return MSPROF_DAEMON_ERROR;
+    }
+    params_->host_ftrace_period = period;
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckFtraceBufsizeValid(const struct MsprofCmdInfo& cmdInfo) const
+{
+    if (cmdInfo.args[ARGS_FTRACE_BUFSIZE] == nullptr) {
+        CmdLog::CmdErrorLog("Argument --ftrace-bufsize: expected one argument (KB per CPU).");
+        return MSPROF_DAEMON_ERROR;
+    }
+    int32_t bufsize = 0;
+    if (!Utils::StrToInt32(bufsize, cmdInfo.args[ARGS_FTRACE_BUFSIZE]) || bufsize < FTRACE_MIN_BUFSIZE_KB ||
+        bufsize > FTRACE_MAX_BUFSIZE_KB) {
+        CmdLog::CmdErrorLog(
+            "Argument --ftrace-bufsize: invalid value '%s'. Range is [%d, %d] KB.", cmdInfo.args[ARGS_FTRACE_BUFSIZE],
+            FTRACE_MIN_BUFSIZE_KB, FTRACE_MAX_BUFSIZE_KB);
+        return MSPROF_DAEMON_ERROR;
+    }
+    params_->host_ftrace_bufsize = bufsize;
+    return MSPROF_DAEMON_OK;
+}
+
 } // namespace Msprof
 } // namespace Dvvp
 } // namespace Analysis

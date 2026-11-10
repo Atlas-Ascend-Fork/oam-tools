@@ -101,6 +101,9 @@ public:
 private:
     int32_t StartAppTask(bool needWait = true);
     int32_t StartAppTaskForDynProf();
+    // Split out of RunModeTasks so each function stays small.
+    int32_t ReportEmptyResult(uint64_t elapsedSeconds) const;
+    int32_t ExportAndQueryResults();
     void SetDefaultParams() const;
     void SetDefaultParamsByPlatformType() const;
 };
