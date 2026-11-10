@@ -31,6 +31,38 @@ COPY_MODE = "c"
 ENCODE_UTF_8 = "utf-8"
 
 
+def _copytree_merge(source_dir, target_dir):
+    """Recursively copy source_dir into target_dir, merging with existing
+    content — the Python 3.8 ``copytree(dirs_exist_ok=True)`` behaviour,
+    written for the Python 3.7 baseline (where copytree raises
+    FileExistsError on an existing destination).
+
+    A symlink is never followed as a directory (that could pull the whole
+    filesystem into the copy); links are copied as links, like
+    ``copytree(symlinks=True)``.
+
+    Like copytree, a per-entry failure does not abort the copy: the
+    remaining entries are still copied and the collected errors are
+    raised at the end as one shutil.Error.
+    """
+    os.makedirs(target_dir, exist_ok=True)
+    errors = []
+    for name in os.listdir(source_dir):
+        source_entry = os.path.join(source_dir, name)
+        target_entry = os.path.join(target_dir, name)
+        try:
+            if os.path.isdir(source_entry) and not os.path.islink(source_entry):
+                _copytree_merge(source_entry, target_entry)
+            elif os.path.islink(source_entry):
+                os.symlink(os.readlink(source_entry), target_entry)
+            else:
+                shutil.copy2(source_entry, target_entry)
+        except OSError as why:
+            errors.append((source_entry, target_entry, str(why)))
+    if errors:
+        raise shutil.Error(errors)
+
+
 class FileOperate:
     @staticmethod
     def check_file(file_path):
@@ -229,7 +261,7 @@ class FileOperate:
             # The caller creates the timestamped output dir first, so the
             # target usually exists; re-copying into it must not crash the
             # whole collection with FileExistsError.
-            shutil.copytree(source_dir_path, target_dir_path, dirs_exist_ok=True)
+            _copytree_merge(source_dir_path, target_dir_path)
         except OSError as e:
             log_error(
                 f"Copy directory {source_dir_path} to {target_dir_path} failed, {e}"

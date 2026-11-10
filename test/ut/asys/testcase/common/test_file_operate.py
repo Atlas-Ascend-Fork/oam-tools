@@ -135,30 +135,90 @@ class TestFileOperate(AssertTest):
         mocker.patch("os.path.exists", return_value=True)
         mocker.patch("os.path.isdir", return_value=True)
         mocker.patch("os.access", return_value=True)
-        mocker.patch("shutil.copytree")
+        mocker.patch("common.file_operate._copytree_merge")
         self.assertTrue(f.copy_dir("./test_src", "./test_dst"))
 
     def test_copy_dir_into_existing_target_keeps_going(self, tmp_path, mocker):
         # The asys output tree is created before collect runs, so copy_dir
         # regularly meets an existing target; copytree without dirs_exist_ok
-        # raised FileExistsError and crashed the whole collection.
+        # raised FileExistsError and crashed the whole collection. The merge
+        # copy is written for the Python 3.7 baseline (dirs_exist_ok needs
+        # 3.8), so it must also merge nested directories.
         source = tmp_path / "src"
         target = tmp_path / "dst"
-        source.mkdir()
+        (source / "sub").mkdir(parents=True)
         target.mkdir()
         (source / "a.txt").write_text("a", encoding="utf-8")
+        (source / "sub" / "b.txt").write_text("b", encoding="utf-8")
+        (target / "old.txt").write_text("old", encoding="utf-8")
 
         self.assertTrue(f.copy_dir(str(source), str(target)))
         self.assertTrue((target / "a.txt").read_text(encoding="utf-8") == "a")
+        self.assertTrue((target / "sub" / "b.txt").read_text(encoding="utf-8") == "b")
+        # pre-existing target content is preserved (merge, not replace)
+        self.assertTrue((target / "old.txt").read_text(encoding="utf-8") == "old")
+
+    def test_copy_dir_copies_symlinks_as_links(self, tmp_path):
+        # A symlinked directory used to fall into copy2 (open() on a
+        # directory raises IsADirectoryError), failing the whole copy and
+        # losing the remaining entries. Links are now copied as links.
+        source = tmp_path / "src"
+        target = tmp_path / "dst"
+        source.mkdir()
+        linked_dir = tmp_path / "linked_dir"
+        linked_file = tmp_path / "linked_file.txt"
+        linked_dir.mkdir()
+        linked_file.write_text("linked", encoding="utf-8")
+        os.symlink(linked_dir, source / "link_to_dir")
+        os.symlink(linked_file, source / "link_to_file.txt")
+        (source / "plain.txt").write_text("plain", encoding="utf-8")
+
+        self.assertTrue(f.copy_dir(str(source), str(target)))
+        self.assertTrue(os.readlink(str(target / "link_to_dir")) == str(linked_dir))
+        self.assertTrue(
+            os.readlink(str(target / "link_to_file.txt")) == str(linked_file)
+        )
+        # entries after the link are still copied
+        self.assertTrue((target / "plain.txt").read_text(encoding="utf-8") == "plain")
+
+    def test_copy_dir_continues_after_first_entry_failure(self, tmp_path, mocker):
+        # copytree collects per-entry errors and keeps copying the rest,
+        # then raises one shutil.Error; the merge copy must do the same, or
+        # a single unreadable entry would lose every entry after it. The
+        # failure is mocked (not chmod 000) so the test also holds when UT
+        # runs as root, where file read permissions are not enforced.
+        source = tmp_path / "src"
+        target = tmp_path / "dst"
+        source.mkdir()
+        (source / "first.txt").write_text("1", encoding="utf-8")
+        (source / "second.txt").write_text("2", encoding="utf-8")
+        nested = source / "sub"
+        nested.mkdir()
+        (nested / "third.txt").write_text("3", encoding="utf-8")
+        real_copy2 = file_operate.shutil.copy2
+
+        def fail_on_first(src, dst):
+            if os.path.basename(src) == "first.txt":
+                raise PermissionError(13, "Permission denied")
+            real_copy2(src, dst)
+
+        mocker.patch.object(file_operate.shutil, "copy2", side_effect=fail_on_first)
+
+        self.assertTrue(not f.copy_dir(str(source), str(target)))
+        # the entries around the failed one are still copied
+        self.assertTrue((target / "second.txt").read_text(encoding="utf-8") == "2")
+        self.assertTrue(
+            (target / "sub" / "third.txt").read_text(encoding="utf-8") == "3"
+        )
 
     def test_copy_dir_copytree_oserror_returns_false(self, tmp_path, mocker, caplog):
-        # A read failure under the source tree surfaces as OSError from
-        # copytree; copy_dir must report False instead of propagating it.
+        # A read failure under the source tree surfaces as OSError from the
+        # merge copy; copy_dir must report False instead of propagating it.
         source = tmp_path / "src"
         target = tmp_path / "dst"
         source.mkdir()
         mocker.patch(
-            "shutil.copytree",
+            "common.file_operate._copytree_merge",
             side_effect=PermissionError(13, "Permission denied"),
         )
 
@@ -166,7 +226,7 @@ class TestFileOperate(AssertTest):
         self.assertTrue("Permission denied" in caplog.text)
 
     def test_copy_dir_failed(self, mocker):
-        mocker.patch("shutil.copytree")
+        mocker.patch("common.file_operate._copytree_merge")
         mocker.patch("os.path.exists", return_value=False)
         mocker.patch("os.access", return_value=True)
         self.assertTrue(not f.copy_dir("./test_src", "./test_dst"))
