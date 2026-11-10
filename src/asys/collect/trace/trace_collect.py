@@ -366,8 +366,9 @@ class ParseTrace:
                     continue
                 trace_file = os.path.join(dirs, file)
                 num += 1
+                parser = ParseTrace(is_file=self.is_file)
                 t = Thread(
-                    target=self.start_parse_file,
+                    target=parser.start_parse_file,
                     args=(trace_file, count, num),
                     daemon=True,
                 )
