@@ -65,16 +65,11 @@ class SelflibCheckPath:
         return len(path_ptr) != 0
 
 
+@pytest.mark.usefixtures("change_test_dir")
 class TestUtilsMethods(CommonAssert):
     # fixture/setup_method 中赋值，此处声明以明确实例属性集合
     debug_info = None
     temp = None
-
-    @pytest.fixture(autouse=True)
-    def change_test_dir(self, tmp_path):
-        self.temp = tmp_path
-        self.debug_info = tmp_path.joinpath("debug_info.txt")
-        os.chdir(tmp_path)
 
     @staticmethod
     def common_mock(mocker, dump_json):

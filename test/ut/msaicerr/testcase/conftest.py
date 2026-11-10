@@ -91,3 +91,15 @@ def make_mock_device():
 @pytest.fixture
 def kernel_mock_device():
     return make_mock_device()
+
+
+@pytest.fixture
+def change_test_dir(request, tmp_path, monkeypatch):
+    """共享 chdir fixture，由各测试类以 @pytest.mark.usefixtures 挂载生效。
+
+    写回实例属性 temp/debug_info 并切换工作目录到 tmp_path，运行结束后由
+    monkeypatch 自动恢复原目录。
+    """
+    request.instance.temp = tmp_path
+    request.instance.debug_info = tmp_path.joinpath("debug_info.txt")
+    monkeypatch.chdir(tmp_path)
