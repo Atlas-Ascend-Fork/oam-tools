@@ -105,7 +105,10 @@ class ParamDict(metaclass=Singleton):
     def _set_arg_symbol_path(self, args):
         arg_name = "symbol_path"
         if getattr(args, arg_name) is not None:
-            self.__add_arg(arg_name, args.symbol_path.split(","))
+            paths = [
+                path.strip() for path in args.symbol_path.split(",") if path.strip()
+            ]
+            self.__add_arg(arg_name, paths)
             log_debug(
                 'set arg: --symbol_path="{0}" success.'.format(
                     self.__args.get(arg_name)

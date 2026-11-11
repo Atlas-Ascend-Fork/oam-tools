@@ -286,6 +286,12 @@ class TestArgChecker(AssertTest):
             == RetCode.SUCCESS
         )
 
+    def test_check_symbol_path_trims_tokens(self):
+        self.assertTrue(
+            check_symbol_path("symbol", f" {ut_root_path} , {ut_root_path}, ")
+            == RetCode.SUCCESS
+        )
+
     def test_check_symbol_path_error(self):
         self.assertTrue(
             check_symbol_path("symbol", "ut_root_path,ut_root_path") == RetCode.FAILED

@@ -124,6 +124,13 @@ class TestParamDict(AssertTest):
         ParamDict().set_args(fake_namespace)
         self.assertTrue(ParamDict().get_arg("task") == "bash ./test.bash")
 
+    def test_symbol_path_csv_tokens_are_trimmed(self):
+        args = Namespace(symbol_path=" /opt/lib , /opt/extra, ")
+
+        ParamDict()._set_arg_symbol_path(args)
+
+        assert ParamDict().get_arg("symbol_path") == ["/opt/lib", "/opt/extra"]
+
     def test_output_setfail(self, mocker):
         # test output empty string
         fake_namespace = Namespace(

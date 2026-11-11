@@ -276,7 +276,7 @@ def check_core_file(_arg_name, arg_val):
 
 
 def check_symbol_path(arg_name, arg_val):
-    arg_list = arg_val.split(",")
+    arg_list = [path.strip() for path in arg_val.split(",") if path.strip()]
     for dir_path in arg_list:
         if f.check_valid_dir(dir_path):
             return RetCode.SUCCESS
