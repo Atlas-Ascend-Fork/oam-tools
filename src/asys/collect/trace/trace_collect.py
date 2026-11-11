@@ -315,9 +315,8 @@ class ParseTrace:
             if not struct_info:
                 self.get_res_data(fp, msg_txt_size)
                 continue
-            msg_txt += "%s.%s %s: " % (
+            msg_txt += "%s %s: " % (
                 time_str[:-3],
-                time_str[-3:],
                 struct_info.get("struct_name"),
             )
             use_msg_data = 0

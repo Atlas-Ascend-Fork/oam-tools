@@ -21,6 +21,7 @@
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
 import os
+import re
 import sys
 import struct
 import random
@@ -49,6 +50,12 @@ test_case_tmp = os.path.join(ut_root_path, "test_tmp")
 test_trace_tmp = os.path.join(ut_root_path, "test_trace_tmp")
 
 
+# issue #219：时间戳必须为 YYYY-MM-DD HH:MM:SS.mmm 单点毫秒格式，
+# 不允许回退为 SS.mmm.mmm 双小数点。
+TRACE_LINE_TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} ")
+TRACE_DOUBLE_DOT_RE = re.compile(r"\d{2}:\d{2}:\d{2}\.\d{3}\.\d{3}")
+
+
 def check_atrace_file(file_name):
     if os.path.exists(file_name):
         with open(file_name, "r", encoding="utf-8") as fr:
@@ -67,6 +74,11 @@ def check_atrace_file(file_name):
                 return False
             if "item_name14[0x69, 0x69]" not in data:
                 return False
+            if TRACE_DOUBLE_DOT_RE.search(data):
+                return False
+            for line in data.splitlines():
+                if line and not TRACE_LINE_TS_RE.match(line):
+                    return False
             return True
     return False
 

@@ -34,6 +34,6 @@ asys analyze -r=trace --file=schedule_tracer_demo.bin --output=$HOME/dfx_info
 解析后的txt文件内容示例：
 
 ```bash
-2024-05-09 19:08:12.408.800 demo0: tid0[0], count0[0], tag0[struct0 tag], streamId0[0], deviceIdArray0[0, 1], hostIdArray0[1, 2, 3, 4]
-2024-05-09 19:08:12.408.804 demo1: tag1[struct1 tag], streamId1[0], deviceIdArray1[0, 1], hostIdArray1[1, 2, 3, 4]
+2024-05-09 19:08:12.408 demo0: tid0[0], count0[0], tag0[struct0 tag], streamId0[0], deviceIdArray0[0, 1], hostIdArray0[1, 2, 3, 4]
+2024-05-09 19:08:12.408 demo1: tag1[struct1 tag], streamId1[0], deviceIdArray1[0, 1], hostIdArray1[1, 2, 3, 4]
 ```
