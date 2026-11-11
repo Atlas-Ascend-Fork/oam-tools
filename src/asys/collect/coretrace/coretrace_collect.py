@@ -164,7 +164,7 @@ class ParseCoreTrace:
         # Check whether the addr2line tools exist.
         if not self.check_tool_exists():
             return False
-        with open(coretrace_file, "r", encoding="utf-8") as fp:
+        with open(coretrace_file, "r", encoding="utf-8", errors="replace") as fp:
             file_lines = fp.readlines()
         if not file_lines:
             log_error(f"The {coretrace_file_name} file is empty.")
