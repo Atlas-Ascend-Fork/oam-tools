@@ -49,10 +49,10 @@ def _force_writable(path):
     subprocess.run([_CHMOD, "-R", "u+w", path], check=False, capture_output=True)
 
 
-def _collect_residuals(install_path):
+def _residual_candidates(install_path):
     """
-    Return a list of paths under install_path that belong to oam-tools and
-    should not remain after a clean uninstall.
+    Return paths under install_path that belong to oam-tools and should not
+    remain after a clean uninstall.
 
     Checks:
       - cann/share/info/oam_tools/          (oam-tools install-info directory)
@@ -69,7 +69,31 @@ def _collect_residuals(install_path):
         os.path.join(arch_linux, "include", "version", "oam_tools_version.h"),
         os.path.join(arch_linux, "lib64", "libopapi_oam.so"),
     ]
-    return [p for p in candidates if os.path.exists(p)]
+    return candidates
+
+
+def _collect_residuals(install_path):
+    """Return candidate paths that still exist after uninstallation."""
+    return [p for p in _residual_candidates(install_path) if os.path.lexists(p)]
+
+
+@pytest.mark.parametrize("candidate_index", range(len(_residual_candidates("."))))
+def test_collect_residuals_reports_dangling_symlink(tmp_path, candidate_index):
+    residual = _residual_candidates(str(tmp_path))[candidate_index]
+    os.makedirs(os.path.dirname(residual), exist_ok=True)
+    os.symlink(str(tmp_path / "missing-target"), residual)
+
+    assert _collect_residuals(str(tmp_path)) == [residual]
+
+
+@pytest.mark.parametrize("candidate_index", range(len(_residual_candidates("."))))
+def test_collect_residuals_reports_regular_file(tmp_path, candidate_index):
+    # 正向对照：普通文件残留同样必须被报告——防止判据回退为 os.path.islink
+    # 之类只覆盖链接形态的写法（PR #913 检视意见：断链用例对该变异体无区分力）。
+    residual = _residual_candidates(str(tmp_path))[candidate_index]
+    os.makedirs(os.path.dirname(residual), exist_ok=True)
+    open(residual, "w").close()
+    assert _collect_residuals(str(tmp_path)) == [residual]
 
 
 # ---------------------------------------------------------------------------
@@ -138,4 +162,3 @@ class TestUninstallViaCannUninstallSh:
             "Residual oam-tools files/dirs found after cann_uninstall.sh:\n"
             + "\n".join(f"  {p}" for p in residuals)
         )
-
