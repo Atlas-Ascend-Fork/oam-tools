@@ -712,8 +712,6 @@ class DumpDataParser:
             utils.AicErrException,
         ) as e:
             utils.print_debug_log(traceback.format_exc())
-            if str(e) == str(Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR):
-                e = "invalid dump file"
             utils.print_error_log(
                 f"Failed to parse the data of dump file:{dump_file}, Error Detail: {e}."
             )
@@ -829,7 +827,11 @@ class BigDumpDataParser:
                 self._read_header_length(dump_file)
                 self._parse_binary_to_json_data(dump_file)
                 return self.dump_json_data
-        except (OSError, IOError, utils.AicErrException) as io_error:
+        except utils.AicErrException:
+            # 内层已定位到具体原因（数据校验失败等），保持原错误码，
+            # 不得被重新包装成含混的"读文件失败"
+            raise
+        except (OSError, IOError) as io_error:
             utils.print_error_log(
                 "Failed to read the dump file %s. %s"
                 % (self.dump_file_path, str(io_error))
@@ -880,15 +882,22 @@ class BigDumpDataParser:
         try:
             dump_parse_cdll = ctypes.CDLL(self.parse_dump_so)
         except (OSError, IOError) as error:
-            utils.print_error_log(str(error))
+            utils.print_error_log(
+                f"Failed to load the dump parser library {self.parse_dump_so}. "
+                f"Please check that it is in LD_LIBRARY_PATH. {error}"
+            )
             raise utils.AicErrException(Constant.MS_AICERR_CONNECT_ERROR)
         data_ptr = ctypes.c_char_p(binary_data)
         res = dump_parse_cdll.ParseDumpProtoToJson(
             data_ptr, ctypes.c_size_t(len(binary_data)), json_file.encode("utf-8")
         )
         if res != 0 or not os.path.isfile(json_file):
-            utils.print_error_log("Parse dump file to json failed.")
-            raise utils.AicErrException(Constant.MS_AICERR_CONNECT_ERROR)
+            utils.print_error_log(
+                f"Failed to parse the dump proto with {self.parse_dump_so} "
+                f"(return code: {res}). The dump file may be corrupted; "
+                f"please check it or update CANN."
+            )
+            raise utils.AicErrException(Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR)
         try:
             with open(json_file, "r", encoding="utf-8") as load_f:
                 self.dump_json_data = json.load(load_f)

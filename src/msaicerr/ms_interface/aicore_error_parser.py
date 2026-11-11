@@ -1509,8 +1509,8 @@ exit()"""
                     "Data dump failed in exception dump. Please contact GE to resolve it!"
                 )
                 return False
-        except utils.AicErrException:
-            utils.print_error_log("Failed to dump data!")
+        except utils.AicErrException as e:
+            utils.print_error_log(f"Failed to dump data! Error Detail: {e}.")
         try:
             data_dump_failed_cmd1 = [
                 "grep",
@@ -1531,8 +1531,8 @@ exit()"""
                     "Data dump failed. Maybe memory is invalid. Search 'D2H failed' in plog!"
                 )
                 return False
-        except utils.AicErrException:
-            utils.print_error_log("Failed to dump data!")
+        except utils.AicErrException as e:
+            utils.print_error_log(f"Failed to dump data! Error Detail: {e}.")
         return True
 
     def check_dump_result(self: any, dfx_message: str, info: AicErrorInfo) -> bool:
@@ -2107,10 +2107,18 @@ exit()"""
                 soc_version, self.device_id
             )
             info.env_check_attempted = True
-        except (OSError, ValueError, RuntimeError, TypeError, utils.AicErrException):
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+            TypeError,
+            utils.AicErrException,
+        ) as e:
             # 环境检查未执行成功，保持 env_available 默认值但标记未采集，
             # info.json 的 env_check.result 据此输出 not_collected
-            utils.print_info_log("run golden op failed.Test env skip!")
+            utils.print_warn_log(
+                f"run golden op failed.Test env skip! Error Detail: {e}."
+            )
         # write info file
         utils.print_info_log(
             f"Step 11. Write the parsing result."

@@ -463,7 +463,7 @@ class TestUtilsMethods(CommonAssert):
         )
         with pytest.raises(utils.AicErrException) as e:
             collection.get_dump_data_info()
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_PATH_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_PATH_ERROR)
 
     def test_get_dump_data_info_collect_error_level_one(self):
         output_path = self.temp.joinpath(f"info_{CUR_TIME_STR}")
@@ -475,7 +475,7 @@ class TestUtilsMethods(CommonAssert):
         collection_plog_path.joinpath("ge_exception.log").touch()
         with pytest.raises(utils.AicErrException) as e:
             collection.get_dump_data_info()
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_PATH_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_PATH_ERROR)
 
     def test_get_dump_data_info_collect_error_level_zero(self):
         output_path = self.temp.joinpath(f"info_{CUR_TIME_STR}")
@@ -487,7 +487,7 @@ class TestUtilsMethods(CommonAssert):
         collection_plog_path.joinpath("dump_exception.log").touch()
         with pytest.raises(utils.AicErrException) as e:
             collection.get_dump_data_info()
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_PATH_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_PATH_ERROR)
 
     def test_check_dump_data_is_valid(self):
         output_path = self.temp.joinpath(f"info_{CUR_TIME_STR}")
@@ -497,7 +497,7 @@ class TestUtilsMethods(CommonAssert):
             collection.check_dump_data_is_valid(
                 "2024-09-12-16:40:08.360.226", "exception_info.42.1.1"
             )
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR)
 
     def test_check_host_and_device_kernel_name(self):
         data_name = "GatherV2.GatherV21.1.1733469426252033"
@@ -833,7 +833,7 @@ class TestUtilsMethods(CommonAssert):
         collection = Collection(input_path, output_path)
         with pytest.raises(utils.AicErrException) as e:
             collection.get_node_and_kernel_name_l1()
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR)
 
     def test_collect_get_node_and_kernel_name_name_error_l1(self):
         input_path = RES_PATH.joinpath("ori_data/collect/notffts")
@@ -848,7 +848,7 @@ class TestUtilsMethods(CommonAssert):
         collection = Collection(input_path, output_path)
         with pytest.raises(utils.AicErrException) as e:
             collection.get_node_and_kernel_name_l1()
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR)
 
     @pytest.mark.parametrize(
         "plog_content, expected",
@@ -891,7 +891,7 @@ class TestUtilsMethods(CommonAssert):
         collection.ffts_flag = False
         with pytest.raises(utils.AicErrException) as e:
             collection.get_kernel_name_l0(data_name)
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR)
 
     def test_collect_get_kernel_name_l0_ffts(self):
         input_path = RES_PATH.joinpath("ori_data/collect/notffts")
@@ -948,7 +948,7 @@ class TestUtilsMethods(CommonAssert):
         collection.ffts_flag = True
         with pytest.raises(utils.AicErrException) as e:
             collection.get_kernel_name_l0(data_name)
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_SLOG_DATA_ERROR)
 
     def test_collect_get_kernel_name_l0_sk_scenario(self):
         # SK场景：标志性打印中的kernelName才是正确的算子名，优先返回
@@ -1276,7 +1276,7 @@ class TestUtilsMethods(CommonAssert):
             collection.check_dump_data_is_valid(
                 "2024-09-12-16:40:08.360.226", data_name
             )
-            self.assertEqual(str(e), str(Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR))
+        self.assertEqual(e.value.args[0], Constant.MS_AICERR_INVALID_DUMP_DATA_ERROR)
 
     def test_check_host_and_device_kernel_name_with_rename(self):
         """

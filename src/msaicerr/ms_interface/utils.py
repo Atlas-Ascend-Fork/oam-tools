@@ -92,6 +92,13 @@ class AicErrException(Exception):
         super().__init__(error_info)
         self.error_info = error_info
 
+    def __str__(self) -> str:
+        # 渲染为 "[错误码] 描述"：日志/traceback 不再出现只有数字、意义不明的错误码
+        desc = Constant.MS_AICERR_ERROR_DESC.get(self.error_info)
+        if desc is None:
+            return f"[{self.error_info}] unknown msaicerr error"
+        return f"[{self.error_info}] {desc}"
+
 
 def _print_log(level: str, msg: str) -> None:
     current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(time.time())))

@@ -68,8 +68,16 @@ class AscendHandlerBase:
         # Step 2. compile dirty_ub kernel
         try:
             build_result = compile_op.get_compile_file(configs.get("compile_temp_dir"))
-        except (OSError, TypeError, ValueError, RuntimeError, utils.AicErrException):
-            utils.print_warn_log("Compile dirty_ub op failed, skip dirty ub")
+        except (
+            OSError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+            utils.AicErrException,
+        ) as e:
+            utils.print_warn_log(
+                f"Compile dirty_ub op failed, skip dirty ub. Error Detail: {e}."
+            )
             return False
 
         # Step 3. find dirty_ub kernel

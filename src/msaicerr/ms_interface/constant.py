@@ -77,6 +77,23 @@ class Constant:
     MS_AICERR_OPERATOR_ARGS_OVERWRITTEN = 106  # 检查到算子args被踩
     MS_AICERR_ATOMIC_OPERATOR_OVERFLOW = 107  # 检查到atomic算子遇到溢出数据导致错误
 
+    # 工具级错误码（<100）的用户可读描述；101+ 是分析结论码，
+    # 对应描述由报告的 root cause 输出，不在此表。
+    MS_AICERR_ERROR_DESC = {
+        MS_AICERR_NONE_ERROR: "success",
+        MS_AICERR_INVALID_PARAM_ERROR: "invalid input parameter",
+        MS_AICERR_INVALID_PATH_ERROR: "invalid input path",
+        MS_AICERR_CONNECT_ERROR: "failed to load the parser or runtime library",
+        MS_AICERR_INVALID_DUMP_DATA_ERROR: "invalid or corrupted dump file",
+        MS_AICERR_OPEN_FILE_ERROR: "failed to open or read the required file",
+        MS_AICERR_EXECUTE_COMMAND_ERROR: "failed to execute the external command",
+        MS_AICERR_INVALID_CONFIG_DATA_ERROR: "invalid configuration file",
+        MS_AICERR_INVALID_SLOG_DATA_ERROR: "required information is missing in the collected logs",
+        MS_AICERR_FIND_DATA_ERROR: "the required data was not found",
+        MS_AICERR_GET_DRIVER_AICORE_NUMBER_ERROR: "failed to get the AI Core number from the driver",
+        MS_AICERR_GET_RUNTIME_BLOCKDIM_ERROR: "failed to get block_dim from the runtime log",
+    }
+
     WRITE_FLAGS = os.O_WRONLY | os.O_CREAT
     WRITE_MODES = stat.S_IWUSR | stat.S_IRUSR
 

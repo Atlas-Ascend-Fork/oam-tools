@@ -1332,7 +1332,9 @@ class TestUtilsMethods(CommonAssert):
         try:
             parser.collect_driver_aicore_number()
         except utils.AicErrException as e:
-            self.assertEqual(str(e), "10")
+            self.assertEqual(
+                str(e), "[10] failed to get the AI Core number from the driver"
+            )
         else:
             self.assertEqual(False, True)
 

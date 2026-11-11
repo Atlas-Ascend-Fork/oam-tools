@@ -152,8 +152,9 @@ def analyse_report_path(args):
         return parser.parse()
 
     except utils.AicErrException as error:
+        # str(error) 已是 "[错误码] 描述" 格式，异常根因在其上方日志中
         utils.print_error_log(
-            f"The aicore error analysis tool has an exception, and error code is {error.error_info}."
+            f"The aicore error analysis tool has an exception: {error}."
         )
         return Constant.MS_AICERR_INVALID_PATH_ERROR
 

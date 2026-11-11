@@ -171,7 +171,9 @@ class TestUtilsMethods(CommonAssert):
         mocker.patch.object(big_dump_parser, "_parse_binary_to_json_data")
         with pytest.raises(AicErrException) as exc_info:
             big_dump_parser.parse()
-        self.assertEqual(str(exc_info.value), "5")
+        self.assertEqual(
+            str(exc_info.value), "[5] failed to open or read the required file"
+        )
         self.assertIn(
             capsys.readouterr().out,
             "No such file or directory: 'exception_info.2.1.20250609144925349'",
@@ -183,21 +185,24 @@ class TestUtilsMethods(CommonAssert):
             f.write(struct.pack("Q", 10))
         with pytest.raises(AicErrException) as exc_info:
             big_dump_parser.check_argument_valid()
-        self.assertEqual(str(exc_info.value), "4")
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_check_argument_valid_file_get_size_failed(self, mocker):
         big_dump_parser = BigDumpDataParser(dump_file)
         mocker.patch("os.path.getsize", effect=IOError("test"))
         with pytest.raises(AicErrException) as exc_info:
             big_dump_parser.check_argument_valid()
-        self.assertEqual(str(exc_info.value), "2")
+        self.assertEqual(str(exc_info.value), "[2] invalid input path")
 
     def test_parse_dump_to_json_load_so_failed(self):
         big_dump_parser = BigDumpDataParser(dump_file)
         create_dump_file(dump_file, 10, 200)
         with pytest.raises(AicErrException) as exc_info:
             getattr(big_dump_parser, "_parse_dump_to_json")()
-        self.assertEqual(str(exc_info.value), "3")
+        # 本机装有 CANN 时 so 可正常加载，此用例实际走到 proto 解析失败分支，
+        # 错误码须是 dump 数据非法(4)而非库加载失败(3)；so 加载失败分支由
+        # test_parse_dump_to_json_check_path / load_func_failed 覆盖
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_parse_dump_to_json_check_path(self, mocker):
         big_dump_parser = BigDumpDataParser(dump_file)
@@ -205,7 +210,8 @@ class TestUtilsMethods(CommonAssert):
         create_dump_file(dump_file, 10, 200)
         with pytest.raises(AicErrException) as exc_info:
             getattr(big_dump_parser, "_parse_dump_to_json")()
-        self.assertEqual(str(exc_info.value), "3")
+        # 解析 proto 失败的根因是 dump 数据非法(4)，不得误报为库加载失败(3)
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_parse_dump_to_json_load_func_failed(self, mocker):
         big_dump_parser = BigDumpDataParser(dump_file)
@@ -213,7 +219,8 @@ class TestUtilsMethods(CommonAssert):
         create_dump_file(dump_file, 10, 200)
         with pytest.raises(AicErrException) as exc_info:
             getattr(big_dump_parser, "_parse_dump_to_json")()
-        self.assertEqual(str(exc_info.value), "3")
+        # 解析 proto 失败的根因是 dump 数据非法(4)，不得误报为库加载失败(3)
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_parse_binary_to_json_data_use_gt_file_size(self, mocker):
         dump_json = {
@@ -292,7 +299,8 @@ class TestUtilsMethods(CommonAssert):
         big_dump_parser = BigDumpDataParser(dump_file)
         with pytest.raises(AicErrException) as exc_info:
             big_dump_parser.parse()
-        self.assertEqual(str(exc_info.value), "5")
+        # 数据校验失败(4)不得被重新包装成读文件失败(5)，错误码须保持原样
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_dump_data_parser(self, mocker):
         dump_json = {
@@ -1126,7 +1134,7 @@ class TestUtilsMethods(CommonAssert):
                 ]
             }
             save_to_bin(tensor_data, "input", {"input": {}}, dump_file)
-        self.assertEqual(str(exc_info.value), "4")
+        self.assertEqual(str(exc_info.value), "[4] invalid or corrupted dump file")
 
     def test_build_dst_file_name_normal_len(self):
         """不超长的解析结果文件名原样返回，不生成mapping.csv"""

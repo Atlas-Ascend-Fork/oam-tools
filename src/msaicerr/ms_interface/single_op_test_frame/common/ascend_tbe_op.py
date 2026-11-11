@@ -940,8 +940,12 @@ class AscendOpKernelRunner:
             RuntimeError,
             AttributeError,
             utils.AicErrException,
-        ):
-            return f"{NOT_RUN_EXEC_FAILED}, please check testcase file(test_single_op.py) or plog."
+        ) as e:
+            # 保留异常详情：只有标记串时无法区分是依赖缺失、launch 参数非法还是环境问题
+            return (
+                f"{NOT_RUN_EXEC_FAILED}, please check testcase file(test_single_op.py) "
+                f"or plog. Error Detail: {e}."
+            )
 
         if launch_ret != 0 or sync_ret != 0:
             aic_info = f"{aic_info}{NOT_RUN_LAUNCH_FAILED}.\r\n"

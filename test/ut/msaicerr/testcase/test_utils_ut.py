@@ -124,6 +124,27 @@ class TestUtilsMethods(CommonAssert):
             utils.execute_command("")
         self.assertEqual(error.value.args[0], Constant.MS_AICERR_EXECUTE_COMMAND_ERROR)
 
+    def test_aicerr_exception_str_is_self_describing(self):
+        # str() 渲染为 "[错误码] 描述"，日志与 traceback 不再出现裸数字错误码
+        exc = utils.AicErrException(Constant.MS_AICERR_OPEN_FILE_ERROR)
+        self.assertEqual(exc.args[0], Constant.MS_AICERR_OPEN_FILE_ERROR)
+        self.assertEqual(exc.error_info, Constant.MS_AICERR_OPEN_FILE_ERROR)
+        self.assertEqual(str(exc), "[5] failed to open or read the required file")
+
+    def test_aicerr_exception_str_unknown_code(self):
+        self.assertEqual(
+            str(utils.AicErrException(999)), "[999] unknown msaicerr error"
+        )
+
+    def test_ms_aicerr_error_desc_covers_all_tool_error_codes(self):
+        # 新增 MS_AICERR_* 工具错误码（<100）时必须同步补描述，防止再出现裸数字
+        codes = {
+            value
+            for name, value in vars(Constant).items()
+            if name.startswith("MS_AICERR_") and isinstance(value, int) and value < 100
+        }
+        self.assertEqual(codes - set(Constant.MS_AICERR_ERROR_DESC), set())
+
     def test_run_cmd_output_pass(self):
         res = utils.run_cmd_output(["ls"])
         assert res
