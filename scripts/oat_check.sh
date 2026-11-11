@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # ----------------------------------------------------------------------------
 # Copyright (c) 2025 Huawei Technologies Co., Ltd.
 #
@@ -28,7 +28,7 @@ else
     echo "[OAT] CRLF detected, auto-fixing and re-running..."
     _TMP="${_SCRIPT}.lf"
     sed 's/\r//' "$_SCRIPT" > "$_TMP" && mv "$_TMP" "$_SCRIPT"
-    exec sh "$_SCRIPT" "$@"
+    exec bash "$_SCRIPT" "$@"
 fi
 
 set -e
