@@ -159,13 +159,20 @@ int32_t CheckCustomEventIsValid(std::string::size_type pos, std::string& metrics
     }
 
     for (size_t i = 0; i < metricsVec.size(); ++i) {
-        std::string event = metricsVec[i];
+        // 原地归一化写回：event 绑定 metricsVec[i]，CheckHexOrDec 会把元素归一化为
+        // 0x 前缀形式（十进制转十六进制）并直接写回容器元素。本循环体不增删
+        // metricsVec 元素（无 push_back/erase，元素引用不因扩容搬移而悬空），
+        // 容器结构修改仅发生在其后的 DeduplicateAcpMetrics。
+        std::string& event = metricsVec[i];
+        // 错误日志须输出改写前的原始输入：CheckHexOrDec 失败时可能已对入参做
+        // trim/去 0x 前缀等改写，直接打印 event 会丢失用户原始输入。
+        const std::string originalEvent = event;
         if (!ParamValidation::instance()->CheckHexOrDec(event, HEX_MODE) &&
             !ParamValidation::instance()->CheckHexOrDec(event, DEC_MODE)) {
             CmdLog::CmdErrorLog(
                 "Argument --aic-metrics %s (lower) is invalid, hexadecimal or decimal "
                 "parameters are allowed in custom mode.",
-                event.c_str());
+                originalEvent.c_str());
             return ARGPARSE_ERROR;
         }
     }
@@ -215,7 +222,13 @@ int32_t CheckGroupMetricsIsValid(std::string& metrics, std::vector<std::string>&
  */
 void DeduplicateAcpMetrics(std::string::size_type pos, std::string& metrics, std::vector<std::string>& metricsVec)
 {
-    if (metricsVec.size() == 1) {
+    // 空向量保护：metricsVec 为空时重建得到空 metrics，其后的 pop_back() 对空串
+    // 是未定义行为（当前调用链 CheckAcpMetricsIsValid 经校验后非空，此处防御
+    // 未来新增调用点传入空向量）。
+    // 单元素提前返回仅限 group 路径（pos==npos）：单元素无重复、重建结果不变；
+    // custom 路径（pos 有效）的单元素仍需走重建完成十进制到 0x 的归一化写回。
+    // 去重双重循环对 size==1 空转（内层 j=i+1 越过 size），不访问 metricsVec[1]。
+    if (metricsVec.empty() || (metricsVec.size() == 1 && pos == std::string::npos)) {
         return;
     }
 

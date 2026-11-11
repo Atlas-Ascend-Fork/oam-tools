@@ -88,6 +88,9 @@ void EXPECT_TestAcp(std::vector<std::string> args, const int expectedRet, std::v
     }
     const char* envp[1] = {nullptr};
     EXPECT_EQ(expectedRet, LltAcpMain(argc, (const char**)argv.data(), envp));
+    // 恢复 cout：局部 stringstream 析构后其 rdbuf 悬空，不恢复会使后续用例中
+    // CmdLog 向 std::cout 的输出解引用已释放缓冲区而崩溃
+    std::cout.rdbuf(oldCoutBuffer);
 }
 
 TEST_F(ACP_BIN_UTEST, AcpBin)
@@ -172,5 +175,64 @@ TEST_F(ACP_BIN_UTEST, AcpBin)
          "test.sh"},
         PROFILING_FAILED, {"[ERROR] Acp is not supported on the current platform type."});
     rmdir("acp_bin_stest");
+}
+
+TEST_F(ACP_BIN_UTEST, AcpCustomDecimalMetricsAreNormalized)
+{
+    std::string metrics = "Custom:10";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa", metrics);
+
+    metrics = "Custom:10,11";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa,0xb", metrics);
+
+    metrics = "Custom:0xa";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa", metrics);
+
+    metrics = "Custom:10,10";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa", metrics);
+}
+
+TEST_F(ACP_BIN_UTEST, AcpCustomMetricsBoundaryCases)
+{
+    // 非法值：校验失败且入参保持原值（错误日志输出改写前的原始输入）
+    std::string metrics = "Custom:xyz";
+    EXPECT_EQ(ARGPARSE_ERROR, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:xyz", metrics);
+
+    // 十/十六进制混合重复：先归一化后去重，得到单一 0x 形式
+    metrics = "Custom:10,0xa";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa", metrics);
+
+    // 尾随分隔符切出空项：空项校验失败，入参保持原值
+    metrics = "Custom:10,";
+    EXPECT_EQ(ARGPARSE_ERROR, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:10,", metrics);
+
+    // 含空格：CheckHexOrDec 内部 trim 后归一化
+    metrics = "Custom: 10";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0xa", metrics);
+
+    // 0 值：归一化为 0x0
+    metrics = "Custom:0";
+    EXPECT_EQ(ARGPARSE_OK, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0x0", metrics);
+
+    // 裸指标走 group 校验路径（平台指标名），不适用 0x 归一化，与带 Custom: 前缀
+    // 不一致；单元素且 pos==npos 时 DeduplicateAcpMetrics 提前返回，无论校验结果
+    // 如何入参均保持原值
+    metrics = "10";
+    CheckAcpMetricsIsValid(metrics);
+    EXPECT_EQ("10", metrics);
+
+    // 超上限：31 个自定义事件超过 [1,30] 上限，入参保持原值
+    metrics = "Custom:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30";
+    EXPECT_EQ(ARGPARSE_ERROR, CheckAcpMetricsIsValid(metrics));
+    EXPECT_EQ("Custom:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30", metrics);
 }
 #undef private
