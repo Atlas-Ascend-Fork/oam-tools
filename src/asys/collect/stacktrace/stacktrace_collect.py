@@ -128,7 +128,7 @@ class AsysStackTrace(AscendTraceDll):
     def _get_last_bin_file_name(self):
         cmd = (
             f"ls -lt {os.path.abspath(self.trace_work_path)}/trace_*/stackcore_event_{self.remote_id}_*/"
-            f"stackcore_tracer_35_{self.remote_id}_*.bin | head -n 1 | awk '{{print $9}}'"
+            f"stackcore_tracer_35_{self.remote_id}_*.bin | head -n 1 | awk '{{print $NF}}'"
         )
         return popen_run_cmd(cmd).replace("\n", "")
 
