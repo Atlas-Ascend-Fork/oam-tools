@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # ----------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
+# Copyright (c) 2025 Huawei Technologies Co., Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@
 """
 Function:
 This file mainly involves the common function.
-Copyright Information:
-Huawei Technologies Co., Ltd. All Rights Reserved © 2020
+Copyright (c) 2020 Huawei Technologies Co., Ltd.
 """
 
 import csv
@@ -248,6 +247,11 @@ def check_path_valid(path: str, isdir: bool = False, output: bool = False) -> No
             raise AicErrException(Constant.MS_AICERR_INVALID_PATH_ERROR)
 
 
+def _output_file_opener(path: str, flags: int) -> int:
+    """Open output files using the mode flags and owner-only creation permissions."""
+    return os.open(path, flags, Constant.WRITE_MODES)
+
+
 def execute_command(cmd: list, file_out: str = None) -> tuple:
     """
     execute command
@@ -263,9 +267,7 @@ def execute_command(cmd: list, file_out: str = None) -> tuple:
                     cmd, shell=False, stdout=file_no, stderr=file_no
                 )
             else:
-                with os.fdopen(
-                    os.open(file_out, Constant.WRITE_FLAGS, Constant.WRITE_MODES), "w"
-                ) as output_file:
+                with open(file_out, "w", opener=_output_file_opener) as output_file:
                     process = subprocess.Popen(
                         cmd, shell=False, stdout=output_file, stderr=file_no
                     )
@@ -401,11 +403,12 @@ def write_file(output_path: str, file_content: str, write_mode="w") -> None:
     dest_dir = os.path.dirname(output_path)
     check_path_valid(dest_dir, isdir=True, output=True)
     try:
-        with os.fdopen(
-            os.open(output_path, Constant.WRITE_FLAGS, Constant.WRITE_MODES), write_mode
-        ) as output_file:
+        with open(output_path, write_mode, opener=_output_file_opener) as output_file:
             output_file.write(file_content)
-        os.chmod(output_path, stat.S_IRUSR)
+        # Append keeps the creation-time 0600: a later append (possibly by a
+        # non-root rerun) must not fail on the read-only seal.
+        if "a" not in write_mode:
+            os.chmod(output_path, stat.S_IRUSR)
     except IOError as io_error:
         print_error_log("Failed to write file %s. %s" % (output_path, io_error))
         raise AicErrException(Constant.MS_AICERR_OPEN_FILE_ERROR) from io_error

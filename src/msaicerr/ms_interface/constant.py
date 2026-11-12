@@ -16,7 +16,6 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 
-import os
 import stat
 import enum
 
@@ -94,7 +93,6 @@ class Constant:
         MS_AICERR_GET_RUNTIME_BLOCKDIM_ERROR: "failed to get block_dim from the runtime log",
     }
 
-    WRITE_FLAGS = os.O_WRONLY | os.O_CREAT
     WRITE_MODES = stat.S_IWUSR | stat.S_IRUSR
 
     DIRECTORY_MASK = 0o700
