@@ -407,7 +407,7 @@ class TestCmdRunTimeout(AssertTest):
         mocker.patch("common.cmd_run._kill_process_group")
         start = time.monotonic()
         with pytest.raises(subprocess.TimeoutExpired):
-            cmd_run._run_timed(
+            cmd_run.run_timed(
                 [cmd_run.BASH, "-c", "sleep 5"],
                 timeout=0.3,
                 stdout=subprocess.PIPE,
@@ -416,7 +416,7 @@ class TestCmdRunTimeout(AssertTest):
             )
         elapsed = time.monotonic() - start
         self.assertTrue(elapsed >= 0.3)
-        assert elapsed < 3.0, "_run_timed waited {0:.2f}s".format(elapsed)
+        assert elapsed < 3.0, "run_timed waited {0:.2f}s".format(elapsed)
 
         start = time.monotonic()
         result = real_time_output("sleep 5", output=False, timeout=0.3)
@@ -424,7 +424,7 @@ class TestCmdRunTimeout(AssertTest):
         self.assertTrue(result is False)
         assert elapsed < 3.5, "real_time_output waited {0:.2f}s".format(elapsed)
 
-    def test_run_timed_keyboardinterrupt_kills_process_group(self, mocker):
+    def testrun_timed_keyboardinterrupt_kills_process_group(self, mocker):
         # 检视意见（diff 198750377）：communicate() 期间的非超时异常（交互式 CLI
         # 下最常见的是 Ctrl-C）必须像 base 的 subprocess.run 那样先回收进程组
         # 再原样抛出，否则 start_new_session 出来的整个会话无人可达。
@@ -434,7 +434,7 @@ class TestCmdRunTimeout(AssertTest):
         kill = mocker.patch("common.cmd_run._kill_process_group")
         wait = mocker.patch("common.cmd_run._wait_after_kill")
         with pytest.raises(KeyboardInterrupt):
-            cmd_run._run_timed(["cmd"], timeout=1)
+            cmd_run.run_timed(["cmd"], timeout=1)
         kill.assert_called_once_with(process)
         wait.assert_called_once_with(process)
 
@@ -462,7 +462,7 @@ class TestCmdRunTimeout(AssertTest):
         wait.assert_called_once_with(process)
 
     @pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX-only")
-    def test_run_timed_keyboardinterrupt_leaves_no_orphan(self, tmp_path, mocker):
+    def testrun_timed_keyboardinterrupt_leaves_no_orphan(self, tmp_path, mocker):
         # 检视意见（diff 198750377）无孤儿回归：真实 sleep 孙进程被中断后必须消失。
         pid_file = tmp_path / "timed_orphan.pid"
         command = "sleep 30 & echo $! > {0}; wait".format(shlex.quote(str(pid_file)))
@@ -474,7 +474,7 @@ class TestCmdRunTimeout(AssertTest):
 
         mocker.patch.object(subprocess.Popen, "communicate", interrupting_communicate)
         with pytest.raises(KeyboardInterrupt):
-            cmd_run._run_timed(
+            cmd_run.run_timed(
                 [cmd_run.BASH, "-c", command],
                 timeout=10,
                 stdout=subprocess.PIPE,

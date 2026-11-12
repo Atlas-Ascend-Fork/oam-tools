@@ -29,12 +29,27 @@ from collect.msnpureport_type_collect.ub_parse import parse_ub_in_place
 
 __all__ = [
     "MSNPUREPORT_TYPE_TABLE",
+    "MSNPUREPORT_TYPE_TIMEOUTS",
     "collect_msnpureport_type_info",
     "merge_dir",
 ]
 
 CMD_PREFIX = "msnpureport report -t "
 EXPORT_TMP_DIR = "export_type_tmp"
+
+# #399 超时规格：全量导出(-f) 60s；类型化导出 -t5 120s / -t6 100s / -t7 120s /
+# -t8 240s / -t9 120s / -t10 100s / -t11 40s（单位秒），挂死时按既有失败
+# 告警路径降级，collect 流程不永久阻塞。
+MSNPUREPORT_TYPE_TIMEOUTS = {
+    "-f": 60,
+    5: 120,
+    6: 100,
+    7: 120,
+    8: 240,
+    9: 120,
+    10: 100,
+    11: 40,
+}
 
 # The command support matrix is table-driven; a driver-side support change
 # only updates this one place.
@@ -168,7 +183,7 @@ def collect_msnpureport_type_info(output_root_path):
         export_cmd = "cd {};{}{}".format(
             shlex.quote(type_dir_path), CMD_PREFIX, type_id
         )
-        cmd_res = run_cmd_output(export_cmd)
+        cmd_res = run_cmd_output(export_cmd, timeout=MSNPUREPORT_TYPE_TIMEOUTS[type_id])
         if not cmd_res[0] or not _archive_type_output(
             type_dir_path, output_root_path, MSNPUREPORT_TYPE_TABLE[type_id]["dirs"]
         ):

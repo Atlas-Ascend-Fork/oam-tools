@@ -25,9 +25,15 @@ import threading
 from datetime import datetime, timezone
 
 from common import log_error, log_warning, log_info, log_debug
-from common.const import RetCode, UNKNOWN, ScreenResult
+from common.const import (
+    RetCode,
+    UNKNOWN,
+    ScreenResult,
+    MSAICERR_ENV_TIMEOUT,
+    CMD_TIMEOUT,
+)
 from common.const import HBM_MIN_TIMEOUT, CPU_MIN_TIMEOUT, DETECT_MAX_TIMEOUT
-from common.cmd_run import check_command, run_linux_cmd
+from common.cmd_run import check_command, run_linux_cmd, run_timed
 from common import AsysDiagnoseSupportedChip, DeviceInfo, ChipHandler
 from common.file_operate import FileOperate as f
 from params.param_dict import ParamDict
@@ -148,8 +154,13 @@ class AsysDiagnose:
                 "cannot be detected. Install systemd and try again."
             )
             return False
-        if not run_linux_cmd("systemd-detect-virt", "none"):
-            log_error("The diagnose command cannot be executed on VMs and docker.")
+        if not run_linux_cmd("systemd-detect-virt", "none", timeout=CMD_TIMEOUT):
+            # 超时（cmd_run 已记录 WARNING "timed out"）与真虚拟机在此同路返回
+            # False；错误文案不再断言"就是虚拟机"，两条线索并列给出。
+            log_error(
+                "The diagnose command cannot be executed on VMs and docker, "
+                "or the systemd-detect-virt probe failed or timed out."
+            )
             return False
 
         # username
@@ -313,14 +324,27 @@ class AsysDiagnose:
         cmd = [sys.executable, str(msaicerr_path), "--env", f"-dev={device_id}"]
         log_debug(f"Start run: {' '.join(cmd)}")
         try:
-            ret = subprocess.run(
+            # run_timed 而非裸 subprocess.run：msaicerr --env 会再启动
+            # golden_op.py 孙进程，超时须 kill 整个进程组一并终止，只杀
+            # 直接子进程会让环境检测任务继续占用 device/CPU。
+            ret = run_timed(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 encoding="utf-8",
+                errors="replace",
                 env=os.environ,
-                check=False,
+                # 单卡 --env 的墙钟预算：驱动/环境异常挂起时按失败降级，
+                # 不让 diagnose 主流程永久阻塞（#399 超时规格）。
+                timeout=MSAICERR_ENV_TIMEOUT,
             )
+        except subprocess.TimeoutExpired:
+            log_error(
+                "Run command: {0} timed out after {1}s, the device is marked "
+                "Fail.".format(" ".join(cmd), MSAICERR_ENV_TIMEOUT)
+            )
+            res[device_id] = ScreenResult.FAIL.value
+            return ""
         except (OSError, ValueError) as e:
             log_error(f"Run command: {' '.join(cmd)} failed, {e}")
             res[device_id] = ScreenResult.FAIL.value

@@ -23,7 +23,6 @@
 from argparse import Namespace
 
 import pytest
-import subprocess
 import os
 import shutil
 
@@ -32,6 +31,7 @@ from testcase.conftest import AssertTest
 
 
 from collect import AsysCollect
+from collect.msnpureport_type_collect import MSNPUREPORT_TYPE_TIMEOUTS
 from params import ParamDict
 
 
@@ -79,22 +79,20 @@ class TestAsysCollect(AssertTest):
     def test_collect_uses_report_subcommand_for_full_export(self, mocker):
         ParamDict().set_env_type("EP")
         commands = []
-        real_run = subprocess.run
+        timeouts = []
 
-        def fake_run(command, *_args, **_kwargs):
-            commands.append(command[2])
-            return real_run(
-                "not supported",
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                encoding="utf-8",
-                check=False,
-            )  # nosec B604  # test mock creation; command is a literal
+        def fake_run_cmd_output(command, timeout=None, **_kwargs):
+            commands.append(command)
+            timeouts.append(timeout)
+            return True, ""
 
         mocker.patch("common.FileOperate.create_dir", return_value=True)
         mocker.patch("common.FileOperate.remove_dir")
-        mocker.patch("subprocess.run", side_effect=fake_run)
+        mocker.patch(
+            "collect.asys_collect.run_cmd_output",
+            side_effect=fake_run_cmd_output,
+        )
+        mocker.patch("common.FileOperate.list_dir", return_value=["20261112000000"])
         mocker.patch(
             "collect.asys_collect.collect_msnpureport_type_info", return_value=True
         )
@@ -103,6 +101,8 @@ class TestAsysCollect(AssertTest):
         asys_collect = AsysCollect()
         self.assertTrue(asys_collect.collect())
         self.assertTrue(any("msnpureport report -f" in command for command in commands))
+        # #399 拍板规格：全量导出命令必须携带 60s 预算
+        self.assertTrue(timeouts[-1] == MSNPUREPORT_TYPE_TIMEOUTS["-f"])
 
     def test_clean_work_removes_typed_export_dir(self, mocker):
         typed_export_path = os.path.join(
@@ -124,7 +124,7 @@ class TestAsysCollect(AssertTest):
         # retried once the recommended form fails.
         commands = []
 
-        def fake_run_cmd_output(command):
+        def fake_run_cmd_output(command, timeout=None, **_kwargs):  # noqa: ARG001
             commands.append(command)
             if "msnpureport report -f" in command:
                 return False, "msnpureport: invalid option -- report"
@@ -143,26 +143,29 @@ class TestAsysCollect(AssertTest):
         self.assertTrue("msnpureport report -f" in commands[0])
         self.assertTrue("msnpureport -f" in commands[1])
 
-    @pytest.mark.parametrize(["run"], [("not supported",), ("ls",)])
-    def test_collect_msnpureport_failed(self, run, mocker, caplog):
+    @pytest.mark.parametrize(["msnpureport_ok"], [(True,), (False,)])
+    def test_collect_msnpureport_failed(self, msnpureport_ok, mocker, caplog):
+        # 旧写法 mock subprocess.run 在 #955 传 timeout 后不再被拦截
+        # （cmd_run 走 Popen 定时路径），改在 run_cmd_output 层 mock：
+        # 导出"成功"但目录为空 → "No files or directories in"；
+        # 导出失败 → "msnpureport tool export device files failed"。
         ParamDict().set_env_type("EP")
         mocker.patch("common.FileOperate.create_dir", return_value=True)
         mocker.patch("common.FileOperate.write_file")
         mocker.patch("common.FileOperate.remove_dir")
-        fake_ret = subprocess.run(
-            run,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            check=False,
-        )  # nosec B602  # test mock creation
-        mocker.patch("subprocess.run", return_value=fake_ret)
+        mocker.patch(
+            "collect.asys_collect.run_cmd_output",
+            return_value=((True, "") if msnpureport_ok else (False, "boom")),
+        )
         mocker.patch("collect.ops.ops_collect.collect_ops", return_value=True)
         asys_collect = AsysCollect()
         self.assertTrue(asys_collect.collect())
-        if run == "ls":
+        if msnpureport_ok:
             self.assertTrue("No files or directories in" in caplog.text)
+        else:
+            self.assertTrue(
+                "msnpureport tool export device files failed" in caplog.text
+            )
 
     def test_collect_success(self, mocker):
         ParamDict().set_env_type("EP")

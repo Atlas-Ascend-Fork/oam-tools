@@ -27,6 +27,7 @@ from common import log_error, log_warning, log_info, log_debug
 from common import FileOperate as f
 from common.cmd_run import check_command, real_time_output
 from common.task_common import get_target_cnt
+from common.const import MSAICERR_ANALYZE_TIMEOUT
 from collect.coretrace import ParseCoreTrace
 from collect.trace import ParseTrace
 from collect.stackcore import ParseStackCore
@@ -217,7 +218,9 @@ class AsysAnalyze:
                 f"-dev {self.device_id} -out {shlex.quote(output_path)}"
             )
         log_debug(f"Start run: {cmd}")
-        res = real_time_output(cmd)
+        # msaicerr -p 是重操作：超时预算 3 分钟，挂死时 kill 进程组并按
+        # 失败返回，不让 analyze 主流程永久阻塞（#399 超时规格）。
+        res = real_time_output(cmd, timeout=MSAICERR_ANALYZE_TIMEOUT)
         self.clean_output()
         return res
 

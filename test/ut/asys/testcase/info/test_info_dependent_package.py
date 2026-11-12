@@ -33,7 +33,7 @@ class TestDependentPackageRows(AssertTest):
         mocker.patch.object(
             asys_info,
             "run_command",
-            side_effect=lambda cmd: self.commands.append(cmd) or "1.0.0",
+            side_effect=lambda cmd, timeout=None: self.commands.append(cmd) or "1.0.0",
         )
 
     def _build(self, mocker, rows):

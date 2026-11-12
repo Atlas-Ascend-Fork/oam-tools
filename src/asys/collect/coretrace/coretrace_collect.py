@@ -22,7 +22,8 @@ from threading import Thread, Lock
 
 from common import FileOperate as f
 from common import log_error, log_warning
-from common.cmd_run import check_command
+from common.cmd_run import check_command, run_timed
+from common.const import ADDR2LINE_TIMEOUT
 from common.task_common import out_progress_bar
 
 
@@ -71,15 +72,27 @@ class ParseCoreTrace:
 
     @staticmethod
     def run_addr2line(cmd):
-        # Only stdout is read here, so a PIPE on stderr would fill up and block
+        # Only stdout is kept, so a PIPE on stderr would fill up and block
         # addr2line once it has more than a pipe buffer of diagnostics, leaving
         # both sides waiting. STDOUT is not an option either: it would mix the
-        # diagnostics into the parsed -Cifps result, so drop them instead. The
-        # context manager closes the pipes and reaps the child.
-        with subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, encoding="utf-8"
-        ) as proc:
-            return proc.stdout.readlines()
+        # diagnostics into the parsed -Cifps result, so drop them instead.
+        # #399 超时规格：addr2line 逐帧符号化超时 1 分钟。经 run_timed 的
+        # communicate(timeout) 等待：超时 kill 整个进程组（孙进程无残留），
+        # 部分输出被丢弃、按"该帧无符号"降级返回空列表，解析线程不永久阻塞
+        # （检视意见：自建 Timer + readlines 在 D 状态下无法解除阻塞，且
+        # kill 生效时会把部分行当成功结果返回）。
+        try:
+            ret = run_timed(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                encoding="utf-8",
+                timeout=ADDR2LINE_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            return []
+        # run_timed 带编码返回 str，逐行列表保持 readlines 语义
+        return ret.stdout.splitlines(keepends=True)
 
     def parse_addr_src_line(self, fp, data, shift):
         parsed_line = ""

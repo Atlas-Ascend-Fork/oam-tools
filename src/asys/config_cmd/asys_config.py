@@ -21,6 +21,7 @@ import os
 from common import log_error
 from common import AsysConfigSupportedChip, get_device
 from common.cmd_run import check_command, run_linux_cmd
+from common.const import CMD_TIMEOUT
 from params import ParamDict
 from config_cmd.interface import get_stress_detect_config, restore_stress_detect_config
 
@@ -42,8 +43,13 @@ class AsysConfig:
                 "cannot be detected. Install systemd and try again."
             )
             return False
-        if not run_linux_cmd("systemd-detect-virt", "none"):
-            log_error("The config command cannot be executed on VMs and docker.")
+        if not run_linux_cmd("systemd-detect-virt", "none", timeout=CMD_TIMEOUT):
+            # 超时（cmd_run 已记录 WARNING "timed out"）与真虚拟机在此同路返回
+            # False；错误文案不再断言"就是虚拟机"，两条线索并列给出。
+            log_error(
+                "The config command cannot be executed on VMs and docker, "
+                "or the systemd-detect-virt probe failed or timed out."
+            )
             return False
         # The whole config command is root-only; the comment and the error
         # text below must stay in sync with this behavior.

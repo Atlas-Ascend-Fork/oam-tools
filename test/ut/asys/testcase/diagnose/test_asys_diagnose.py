@@ -922,7 +922,7 @@ class TestAsysDiagnose(AssertTest):
             "AsysDiagnoseSupportedChip",
             lambda: FakeSupportedChip(),
         )
-        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args, **_kw: True)
         monkeypatch.setattr(asys_diagnose, "check_command", lambda *_args: True)
         monkeypatch.setattr(asys_diagnose.os, "getuid", lambda: 0)
         monkeypatch.setattr(AsysDiagnose, "wait_view", lambda _self: None)
@@ -1005,7 +1005,7 @@ class TestAsysDiagnose(AssertTest):
             )(),
         )
         monkeypatch.setattr(asys_diagnose, "check_command", lambda *_args: True)
-        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args: True)
+        monkeypatch.setattr(asys_diagnose, "run_linux_cmd", lambda *_args, **_kw: True)
         monkeypatch.setattr(asys_diagnose.os, "getuid", lambda: 0)
         monkeypatch.setattr(AsysDiagnose, "wait_view", lambda _self: None)
         monkeypatch.setattr(AsysDiagnose, "print_save", lambda *_args: None)
@@ -1275,8 +1275,10 @@ class TestAsysDiagnose(AssertTest):
         self.assertTrue(diagnose.env_detect("component"))
 
     def test_run_msaicerr_cmd_oserror_marks_device_failed(self, mocker, caplog):
+        # #955 改用 run_timed（进程组超时），mock 也须落在该层
         mocker.patch(
-            "subprocess.run", side_effect=FileNotFoundError("msaicerr unavailable")
+            "diagnose.asys_diagnose.run_timed",
+            side_effect=FileNotFoundError("msaicerr unavailable"),
         )
         result = {}
 

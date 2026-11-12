@@ -30,6 +30,7 @@ from common import log_error, log_warning
 from common.const import (
     UNKNOWN,
     NONE,
+    CMD_TIMEOUT,
     MEMORY_FREQUENCY,
     HBM_FREQUENCY,
     CONTROL_CPU_FREQUENCY,
@@ -83,7 +84,7 @@ class AsysInfo:
             "PCIe Dev Count(abnormal)": f"{LSPCI_GREP_VERSION} | grep 'rev ff' | {GET_COUNT}",
         }
         for query_name, query_cmds in pcie_info_query_cmds.items():
-            count = run_command(query_cmds)
+            count = run_command(query_cmds, timeout=CMD_TIMEOUT)
             if not count.isdigit() or (query_name == "PCIe Dev Count" and count == "0"):
                 table_data[PCIE_INFO] = []
                 break
@@ -105,7 +106,7 @@ class AsysInfo:
             "Disk Total Size": """df -k / |sed -n '2p' | awk '{printf $2; print " kB"}'""",
         }
         for query_name, query_cmds in host_info_query_cmds.items():
-            host_info = run_command(query_cmds)
+            host_info = run_command(query_cmds, timeout=CMD_TIMEOUT)
             if not host_info:
                 continue
             table_data[" Host Info "].append([query_name, host_info])
@@ -202,7 +203,7 @@ class AsysInfo:
             if not f.is_dep_row(item):
                 log_warning(f"Skip unusable dependency row: {item}")
                 continue
-            info = run_command(item[1])
+            info = run_command(item[1], timeout=CMD_TIMEOUT)
             if info == "NONE":
                 continue
             dependent_packet.append([item[0], info])
@@ -235,30 +236,37 @@ class AsysInfo:
                     version = run_command(
                         "cat {}/{}/version.info {}".format(
                             install_path, pag_name, grep_version
-                        )
+                        ),
+                        timeout=CMD_TIMEOUT,
                     )
                 else:
                     version = run_command(
                         "cat {}/cann/share/info/{}/version.info {}".format(
                             install_path, pag_name, grep_version
-                        )
+                        ),
+                        timeout=CMD_TIMEOUT,
                     )
                 if version == "":
                     version = "None"
                 table_data[DEVICE_VERSION].append([pag_name, version])
         else:
             driver_version = run_command(
-                f"cat /var/davinci/driver/version.info {grep_version}"
+                f"cat /var/davinci/driver/version.info {grep_version}",
+                timeout=CMD_TIMEOUT,
             )
             table_data[DEVICE_VERSION].append([CannPkg.driver, driver_version])
-            firmware_version = run_command(f"cat /fw/version.info {grep_version}")
+            firmware_version = run_command(
+                f"cat /fw/version.info {grep_version}", timeout=CMD_TIMEOUT
+            )
             table_data[DEVICE_VERSION].append([CannPkg.firmware, firmware_version])
             runtime_version = run_command(
-                f"cat /usr/local/Ascend/latest/runtime/version.info {grep_version}"
+                f"cat /usr/local/Ascend/latest/runtime/version.info {grep_version}",
+                timeout=CMD_TIMEOUT,
             )
             if not runtime_version or runtime_version == "NONE":
                 runtime_version = run_command(
-                    f"cat /usr/local/Ascend/runtime/version.info {grep_version}"
+                    f"cat /usr/local/Ascend/runtime/version.info {grep_version}",
+                    timeout=CMD_TIMEOUT,
                 )
             table_data[DEVICE_VERSION].append(["runtime", runtime_version])
 
@@ -268,11 +276,14 @@ class AsysInfo:
         """
         table_data = {HOST_VERSION: [], DEVICE_VERSION: []}
         os_version_path = os.sep + "etc/*release"
-        table_data[HOST_VERSION].append(["Kernel", run_command("uname -r")])
+        table_data[HOST_VERSION].append(
+            ["Kernel", run_command("uname -r", timeout=CMD_TIMEOUT)]
+        )
         os_version = run_command(
             "cat "
             + os_version_path
-            + """ | grep PRETTY_NAME | awk -v FS='"' '{print $2}'"""
+            + """ | grep PRETTY_NAME | awk -v FS='"' '{print $2}'""",
+            timeout=CMD_TIMEOUT,
         )
         table_data[HOST_VERSION].append(["OS", os_version])
 

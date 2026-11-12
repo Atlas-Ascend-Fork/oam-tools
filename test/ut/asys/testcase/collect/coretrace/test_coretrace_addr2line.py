@@ -74,29 +74,13 @@ class TestCoreTraceAddr2line(AssertTest):
 
         assert out == ["main\n"], out
 
-    def test_process_is_reaped_through_the_context_manager(self, mocker):
-        """Without the context manager the child is never waited for."""
-        seen = {}
+    @pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX-only")
+    def test_child_is_fully_reaped_before_returning(self):
+        """Without reaping the child, its output would never arrive.
 
-        class _Stream:
-            @staticmethod
-            def readlines():
-                return ["main\n"]
-
-        class _Spy:
-            def __init__(self, *_args, **_kwargs):
-                self.stdout = _Stream()
-
-            def __enter__(self):
-                seen["entered"] = True
-                return self
-
-            def __exit__(self, *_exc):
-                seen["exited"] = True
-                return False
-
-        mocker.patch("subprocess.Popen", _Spy)
-
-        assert ParseCoreTrace.run_addr2line(["addr2line"]) == ["main\n"]
-        assert seen.get("entered") is True, "the child was not entered as a context"
-        assert seen.get("exited") is True, "the child was never reaped"
+        #955 检视意见后 run_addr2line 走 run_timed（communicate 等待，退出
+        即已回收）：只有子进程被完整回收（且无孤儿），stdout 才能完整到达，
+        返回行列表与旧 readlines 契约一致。
+        """
+        out = ParseCoreTrace.run_addr2line(["echo", "main"])
+        assert out == ["main\n"], out

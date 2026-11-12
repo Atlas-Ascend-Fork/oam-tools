@@ -319,7 +319,8 @@ class TestAsysConfig(AssertTest):
         ParamDict().set_env_type("EP")
         self.assertTrue(asys.main() is False)
         self.assertTrue(
-            "The config command cannot be executed on VMs and docker." in caplog.text
+            "The config command cannot be executed on VMs and docker, "
+            "or the systemd-detect-virt probe failed or timed out." in caplog.text
         )
 
     @pytest.mark.skip(reason="temporarily skipped due to test failure")

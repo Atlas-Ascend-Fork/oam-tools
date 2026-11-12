@@ -347,7 +347,8 @@ class TestAsysConfig(AssertTest):
         ParamDict().set_args(args)
         self.assertTrue(AsysConfig().run() is False)
         self.assertTrue(
-            "The config command cannot be executed on VMs and docker." in caplog.text
+            "The config command cannot be executed on VMs and docker, "
+            "or the systemd-detect-virt probe failed or timed out." in caplog.text
         )
 
     def test_asys_config_virt_tool_missing_error(self, mocker, caplog):

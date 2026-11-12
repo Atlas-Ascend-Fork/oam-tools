@@ -28,13 +28,14 @@ from common import FileOperate as f
 from common import log_error, log_warning, log_debug
 from common.cmd_run import check_command, run_linux_cmd
 from common.task_common import out_progress_bar, str_to_hex, is_hexadecimal
-from common.const import ADDR_LEN_HEX
+from common.const import ADDR_LEN_HEX, ADDR2LINE_TIMEOUT
 
 
 class ParseStackCore:
     # Unbounded per-line threads multiplied by per-file threads could exhaust
-    # the process; a bounded pool caps the thread count (hang protection for
-    # the addr2line/readelf subprocess itself is tracked by #399).
+    # the process; a bounded pool caps the thread count. A hung addr2line/
+    # readelf subprocess is bounded by ADDR2LINE_TIMEOUT (#399, landed in
+    # this change set).
     PARSE_LINE_WORKERS = 32
     PARSE_FILE_WORKERS = 8
 
@@ -85,6 +86,7 @@ class ParseStackCore:
             output = subprocess.check_output(
                 [self.__addr2line, hex(address), "-e", so_name, "-f", "-C", "-s", "-i"],
                 stderr=subprocess.STDOUT,
+                timeout=ADDR2LINE_TIMEOUT,
             )
             output_lines = output.decode(errors="replace").strip().split("\n")
             result_lines = []
@@ -100,6 +102,7 @@ class ParseStackCore:
             TypeError,
             AttributeError,
             subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
             UnicodeDecodeError,
         ) as e:
             # Keep the warning text stable per so_name: warning() deduplicates
@@ -194,7 +197,10 @@ class ParseStackCore:
             self.warning(so_name, warning_info)
             file_lines[index] = line.replace(line_num, "###")
             return False
-        if run_linux_cmd(f"{self.__readelf} -h {shlex.quote(binary_path)} | grep EXEC"):
+        if run_linux_cmd(
+            f"{self.__readelf} -h {shlex.quote(binary_path)} | grep EXEC",
+            timeout=ADDR2LINE_TIMEOUT,
+        ):
             address = str_to_hex(stack_addr)
         else:
             address = str_to_hex(stack_addr) - str_to_hex(delta_addr)
@@ -275,9 +281,9 @@ class ParseStackCore:
             if not (is_hexadecimal(stack_addr) and is_hexadecimal(delta_addr)):
                 continue
             parse_tasks.append((index, line, file_lines))
-        # This bounds the per-line concurrency only; it does NOT protect
-        # against a hung addr2line (subprocess has no timeout), which still
-        # blocks the pool shutdown. That hang protection is tracked by #399.
+        # This bounds the per-line concurrency only; a hung addr2line is
+        # bounded per call by ADDR2LINE_TIMEOUT (#399), so it cannot block the
+        # pool shutdown indefinitely.
         with ThreadPoolExecutor(max_workers=self.PARSE_LINE_WORKERS) as line_pool:
             for task in parse_tasks:
                 line_pool.submit(self.parse_line, *task)
@@ -309,8 +315,8 @@ class ParseStackCore:
                 stackcore_file = os.path.join(dirs, file)
                 num += 1
                 file_tasks.append((stackcore_file, num))
-        # This bounds the per-file concurrency only; a hung worker still
-        # blocks the pool shutdown (subprocess timeout is tracked by #399).
+        # This bounds the per-file concurrency only; a hung worker cannot
+        # block the pool shutdown indefinitely (per-call timeout, #399).
         with ThreadPoolExecutor(max_workers=self.PARSE_FILE_WORKERS) as file_pool:
             for stackcore_file, file_num in file_tasks:
                 file_pool.submit(

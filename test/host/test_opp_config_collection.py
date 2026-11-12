@@ -45,6 +45,10 @@ def collector(monkeypatch):
     log_module.log_error = logger.error
     constants = ModuleType("common.const")
     constants.CONFIG_TABLE_FILE = ""
+    # ops_collect 经 common.const 导入超时预算（#399/#955）；伪造模块须与
+    # src/asys/common/const.py 的真实定义保持一致，否则 load_source 阶段
+    # ImportError（真实值以源文件为准，这里只保证符号存在）。
+    constants.CMD_TIMEOUT = 60
     params = ModuleType("params")
     params.ParamDict = SimpleNamespace
     driver = ModuleType("drv")

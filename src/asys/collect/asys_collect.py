@@ -40,7 +40,10 @@ from collect.graph import collect_graph
 from collect.ops import collect_ops
 from collect.trace import collect_trace
 from collect.data_dump import collect_data_dump
-from collect.msnpureport_type_collect import collect_msnpureport_type_info
+from collect.msnpureport_type_collect import (
+    collect_msnpureport_type_info,
+    MSNPUREPORT_TYPE_TIMEOUTS,
+)
 
 __all__ = ["AsysCollect"]
 
@@ -74,7 +77,11 @@ class AsysCollect:
             f.create_dir(export_dir_path)
             export_dir_cmd = "cd " + shlex.quote(export_dir_path)
             export_cmd = "{0};{1}".format(export_dir_cmd, export_tool)
-            cmd_res = run_cmd_output(export_cmd)
+            # #399 拍板规格：msnpureport 全量导出(-f)超时 60s，挂死时按
+            # 既有失败路径降级（清理临时目录、返回失败）
+            cmd_res = run_cmd_output(
+                export_cmd, timeout=MSNPUREPORT_TYPE_TIMEOUTS["-f"]
+            )
             if not cmd_res[0]:
                 log_error(
                     'Call msnpureport tool failed, sys.stderr: "{}"'.format(

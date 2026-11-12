@@ -34,6 +34,7 @@ from common.const import (
     RetCode,
     CHECK_BIN_MAX_TIMEOUT,
     CHECK_BIN_DEFAULT_TIMEOUT,
+    CMD_TIMEOUT,
 )
 from params import ParamDict
 from collect.stacktrace import AscendTraceDll
@@ -216,7 +217,8 @@ class AsysStackTrace(AscendTraceDll):
         cmd = f"ps -p {self.remote_id}"
         # Split the command output into logical lines without manually
         # trimming a presumed trailing newline.
-        ret = popen_run_cmd(cmd).splitlines()
+        # ps 探测属于通用命令档，吃 1 分钟超时预算（#399）。
+        ret = popen_run_cmd(cmd, timeout=CMD_TIMEOUT).splitlines()
         if len(ret) != 2:
             log_error("The remote parameter must be set to the PID of the process.")
             return False
@@ -249,7 +251,7 @@ class AsysStackTrace(AscendTraceDll):
             rf"ps -efT | grep ' {self.remote_id} ' | grep -v {current_pid} | awk '{{print $2}}' | xargs ps -Lf \
                  | awk '{{print $4}}'"
         )
-        ret = popen_run_cmd(cmd).split("\n")
+        ret = popen_run_cmd(cmd, timeout=CMD_TIMEOUT).split("\n")
         ret = [i for i in ret if i.isdigit()]
         if not ret:
             log_error(f"Get pid failed by remote: {self.remote_id}.")
@@ -260,7 +262,7 @@ class AsysStackTrace(AscendTraceDll):
     def _get_other_stacktrace_remote_id(current_pid):
         all_remote_id = []
         cmd = rf"ps -ef | grep -E 'asys(\.py)? collect' | grep stacktrace | grep -v ' {current_pid} '"
-        ret = popen_run_cmd(cmd).split("\n")
+        ret = popen_run_cmd(cmd, timeout=CMD_TIMEOUT).split("\n")
         ret = [i for i in ret if i]
         if not ret:
             return all_remote_id

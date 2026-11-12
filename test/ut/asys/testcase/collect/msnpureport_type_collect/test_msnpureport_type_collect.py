@@ -43,7 +43,7 @@ class TestMsnpureportTypeCollect:
         commands = []
         output_dirs = {}
 
-        def fake_run_cmd_output(command):
+        def fake_run_cmd_output(command, timeout=None):  # noqa: ARG001  # timeout kwarg since #399
             commands.append(command)
             type_dir = os.path.join(self.output, "export_type_tmp", "type_5")
             output_dir = os.path.join(type_dir, "20261107110000")
@@ -82,7 +82,7 @@ class TestMsnpureportTypeCollect:
     def test_950_runs_all_commands_and_merges_ao_dirs(self, mocker):
         commands = []
 
-        def fake_run_cmd_output(command):
+        def fake_run_cmd_output(command, timeout=None):  # noqa: ARG001  # timeout kwarg since #399
             commands.append(command)
             type_id = int(command.rsplit("-t ", 1)[1].split()[0])
             type_dir = os.path.join(self.output, "export_type_tmp", f"type_{type_id}")
@@ -149,7 +149,7 @@ class TestMsnpureportTypeCollect:
     def test_960_environment_runs_all_type_commands(self, mocker):
         commands = []
 
-        def fake_run_cmd_output(command):
+        def fake_run_cmd_output(command, timeout=None):  # noqa: ARG001  # timeout kwarg since #399
             commands.append(command)
             type_id = int(command.rsplit("-t ", 1)[1].split()[0])
             type_dir = os.path.join(self.output, "export_type_tmp", f"type_{type_id}")
@@ -195,7 +195,7 @@ class TestMsnpureportTypeCollect:
     def test_partial_failure_returns_true_and_warns_once(self, mocker, caplog):
         commands = []
 
-        def fake_run_cmd_output(command):
+        def fake_run_cmd_output(command, timeout=None):  # noqa: ARG001  # timeout kwarg since #399
             commands.append(command)
             type_id = int(command.rsplit("-t ", 1)[1].split()[0])
             if type_id != 5:

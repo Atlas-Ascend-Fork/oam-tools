@@ -34,6 +34,7 @@ __all__ = [
     "run_linux_cmd",
     "popen_run_cmd",
     "real_time_output",
+    "run_timed",
 ]
 
 # Prefer bash where available, but keep the command channel usable on POSIX-only
@@ -79,7 +80,7 @@ def _close_process_pipes(process):
                 pass
 
 
-def _run_timed(args, timeout=None, **kwargs):
+def run_timed(args, timeout=None, **kwargs):
     """subprocess.run equivalent that kills the whole process group on
     timeout. Raises subprocess.TimeoutExpired (like subprocess.run)."""
     if timeout is None:
@@ -131,7 +132,7 @@ def run_linux_cmd(cmd, cmp_str="", timeout=None) -> bool:
     if not isinstance(cmd, str):
         return False
     try:
-        ret = _run_timed(
+        ret = run_timed(
             [BASH, "-c", cmd],
             timeout=timeout,
             stdout=subprocess.PIPE,
@@ -150,7 +151,7 @@ def run_linux_cmd(cmd, cmp_str="", timeout=None) -> bool:
 
 def run_command(command, timeout=None) -> str:
     try:
-        ret = _run_timed(
+        ret = run_timed(
             [BASH, "-c", command],
             timeout=timeout,
             stdout=subprocess.PIPE,
@@ -192,7 +193,7 @@ def run_command(command, timeout=None) -> str:
 
 def run_cmd_output(command, timeout=None) -> [bool, str]:
     try:
-        ret = _run_timed(
+        ret = run_timed(
             [BASH, "-c", command],
             timeout=timeout,
             stdout=subprocess.PIPE,
@@ -335,7 +336,7 @@ def run_cmd_list(cmd_list, cwd=None, timeout=None) -> tuple:
     so a hung lsof scanning a stuck mount cannot wedge the caller.
     """
     try:
-        ret = _run_timed(
+        ret = run_timed(
             cmd_list,
             timeout=timeout,
             cwd=cwd,
@@ -365,7 +366,7 @@ def popen_run_cmd(command, timeout=None):
     run the command and return stdout (stderr suppressed).
     """
     try:
-        ret = _run_timed(
+        ret = run_timed(
             [BASH, "-c", command],
             timeout=timeout,
             stdout=subprocess.PIPE,

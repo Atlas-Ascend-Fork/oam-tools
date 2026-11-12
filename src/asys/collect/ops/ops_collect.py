@@ -25,6 +25,7 @@ import subprocess
 from params import ParamDict
 from common import consts
 from common import log_debug, log_info, log_warning
+from common.const import CMD_TIMEOUT
 from common import FileOperate as f
 from common.file_operate import COPY_MODE, MOVE_MODE
 from drv import EnvVarName
@@ -44,7 +45,11 @@ def _grep_lines(pattern, path):
             stderr=subprocess.PIPE,
             encoding="utf-8",
             check=False,
+            timeout=CMD_TIMEOUT,
         )
+    except subprocess.TimeoutExpired:
+        log_debug(f"Run grep for '{pattern}' timed out after {CMD_TIMEOUT}s")
+        return []
     except OSError as error:
         log_debug(f"Run grep for '{pattern}' failed, {error}")
         return []

@@ -98,6 +98,15 @@ BALANCE_ALGORITHM_MAP = {
 
 GET_DEVICES_INFO_TIMEOUT = 10
 
+# #399 超时规格：msaicerr --env 单卡执行超时 1 分钟（asys diagnose 逐卡调用）
+MSAICERR_ENV_TIMEOUT = 60
+# #399 超时规格：msaicerr -p 报错分析超时 3 分钟（asys analyze aicore_error 转调）
+MSAICERR_ANALYZE_TIMEOUT = 180
+# #399 超时规格：grep / addr2line / readelf 等单条外部命令超时 1 分钟
+CMD_TIMEOUT = 60
+# stackcore/coretrace 的 addr2line 逐帧符号化：与 grep 同规格（#399）
+ADDR2LINE_TIMEOUT = 60
+
 ALL_NOT_SUPPORTED_CHIP_TYPE = "NULL"
 ALL_SUPPORTED_CHIP_TYPE = "ALL"
 

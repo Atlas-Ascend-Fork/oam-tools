@@ -23,7 +23,6 @@
 import sys
 import pytest
 import os
-import subprocess
 
 from testcase.conftest import CONF_SRC_PATH, ut_root_path
 
@@ -70,15 +69,10 @@ class TestInfo(AssertTest):
         @预期结果: 获取打屏关键词
         """
         mocker.patch.object(ParamDict, "get_arg", return_value="hardware")
-        fake_ret = subprocess.run(
-            "cat /proc/cpuinfo | grep notest",
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            encoding="utf-8",
-            check=False,
-        )  # nosec B602  # test mock creation
-        mocker.patch("subprocess.run", return_value=fake_ret)
+        # #955 起 run_command 传 timeout，走 cmd_run 的 Popen 定时路径，
+        # mock subprocess.run 不再拦截；直接 mock run_command 保持用例
+        # "外部查询全部无数据"的原始意图。
+        mocker.patch("info.asys_info.run_command", return_value="")  # noqa: PIE790  # mock at the seam the production code calls
         ParamDict().set_env_type("EP")
         AsysInfo().get_hardware_info()
         captured = capsys.readouterr()

@@ -38,7 +38,7 @@ def test_readelf_command_is_escaped(monkeypatch):
     parser.file = "stackcore.txt"  # make self.warning() emit through log_warning
     seen = {}
 
-    def fake_run_linux_cmd(cmd, cmp_str=""):
+    def fake_run_linux_cmd(cmd, cmp_str="", timeout=None):  # noqa: ARG001
         seen["cmd"] = cmd
         return False
 
