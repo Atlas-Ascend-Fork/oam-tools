@@ -309,8 +309,8 @@ Closed-source binary packages are fetched per branch. The table below uses the d
 
 | Subrepository | Version | Download Address |
 |---|---|---|
-|msprobe|master|https://gitcode.com/Ascend/msprobe|
-|msprof|master|https://gitcode.com/Ascend/msprof|
+|msprobe|master|<https://gitcode.com/Ascend/msprobe>|
+|msprof|master|<https://gitcode.com/Ascend/msprof>|
 |cann-cmake|master-059|[cmake-master-059.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-059.tar.gz)|
 
 <a id="environment-verification"></a>
