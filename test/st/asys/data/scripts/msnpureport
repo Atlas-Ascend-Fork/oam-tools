@@ -62,4 +62,45 @@ mkdir -p ${time_stamp}/stackcore/dev-os-0/
 touch ${time_stamp}/stackcore/dev-os-0/stackcore.slogd.11233.6.583572
 touch ${time_stamp}/stackcore/dev-os-0/stackcore.slogd.11546.6.583572
 
-echo "llt msnpureport execute finsh."
+echo "llt msnpureport execute finish."
+# Typed export for ST: "msnpureport report -t <id>" (also tolerates the legacy
+# "-t <id>" form). Produces the timestamp dir plus the per-type info dirs so
+# the asys collect ST exercises the real archive/merge/parse path.
+args="$*"
+type_id=""
+case "$args" in
+    *"report -t "*|*" -t "*)
+        type_id=$(echo "$args" | sed -n 's/.*-t[[:space:]]\+\([0-9]\+\).*/\1/p')
+        ;;
+esac
+if [ -n "$type_id" ]; then
+    ts_dir="${time_stamp}"
+    case "$type_id" in
+        5)
+            mkdir -p "${ts_dir}/system_info/dev-os-0/event_sched"
+            echo "llt event sched data" > "${ts_dir}/system_info/dev-os-0/event_sched/event.log"
+            ;;
+        6)
+            mkdir -p "${ts_dir}/ub_info/dev-os-0/mami"
+            printf 'ub' > "${ts_dir}/ub_info/dev-os-0/mami/ubmem_daw.bin"
+            ;;
+        7|8|9)
+            leaf_name="ao_self"
+            [ "$type_id" = "8" ] && leaf_name="ao_cnt"
+            [ "$type_id" = "9" ] && leaf_name="ao_uart"
+            mkdir -p "${ts_dir}/ao_info/dev-os-0/${leaf_name}"
+            echo "llt ${leaf_name} data" > "${ts_dir}/ao_info/dev-os-0/${leaf_name}/ao.log"
+            ;;
+        10)
+            mkdir -p "${ts_dir}/ccu_info/dev-os-0"
+            echo "llt ccu data" > "${ts_dir}/ccu_info/dev-os-0/ccu.log"
+            ;;
+        11)
+            mkdir -p "${ts_dir}/network_info/dev-os-0"
+            echo "llt network data" > "${ts_dir}/network_info/dev-os-0/network.log"
+            ;;
+    esac
+    echo "llt msnpureport typed export ${type_id} finish."
+    exit 0
+fi
+exit 0

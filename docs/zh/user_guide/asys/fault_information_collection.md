@@ -28,31 +28,38 @@ asys collect --task_dir=$HOME/cache_path --tar="True" --output=$HOME/dfx_info
 执行完命令后，在\{output\}/asys\_output\_timestamp路径下的故障信息文件目录如下所示：
 
 ```bash
-├── asys_output_timestamp         
+├── asys_output_timestamp
    ├── software_info.txt            // 安装包版本、环境变量、依赖软件、系统信息
    ├── hardware_info.txt            // 收集了host和device侧硬件信息，host信息包括内核版本信息、CPU型号、内存和硬盘使用情况等， device信息包括设备个数、aicpu个数等
    ├── status_info.txt              // 收集device的信息，包含芯片型号、CPU和AI Core利用率等
    ├── health_result.txt            // 收集device健康信息，包括故障码和故障信息
-   └── dfx              
-       ├── bbox                     // Device侧的黑匣子信息       
+   └── dfx
+       ├── bbox                     // Device侧的黑匣子信息
        ├── data-dump                // L0发生AI Core Error时，生成L0 exception dump文件
        ├── graph                    // dump图信息，包含GE与TF Adapter的dump图，L0 exception dump不收集该信息
-       ├── ops                      // 算子编译信息，包括算子编译*.o和*.json文件、自定义算子配置信息等                    
+       ├── ops                      // 算子编译信息，包括算子编译*.o和*.json文件、自定义算子配置信息等
        ├── stackcore                // 报错触发coredump时的core文件信息
        ├── atrace                   // trace落盘信息，包括trace二进制文件解析的明文文件
-       └── log          
-           ├── device       
+       ├── system_info              // 其他模块维测信息（-t 5），如事件调度模块维测信息、驱动proc日志、TEE日志等；仅部分芯片型号环境收集
+       ├── ub_info                  // UB（Unified Bus）维测信息（-t 6）；仅950/960系列环境收集，mami目录下二进制文件解析成功时转换为同名txt并删除bin，解析失败时保留原始bin供现场分析
+       ├── ao_info                  // AO（Always Online）维测信息（-t 7/-t 8/-t 9）：ao_self（AO区日志）、ao_cnt（AO计数）、ao_uart（串口录音）；仅950/960系列环境收集
+       ├── ccu_info                 // CCU维测信息（-t 10）；仅950/960系列环境收集
+       ├── network_info             // network维测信息（-t 11）；仅950/960系列环境收集
+       └── log
+           ├── device
            │     ├──dev-os-{id}
            │           ├── firmware      // 固件生成的日志
            │           ├── slogd         // 日志相关进程的维测日志
            │           ├── application   // 业务进程产生的非EVENT级别应用日志
            │           └── system        // 常驻进程生成的日志
-           └── host     
+           └── host
                 ├── message         // message/syslog日志
                 ├── install         // 包历史安装情况的日志
                 ├── cann            // 应用类日志
                 └── driver          // Host侧驱动日志
 ```
+
+上述system\_info、ub\_info、ao\_info、ccu\_info和network\_info目录内容的详细信息，请参见[《msnpureport 工具使用指南》](https://support.huawei.com/enterprise/zh/ascend-computing/ascend-hdk-pid-252764743?category=reference-guides&subcategory=command-reference)。
 
 **其中，用户可根据需求自行定义software\_info.txt文件中收集的第三方依赖软件的版本信息**。在asys工具目录下的“ascend\_system\_advisor/conf/dependent\_package.csv”文件中，增加或删除配置项，每行对应一个配置项，逗号分割依赖项名字和查询指令，逗号后无空格。示例片段如下：
 

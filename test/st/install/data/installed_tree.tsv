@@ -265,6 +265,9 @@ f	0750	0755		tools/ascend_system_advisor/asys/collect/stacktrace/stacktrace_coll
 d	0750	0755		tools/ascend_system_advisor/asys/collect/trace
 f	0750	0755		tools/ascend_system_advisor/asys/collect/trace/__init__.py
 f	0750	0755		tools/ascend_system_advisor/asys/collect/trace/trace_collect.py
+d	0750	0755		tools/ascend_system_advisor/asys/collect/msnpureport_type_collect
+f	0750	0755		tools/ascend_system_advisor/asys/collect/msnpureport_type_collect/__init__.py
+f	0750	0755		tools/ascend_system_advisor/asys/collect/msnpureport_type_collect/ub_parse.py
 d	0750	0755		tools/ascend_system_advisor/asys/common
 f	0750	0755		tools/ascend_system_advisor/asys/common/__init__.py
 d	0750	0755		tools/ascend_system_advisor/asys/common/ascend350

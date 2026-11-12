@@ -65,6 +65,30 @@ class TestAsysLaunch(AssertTest):
     def teardown_method(self):
         ParamDict.clear()
 
+    def test_clean_work_removes_typed_export_dir(self, mocker):
+        asys_launch = AsysLaunch()
+        asys_launch.output_root_path = os.path.join(
+            ut_root_path, "asys_output_launch_clean_tmp"
+        )
+        full_export_path = os.path.join(asys_launch.output_root_path, "export_tmp")
+        typed_export_path = os.path.join(
+            asys_launch.output_root_path, "export_type_tmp"
+        )
+        os.makedirs(typed_export_path, exist_ok=True)
+        delete_dirs = mocker.patch("common.FileOperate.delete_dirs")
+
+        asys_launch.clean_work()
+
+        delete_dirs.assert_called_once_with(
+            [
+                os.path.join(asys_launch.output_root_path, "npu_collect_intermediates"),
+                full_export_path,
+                typed_export_path,
+            ]
+        )
+        if os.path.exists(asys_launch.output_root_path):
+            shutil.rmtree(asys_launch.output_root_path)
+
     def test_launch_env_missing_ini_item(self, mocker, monkeypatch, caplog):
         mocker.patch("common.FileOperate.create_dir", return_value=True)
         obj = AsysLaunch()

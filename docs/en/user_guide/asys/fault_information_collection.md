@@ -40,6 +40,11 @@ After the command is executed, the fault information files in  **\{output\}/asys
        ├── ops                      // Operator compilation information, including the *.o and *.json files of operator compilation and custom operator configuration.
        ├── stackcore                // Information about the core file generated when a core dump is triggered by an error.
        ├── atrace                  // Trace flush information, including the plaintext file parsed from the trace binary file.
+       ├── system_info              // Other module maintenance and test information (-t 5), such as event scheduling module information, driver proc logs, and TEE logs. Collected only in some chip model environments.
+       ├── ub_info                  // UB (Unified Bus) maintenance and test information (-t 6). Collected only on 950/960 series environments. Binary files in the mami directory are converted to .txt files with the same names and the .bin files are removed when parsing succeeds; the original .bin files are retained for on-site analysis when parsing fails.
+       ├── ao_info                  // AO (Always Online) maintenance and test information (-t 7/-t 8/-t 9): ao_self (AO logs), ao_cnt (AO counters), and ao_uart (UART recordings). Collected only on 950/960 series environments.
+       ├── ccu_info                 // CCU maintenance and test information (-t 10). Collected only on 950/960 series environments.
+       ├── network_info             // network maintenance and test information (-t 11). Collected only on 950/960 series environments.
        └── log
            ├── device
            │     ├──dev-os-{id}
@@ -53,6 +58,8 @@ After the command is executed, the fault information files in  **\{output\}/asys
                 ├── cann            // Application logs.
                 └── driver          // Driver logs on the host.
 ```
+
+For details about the content in the system\_info, ub\_info, ao\_info, ccu\_info, and network\_info directories, see [msnpureport Tool User Guide](https://support.huawei.com/enterprise/en/ascend-computing/ascend-hdk-pid-252764743?category=reference-guides&subcategory=command-reference).
 
 **You can accordingly customize the version information of the third-party dependent software collected in the software\_info.txt file.**  In the  **ascend\_system\_advisor/conf/dependent\_package.csv**  file in the asys tool directory, add or delete configuration items. Each line corresponds to a configuration item. Use commas \(,\) to separate dependency item names and query commands. There should be no space after each comma. The following is an example:
 

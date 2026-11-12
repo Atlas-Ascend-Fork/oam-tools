@@ -46,7 +46,10 @@ import asys
 from common import DeviceInfo
 from params import ParamDict
 from analyze.coredump_analyze import CoreDump, thread_stacks_reg_info
-from analyze.asys_analyze import AsysAnalyze
+from collect.msnpureport_type_collect.ub_parse import (
+    _convert_ub_port_status,
+    _convert_ub_port_perf_test,
+)
 from collect import AsysCollect
 from collect.trace import ParseTrace
 
@@ -1346,9 +1349,11 @@ class TestAnalyze(AssertTest):
         actual_exists = os.path.exists
         mocker.patch(
             "os.path.exists",
-            side_effect=lambda path: False
-            if os.path.basename(path) == "msaicerr.py"
-            else actual_exists(path),
+            side_effect=lambda path: (
+                False
+                if os.path.basename(path) == "msaicerr.py"
+                else actual_exists(path)
+            ),
         )
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
         sys.argv = [
@@ -1559,13 +1564,13 @@ class TestAnalyze(AssertTest):
         values = [2] + [i % 4 for i in range(DSMI_UB_PORT_NUM)]
         with open(bin_path, "wb") as fw:
             fw.write(struct.pack(f"I{DSMI_UB_PORT_NUM}I", *values))
-        AsysAnalyze._convert_ub_port_status(bin_path, txt_path)
+        self.assertTrue(_convert_ub_port_status(bin_path, txt_path))
         self.assertTrue(check_file_contents(txt_path, "DSMI UB Port Status Data"))
 
         # 文件缺失：不生成 txt
         miss_txt = os.path.join(test_case_tmp, "miss_status.txt")
-        AsysAnalyze._convert_ub_port_status(
-            os.path.join(test_case_tmp, "no.bin"), miss_txt
+        self.assertTrue(
+            not _convert_ub_port_status(os.path.join(test_case_tmp, "no.bin"), miss_txt)
         )
         self.assertTrue(not os.path.exists(miss_txt))
 
@@ -1574,7 +1579,7 @@ class TestAnalyze(AssertTest):
         short_txt = os.path.join(test_case_tmp, "short_status.txt")
         with open(short_path, "wb") as fw:
             fw.write(b"\x01")
-        AsysAnalyze._convert_ub_port_status(short_path, short_txt)
+        self.assertTrue(not _convert_ub_port_status(short_path, short_txt))
         self.assertTrue(not os.path.exists(short_txt))
 
     def test_convert_ub_port_perf_test(self):
@@ -1589,11 +1594,13 @@ class TestAnalyze(AssertTest):
         values = list(range(struct.calcsize(fmt) // 4))
         with open(bin_path, "wb") as fw:
             fw.write(struct.pack(fmt, *values))
-        AsysAnalyze._convert_ub_port_perf_test(bin_path, txt_path)
+        self.assertTrue(_convert_ub_port_perf_test(bin_path, txt_path))
         self.assertTrue(check_file_contents(txt_path, "Port Performance Test Counter"))
 
         miss_txt = os.path.join(test_case_tmp, "miss_perf.txt")
-        AsysAnalyze._convert_ub_port_perf_test(
-            os.path.join(test_case_tmp, "no.bin"), miss_txt
+        self.assertTrue(
+            not _convert_ub_port_perf_test(
+                os.path.join(test_case_tmp, "no.bin"), miss_txt
+            )
         )
         self.assertTrue(not os.path.exists(miss_txt))

@@ -58,6 +58,91 @@ class TestAsysCollect(AssertTest):
         if os.path.exists(os.path.join(ut_root_path, "asys_output_20230227093645758")):
             shutil.rmtree(os.path.join(ut_root_path, "asys_output_20230227093645758"))
 
+    def test_collect_calls_msnpureport_type_collect(self, mocker):
+        ParamDict().set_env_type("EP")
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        mocker.patch("common.FileOperate.copy_dir", return_value=True)
+        mocker.patch(
+            "common.FileOperate.list_dir", return_value=["asys_ut_test_export_tmp"]
+        )
+        mocker.patch("common.FileOperate.write_file")
+        mocker.patch("os.walk")
+        mocker.patch("collect.ops.ops_collect.collect_ops", return_value=True)
+        type_collect = mocker.patch(
+            "collect.asys_collect.collect_msnpureport_type_info", return_value=True
+        )
+
+        asys_collect = AsysCollect()
+        self.assertTrue(asys_collect.collect())
+        type_collect.assert_called_once_with(asys_collect.output_root_path)
+
+    def test_collect_uses_report_subcommand_for_full_export(self, mocker):
+        ParamDict().set_env_type("EP")
+        commands = []
+        real_run = subprocess.run
+
+        def fake_run(command, *_args, **_kwargs):
+            commands.append(command[2])
+            return real_run(
+                "not supported",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding="utf-8",
+                check=False,
+            )  # nosec B604  # test mock creation; command is a literal
+
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        mocker.patch("common.FileOperate.remove_dir")
+        mocker.patch("subprocess.run", side_effect=fake_run)
+        mocker.patch(
+            "collect.asys_collect.collect_msnpureport_type_info", return_value=True
+        )
+        mocker.patch("collect.ops.ops_collect.collect_ops", return_value=True)
+
+        asys_collect = AsysCollect()
+        self.assertTrue(asys_collect.collect())
+        self.assertTrue(any("msnpureport report -f" in command for command in commands))
+
+    def test_clean_work_removes_typed_export_dir(self, mocker):
+        typed_export_path = os.path.join(
+            ParamDict().asys_output_timestamp_dir, "export_type_tmp"
+        )
+        os.makedirs(typed_export_path, exist_ok=True)
+        delete_dirs = mocker.patch("common.FileOperate.delete_dirs")
+
+        AsysCollect().clean_work()
+
+        full_export_path = os.path.join(
+            ParamDict().asys_output_timestamp_dir, "export_tmp"
+        )
+        delete_dirs.assert_called_once_with([full_export_path, typed_export_path])
+
+    def test_device_file_export_falls_back_to_legacy_cmd(self, mocker):
+        # A driver package predating the "report" subcommand must keep the
+        # full device export working: the legacy "msnpureport -f" form is
+        # retried once the recommended form fails.
+        commands = []
+
+        def fake_run_cmd_output(command):
+            commands.append(command)
+            if "msnpureport report -f" in command:
+                return False, "msnpureport: invalid option -- report"
+            return True, ""
+
+        mocker.patch(
+            "collect.asys_collect.run_cmd_output", side_effect=fake_run_cmd_output
+        )
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
+        mocker.patch("common.FileOperate.list_dir", return_value=["20261110000000"])
+        mocker.patch("common.FileOperate.remove_dir")
+
+        asys_collect = AsysCollect()
+        self.assertTrue(asys_collect._device_file_export())
+        self.assertTrue(len(commands) == 2)
+        self.assertTrue("msnpureport report -f" in commands[0])
+        self.assertTrue("msnpureport -f" in commands[1])
+
     @pytest.mark.parametrize(["run"], [("not supported",), ("ls",)])
     def test_collect_msnpureport_failed(self, run, mocker, caplog):
         ParamDict().set_env_type("EP")

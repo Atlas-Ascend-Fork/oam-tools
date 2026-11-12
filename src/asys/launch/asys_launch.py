@@ -182,7 +182,14 @@ class AsysLaunch:
             self.output_root_path, "npu_collect_intermediates"
         )
         msnpureport_export_path = os.path.join(self.output_root_path, "export_tmp")
-        dir_list = [npu_collect_path, msnpureport_export_path]
+        msnpureport_type_export_path = os.path.join(
+            self.output_root_path, "export_type_tmp"
+        )
+        dir_list = [
+            npu_collect_path,
+            msnpureport_export_path,
+            msnpureport_type_export_path,
+        ]
         f.delete_dirs(dir_list)
 
     def run(self):

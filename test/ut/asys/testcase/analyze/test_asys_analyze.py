@@ -655,9 +655,7 @@ class TestAsysAnalyze(AssertTest):
         mocker.patch.object(
             ParamDict, "asys_output_timestamp_dir", return_value=test_trace_tmp
         )
-        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_statistic")
-        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_ssu_schedule")
-        mocker.patch.object(AsysAnalyze, "_convert_ub_ubnl_dfx_config_item")
+        mocker.patch("analyze.asys_analyze.convert_ub_files")
         analyze = AsysAnalyze()
         analyze.output = test_trace_tmp
         analyze.path = os.path.join(ut_root_path, "data")

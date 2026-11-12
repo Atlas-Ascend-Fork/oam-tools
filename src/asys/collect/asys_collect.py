@@ -40,6 +40,7 @@ from collect.graph import collect_graph
 from collect.ops import collect_ops
 from collect.trace import collect_trace
 from collect.data_dump import collect_data_dump
+from collect.msnpureport_type_collect import collect_msnpureport_type_info
 
 __all__ = ["AsysCollect"]
 
@@ -69,10 +70,9 @@ class AsysCollect:
             AsysHealth().run()
 
     def _device_file_export(self):
-        def run_msnpureport(export_dir_path):
+        def run_msnpureport(export_dir_path, export_tool):
             f.create_dir(export_dir_path)
             export_dir_cmd = "cd " + shlex.quote(export_dir_path)
-            export_tool = "msnpureport -f"
             export_cmd = "{0};{1}".format(export_dir_cmd, export_tool)
             cmd_res = run_cmd_output(export_cmd)
             if not cmd_res[0]:
@@ -86,7 +86,12 @@ class AsysCollect:
             return True
 
         export_dir_path = os.path.join(self.output_root_path, "export_tmp")
-        if not run_msnpureport(export_dir_path):
+        # Prefer the documented "msnpureport report -f" form; fall back to the
+        # legacy "msnpureport -f" for driver packages predating the report
+        # subcommand, so the full device export keeps working on old drivers.
+        if not run_msnpureport(
+            export_dir_path, "msnpureport report -f"
+        ) and not run_msnpureport(export_dir_path, "msnpureport -f"):
             return False
         # export success
         in_export_dir = f.list_dir(export_dir_path)
@@ -123,6 +128,8 @@ class AsysCollect:
                 collect_device_logs(msnpureport_output_dir, self.output_root_path)
             else:
                 log_error("msnpureport tool export device files failed.")
+            if not collect_msnpureport_type_info(self.output_root_path):
+                log_error("Collect msnpureport typed info failed.")
         else:
             collect_rc_logs(self.output_root_path)
 
@@ -165,7 +172,10 @@ class AsysCollect:
 
     def clean_work(self):
         msnpureport_export_path = os.path.join(self.output_root_path, "export_tmp")
-        dir_list = [msnpureport_export_path]
+        msnpureport_type_export_path = os.path.join(
+            self.output_root_path, "export_type_tmp"
+        )
+        dir_list = [msnpureport_export_path, msnpureport_type_export_path]
         f.delete_dirs(dir_list)
 
     def run(self):
