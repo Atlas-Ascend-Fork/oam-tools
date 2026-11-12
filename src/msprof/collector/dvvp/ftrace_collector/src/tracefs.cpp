@@ -15,6 +15,8 @@
  */
 #include "tracefs.h"
 
+#include "ftrace_path.h"
+
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -121,7 +123,7 @@ bool TraceFs::DetectRoot(std::string& root)
 
 bool TraceFs::ReadText(const std::string& root, const std::string& relativePath, std::string& content)
 {
-    std::ifstream stream(root + "/" + relativePath);
+    std::ifstream stream(CanonicalizeFilePath(root + "/" + relativePath));
     if (!stream.is_open()) {
         return false;
     }
@@ -133,7 +135,7 @@ bool TraceFs::ReadText(const std::string& root, const std::string& relativePath,
 
 bool TraceFs::WriteText(const std::string& root, const std::string& relativePath, const std::string& value)
 {
-    std::ofstream stream(root + "/" + relativePath, std::ios::out | std::ios::trunc);
+    std::ofstream stream(CanonicalizeFilePath(root + "/" + relativePath), std::ios::out | std::ios::trunc);
     if (!stream.is_open()) {
         return false;
     }
@@ -426,7 +428,7 @@ struct ThreadStatus {
 
 bool ReadThreadStatus(const std::string& statusPath, ThreadStatus& status)
 {
-    std::ifstream in(statusPath);
+    std::ifstream in(CanonicalizeFilePath(statusPath));
     if (!in.is_open()) {
         return false;
     }
@@ -482,7 +484,7 @@ bool TraceFs::WriteEventMetaJson(
     std::string clock;
     (void)ReadText(root, "trace_clock", clock);
 
-    std::ofstream out(path);
+    std::ofstream out(CanonicalizeFilePath(path));
     if (!out.is_open()) {
         return false;
     }
@@ -502,7 +504,7 @@ bool TraceFs::WriteEventMetaJson(
 
 bool TraceFs::WriteThreadMapJson(const std::string& path, uint64_t snapshotStartNs, uint64_t snapshotEndNs)
 {
-    std::ofstream out(path);
+    std::ofstream out(CanonicalizeFilePath(path));
     if (!out.is_open()) {
         return false;
     }

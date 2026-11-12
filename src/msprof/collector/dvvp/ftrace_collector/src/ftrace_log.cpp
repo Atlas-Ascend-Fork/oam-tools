@@ -33,7 +33,7 @@ FtraceLog& FtraceLog::Instance()
     return instance;
 }
 
-void FtraceLog::Write(const std::string& level, const std::string& message)
+void FtraceLog::Write(const std::string& level, const std::string& message) const
 {
     const std::string line = std::string(LOG_TAG) + level + ": " + message;
     if (level == "error") {
@@ -45,18 +45,19 @@ void FtraceLog::Write(const std::string& level, const std::string& message)
     }
 }
 
-void FtraceLog::Event(const std::string& event, const std::string& detail)
+void FtraceLog::Event(const std::string& event, const std::string& detail) const
 {
     MSPROF_EVENT("%s%s %s", LOG_TAG, event.c_str(), detail.c_str());
 }
 
-void FtraceLog::KeyValues(const std::string& event, const std::string& kvs)
+void FtraceLog::KeyValues(const std::string& event, const std::string& kvs) const
 {
     MSPROF_LOGI("%s%s %s", LOG_TAG, event.c_str(), kvs.c_str());
 }
 
 void FtraceLog::Heartbeat(
-    uint64_t bytes, uint64_t events, uint64_t drops, uint64_t diskFreeMb, int64_t writeLatencyP99Ms, double cpuBusy)
+    uint64_t bytes, uint64_t events, uint64_t drops, uint64_t diskFreeMb, int64_t writeLatencyP99Ms,
+    double cpuBusy) const
 {
     char line[MAX_LINE_LEN] = {0};
     const int32_t written = snprintf_s(

@@ -27,7 +27,6 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/syscall.h>
-#include <sys/sysinfo.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -46,6 +45,7 @@
 #include "securec.h"
 
 #include "cpu_reader.h"
+#include "ftrace_path.h"
 #include "file_owner.h"
 #include "ftrace_constants.h"
 #include "ftrace_log.h"
@@ -295,7 +295,8 @@ uint32_t Crc32(const uint8_t* data, size_t length)
     for (size_t idx = 0; idx < length; ++idx) {
         crc ^= data[idx];
         for (int32_t bit = 0; bit < kBitsPerByte; ++bit) {
-            crc = (crc >> 1) ^ (0xEDB88320U & ((crc & 1U) ? 0xFFFFFFFFU : 0U));
+            const uint32_t mask = 0U - (crc & 1U); // all ones when the low bit is set
+            crc = (crc >> 1) ^ (0xEDB88320U & mask);
         }
     }
     return ~crc;
@@ -343,7 +344,7 @@ bool EnsureDirTree(const std::string& path)
 
 std::string ReadFirstLine(const std::string& path)
 {
-    FILE* file = fopen(path.c_str(), "r");
+    FILE* file = fopen(CanonicalizeFilePath(path).c_str(), "r");
     if (file == nullptr) {
         return "";
     }
@@ -362,7 +363,7 @@ std::string ReadFirstLine(const std::string& path)
 // The holder record lets the loser tell who is blocking the node lock.
 bool ReadWholeFile(const std::string& path, std::string& content)
 {
-    FILE* file = fopen(path.c_str(), "r");
+    FILE* file = fopen(CanonicalizeFilePath(path).c_str(), "r");
     if (file == nullptr) {
         return false;
     }
@@ -766,11 +767,12 @@ int32_t AcquireNodeLock(const Options& options, int32_t& lockFd)
     // Open an existing lock without O_CREAT: /var/tmp and /tmp are sticky, and with
     // fs.protected_regular a root open(O_CREAT) of a file owned by the invoking user is denied
     // (EACCES), which used to make the collector exit with an environment error.
-    lockFd = open(options.lockPath.c_str(), O_RDWR | O_CLOEXEC, kLockFileMode);
+    const std::string lockPath = CanonicalizeFilePath(options.lockPath);
+    lockFd = open(lockPath.c_str(), O_RDWR | O_CLOEXEC, kLockFileMode);
     if (lockFd < 0 && errno == ENOENT) {
-        lockFd = open(options.lockPath.c_str(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, kLockFileMode);
+        lockFd = open(lockPath.c_str(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, kLockFileMode);
         if (lockFd < 0 && errno == EEXIST) {
-            lockFd = open(options.lockPath.c_str(), O_RDWR | O_CLOEXEC, kLockFileMode);
+            lockFd = open(lockPath.c_str(), O_RDWR | O_CLOEXEC, kLockFileMode);
         }
     }
     if (lockFd < 0) {

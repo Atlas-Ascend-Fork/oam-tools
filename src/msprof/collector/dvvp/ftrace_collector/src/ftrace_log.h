@@ -27,14 +27,14 @@ public:
     static FtraceLog& Instance();
 
     // level is "info" / "warn" / "error"; the message keeps the key=value shape used in the logs
-    void Write(const std::string& level, const std::string& message);
+    void Write(const std::string& level, const std::string& message) const;
     // Runs through MSPROF_EVENT, the plog "event" channel used for one-shot lifecycle records
     // (the collector's version banner is the only user for now).
-    void Event(const std::string& event, const std::string& detail);
-    void KeyValues(const std::string& event, const std::string& kvs);
+    void Event(const std::string& event, const std::string& detail) const;
+    void KeyValues(const std::string& event, const std::string& kvs) const;
     void Heartbeat(
         uint64_t bytes, uint64_t events, uint64_t drops, uint64_t diskFreeMb, int64_t writeLatencyP99Ms,
-        double cpuBusy);
+        double cpuBusy) const;
 
 private:
     FtraceLog() = default;

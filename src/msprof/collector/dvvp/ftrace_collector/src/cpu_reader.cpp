@@ -15,6 +15,8 @@
  */
 #include "cpu_reader.h"
 
+#include "ftrace_path.h"
+
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
@@ -64,7 +66,10 @@ CpuReader::~CpuReader()
     CloseFiles();
 }
 
-void CpuReader::Start() { thread_ = std::thread(&CpuReader::Run, this); }
+void CpuReader::Start()
+{
+    thread_ = std::thread([this]() { Run(); });
+}
 
 void CpuReader::RequestStop() { stopRequested_.store(true); }
 
@@ -97,14 +102,16 @@ std::string CpuReader::Error() const
 
 bool CpuReader::OpenFiles()
 {
-    const std::string rawPath = traceRoot_ + "/per_cpu/cpu" + std::to_string(cpu_) + "/trace_pipe_raw";
+    const std::string rawPath =
+        CanonicalizeFilePath(traceRoot_ + "/per_cpu/cpu" + std::to_string(cpu_) + "/trace_pipe_raw");
     rawFd_ = open(rawPath.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (rawFd_ < 0) {
         std::lock_guard<std::mutex> lock(errorMutex_);
         error_ = "open " + rawPath + " failed: " + strerror(errno);
         return false;
     }
-    outFd_ = open(outputPath_.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, kWriterFileMode);
+    const std::string outputPath = CanonicalizeFilePath(outputPath_);
+    outFd_ = open(outputPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, kWriterFileMode);
     if (outFd_ < 0) {
         std::lock_guard<std::mutex> lock(errorMutex_);
         error_ = "open " + outputPath_ + " failed: " + strerror(errno);
