@@ -36,6 +36,8 @@ static std::set<std::string> g_pluginApiStubSet = {
     "rtRegisterAllKernel",
     "rtGetBinaryDeviceBaseAddr",
     "rtProfSetProSwitch",
+    "aclrtBinaryGetDevAddress",
+    "rtMemcpy",
     "rtKernelLaunch",
     "rtKernelLaunchWithHandle",
     "rtKernelLaunchWithHandleV2",
@@ -46,6 +48,7 @@ static std::set<std::string> g_pluginApiStubSet = {
     "rtsLaunchKernelWithHostArgs",
     "rtLaunchKernelByFuncHandleV3",
     "rtLaunchKernelWithArgsArray",
+    "aclrtFunctionGetBinary",
     "rtStreamSynchronize",
     "rtMalloc",
     "rtFree",
@@ -68,6 +71,12 @@ void AcpApiPlugin::LoadRuntimeApi()
 
         MSPROF_LOGI("Load api[%s] from %s success.", it.c_str(), RUNTIME_LIB_PATH);
         apiStubInfoMap_.insert({it, {it, addr}});
+    }
+
+    msprofGetInjectionFunc_ =
+        reinterpret_cast<MsprofGetInjectionFuncT>(dlsym(acpRuntimeLibHandle_, "MsprofGetInjectionFunc"));
+    if (msprofGetInjectionFunc_ == nullptr) {
+        MSPROF_LOGW("Unable to load MsprofGetInjectionFunc from %s.", RUNTIME_LIB_PATH);
     }
 }
 
@@ -108,6 +117,32 @@ rtError_t AcpApiPlugin::ApiRtGetBinaryDeviceBaseAddress(CONST_VOID_PTR handle, V
     return rtGetBinaryDeviceBaseAddress_(handle, &launchBase);
 }
 
+rtError_t AcpApiPlugin::ApiGetBinaryData(aclrtBinHandle handle, std::vector<uint8_t>& data)
+{
+    aclrtBinaryGetDevAddress_ =
+        reinterpret_cast<AclrtBinaryGetDevAddressFunc>(GetPluginApiStubFunc("aclrtBinaryGetDevAddress"));
+    rtMemcpy_ = reinterpret_cast<RtMemcpyFunc>(GetPluginApiStubFunc("rtMemcpy"));
+    if ((aclrtBinaryGetDevAddress_ == nullptr) || (rtMemcpy_ == nullptr)) {
+        return ACL_ERROR_RT_PROFILING_ERROR;
+    }
+
+    void* binaryAddr = nullptr;
+    size_t binarySize = 0;
+    if (aclrtBinaryGetDevAddress_(handle, &binaryAddr, &binarySize) != ACL_SUCCESS) {
+        return ACL_ERROR_RT_PROFILING_ERROR;
+    }
+    if ((binaryAddr == nullptr) || (binarySize == 0)) {
+        return ACL_ERROR_RT_PROFILING_ERROR;
+    }
+
+    data.resize(binarySize);
+    if (rtMemcpy_(data.data(), data.size(), binaryAddr, binarySize, RT_MEMCPY_DEVICE_TO_HOST) != RT_ERROR_NONE) {
+        data.clear();
+        return ACL_ERROR_RT_PROFILING_ERROR;
+    }
+    return RT_ERROR_NONE;
+}
+
 VOID_PTR AcpApiPlugin::GetPluginApiStubFunc(const std::string funcName)
 {
     ProfAPI::PthreadOnce(&apiLoadFlag_, []() -> void { AcpApiPlugin::instance()->LoadRuntimeApi(); });
@@ -118,6 +153,17 @@ VOID_PTR AcpApiPlugin::GetPluginApiStubFunc(const std::string funcName)
     }
 
     return it->second.funcAddr;
+}
+
+void* AcpApiPlugin::GetMsprofInjectionFunc(uint32_t type)
+{
+    ProfAPI::PthreadOnce(&apiLoadFlag_, []() -> void { AcpApiPlugin::instance()->LoadRuntimeApi(); });
+    if (msprofGetInjectionFunc_ == nullptr) {
+        MSPROF_LOGE("MsprofGetInjectionFunc is not loaded.");
+        return nullptr;
+    }
+
+    return msprofGetInjectionFunc_(type);
 }
 
 } // namespace Acp

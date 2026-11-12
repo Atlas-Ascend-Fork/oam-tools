@@ -54,7 +54,6 @@ public:
     void SetTaskBlockDim(const uint32_t blockDim);
     int32_t TaskStop();
     // pc sampling
-    void AddBinary(VOID_PTR handle, const RtDevBinary& binary);
     void RemoveBinary(VOID_PTR handle);
     void DumpBinary(VOID_PTR handle);
     void AddBinaryBaseAddr(VOID_PTR handle, VOID_PTR baseAddr);
@@ -71,7 +70,7 @@ public:
     void RegisterRtMemcpyFunc(RtMemcpyAsyncFunc memcpyAsyncFunc);
     // rtMalloc and rtFree
     void RegisterRtMallocFunc(RtMallocFunc mallocFunc, RtFreeFunc freeFunc);
-    void SaveRtMallocAttr(AcpBackupAttr& attr);
+    void SaveRtMallocAttr(AcpBackupAttr attr);
     void ReleaseRtMallocAddr(const void* ptr);
 
 private:
@@ -98,6 +97,7 @@ private:
     SHARED_PTR_ALIA<analysis::dvvp::message::ProfileParams> params_;
     std::mutex binaryMtx_;
     std::map<VOID_PTR, AcpDevBinary> devBinaryMap_;
+    std::mutex mallocMtx_;
     std::vector<AcpBackupAttr> mallocVec_;
     std::vector<AcpBackupAttr> memoryVec_;
     std::vector<std::string> metrics_;

@@ -27,13 +27,28 @@ using namespace Analysis::Dvvp::App;
 using namespace analysis::dvvp::common::utils;
 using namespace Collector::Dvvp::Acp;
 
+static bool IsEnvNeedFilter(const std::string& envItem)
+{
+    // ASCEND_WORK_PATH/ASCEND_DUMP_PATH 会激活应用内 IDEDD（kernel dfx dump），其初始化
+    // 将提前触发 runtime Boot，此时芯片属性尚未注册导致 Boot 失败报错（首次必败、二次成功）。
+    // 单算子采集场景不依赖 dump 能力，过滤以消除该初始化竞态噪音。
+    constexpr char ASCEND_WORK_PATH_PREFIX[] = "ASCEND_WORK_PATH=";
+    constexpr char ASCEND_DUMP_PATH_PREFIX[] = "ASCEND_DUMP_PATH=";
+    return (envItem.compare(0, sizeof(ASCEND_WORK_PATH_PREFIX) - 1, ASCEND_WORK_PATH_PREFIX) == 0) ||
+           (envItem.compare(0, sizeof(ASCEND_DUMP_PATH_PREFIX) - 1, ASCEND_DUMP_PATH_PREFIX) == 0);
+}
+
 static void SetEnvList(CONST_CHAR_PTR& envp, std::vector<std::string>& envpList)
 {
     uint32_t envpLen = 0;
     constexpr uint32_t maxEnvpLen = 4096;
     const char** env = &envp;
     while (*env) {
-        envpList.push_back(*env++);
+        const std::string envItem = *env++;
+        if (IsEnvNeedFilter(envItem)) {
+            continue;
+        }
+        envpList.push_back(envItem);
         envpLen++;
         if (envpLen >= maxEnvpLen) {
             CmdLog::CmdErrorLog("Truncate env params due to exceeding limit!");

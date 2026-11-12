@@ -18,12 +18,14 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 #include "singleton/singleton_tool.h"
 #include "runtime/base.h"
 #include "runtime/kernel.h"
 #include "runtime/rts/rts_kernel.h"
 #include "runtime/mem.h"
 #include "prof_utils_tool.h"
+#include "acp_aclrt_injection_tool.h"
 
 namespace Collector {
 namespace Dvvp {
@@ -37,6 +39,8 @@ using RtDevBinaryUnRegisterFunc = rtError_t (*)(void*);
 using RtFunctionRegisterFunc = rtError_t (*)(void*, const void*, const char_t*, const void*, uint32_t);
 using RtRegisterAllKernelFunc = rtError_t (*)(const rtDevBinary_t*, void**);
 using RtGetBinaryDeviceBaseAddressFunc = rtError_t (*)(const void* handle, void** launchBase);
+using AclrtBinaryGetDevAddressFunc = aclError (*)(aclrtBinHandle binHandle, void** binAddr, size_t* binSize);
+using RtMemcpyFunc = rtError_t (*)(void* dst, uint64_t destMax, const void* src, uint64_t cnt, rtMemcpyKind_t kind);
 using RtProfSetProSwitchFunc = rtError_t (*)(void* data, uint32_t len);
 using RtKernelLaunchFunc = rtError_t (*)(
     const void* stubFunc, uint32_t blockDim, void* args, uint32_t argsSize, rtSmDesc_t* smDesc, rtStream_t stm);
@@ -85,6 +89,8 @@ public:
     VOID_PTR GetPluginApiStubFunc(const std::string funcName);
     rtError_t ApiRtStreamSynchronize(rtStream_t stream);
     rtError_t ApiRtGetBinaryDeviceBaseAddress(CONST_VOID_PTR handle, VOID_PTR& launchBase);
+    rtError_t ApiGetBinaryData(aclrtBinHandle handle, std::vector<uint8_t>& data);
+    void* GetMsprofInjectionFunc(uint32_t type);
 
 private:
     void LoadRuntimeApi();
@@ -92,6 +98,9 @@ private:
     VOID_PTR acpRuntimeLibHandle_{nullptr};
     RtStreamSynchronizeFunc rtStreamSynchronize_{nullptr};
     RtGetBinaryDeviceBaseAddressFunc rtGetBinaryDeviceBaseAddress_{nullptr};
+    AclrtBinaryGetDevAddressFunc aclrtBinaryGetDevAddress_{nullptr};
+    RtMemcpyFunc rtMemcpy_{nullptr};
+    MsprofGetInjectionFuncT msprofGetInjectionFunc_{nullptr};
     std::map<std::string, ApiStubInfo> apiStubInfoMap_;
 };
 

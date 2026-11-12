@@ -158,7 +158,7 @@ set(profinjCpp
     ${PROF_BASIC_DIR}/osal/osal.c
     src/acp_command.cpp
     src/acp_pipe_transfer_tool.cpp
-    src/acp_runtime_api_tool.cpp
+    src/acp_aclrt_injection_tool.cpp
     src/acp_manager_tool.cpp
     src/acp_api_plugin.cpp
     src/acp_compute_device_job_tool.cpp
@@ -257,6 +257,12 @@ target_compile_options(profinj PRIVATE
     -fstack-protector-all
     -fno-strict-aliasing
     -fno-common
+    # profinj 与 CANN 包的 libprofimpl.so 同源共存于应用进程：隐藏符号使
+    # GNU_UNIQUE 单例（Meyers singleton 模板静态变量）不参与进程级合并，
+    # 避免两侧 Platform/ConfigManager 等共享同一实例导致跨界虚调用崩溃；
+    # 唯一对外入口 acltoolInitialize 经 MSVP_PROF_API 显式导出。
+    -fvisibility=hidden
+    $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>
     -Wfloat-equal
     -Wextra
     -Wall
@@ -278,6 +284,7 @@ target_link_options(profinj PRIVATE
     -Wl,-z,relro,-z,now,-z,noexecstack
     -Wl,-Bsymbolic
     -Wl,--exclude-libs=ALL
+    -pthread
 )
 
 target_link_libraries(profinj PRIVATE

@@ -25,6 +25,8 @@ set(testSrc
     testcase/op_analyzer_biu_utest.cpp
     testcase/op_analyzer_pmu_utest.cpp
     testcase/job_wrapper_utest.cpp
+    testcase/acp_aclrt_injection_utest.cpp
+    testcase/common_utils_utest.cpp
 )
 
 set(src_file
@@ -38,7 +40,7 @@ set(src_file
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_pipe_transfer_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_manager_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_api_plugin.cpp
-    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_runtime_api_tool.cpp
+    ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_aclrt_injection_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/acp_compute_device_job_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_base_tool.cpp
     ${MSPROF_SOURCE_DIR}/dvvp/acp/src/op_analyzer_pmu_tool.cpp

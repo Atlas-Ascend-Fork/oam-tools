@@ -19,6 +19,7 @@
 #include "config_manager_tool.h"
 #include "acp_pipe_transfer_tool.h"
 #include "platform/platform_tool.h"
+#include "env_manager_tool.h"
 #define private public
 #include "acp_command.h"
 
@@ -26,6 +27,7 @@ using namespace analysis::dvvp::common::error;
 using namespace analysis::dvvp::common::utils;
 using namespace Analysis::Dvvp::Common::Platform;
 using namespace Collector::Dvvp::Acp;
+using namespace Analysis::Dvvp::App;
 
 class ACP_BIN_UTEST : public testing::Test {
 protected:
@@ -236,3 +238,25 @@ TEST_F(ACP_BIN_UTEST, AcpCustomMetricsBoundaryCases)
     EXPECT_EQ("Custom:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30", metrics);
 }
 #undef private
+
+TEST_F(ACP_BIN_UTEST, AcpBinFilterDumpEnv)
+{
+    // ASCEND_WORK_PATH/ASCEND_DUMP_PATH 会激活应用内 IDEDD 提前触发 runtime 初始化失败，
+    // 透传时应被过滤；其余环境变量正常透传
+    const char* envp[] = {"ASCEND_WORK_PATH=/tmp/work", "ASCEND_DUMP_PATH=/tmp/dump", "PATH=/usr/bin", nullptr};
+    const char* argv[] = {"acp", "--help"};
+    EXPECT_EQ(PROFILING_FAILED, LltAcpMain(2, argv, envp));
+    const auto envList = EnvManager::instance()->GetGlobalEnv();
+    bool hasFilteredEnv = false;
+    bool hasKeptEnv = false;
+    for (const auto& env : envList) {
+        if ((env.find("ASCEND_WORK_PATH=") == 0) || (env.find("ASCEND_DUMP_PATH=") == 0)) {
+            hasFilteredEnv = true;
+        }
+        if (env.find("PATH=") == 0) {
+            hasKeptEnv = true;
+        }
+    }
+    EXPECT_FALSE(hasFilteredEnv);
+    EXPECT_TRUE(hasKeptEnv);
+}

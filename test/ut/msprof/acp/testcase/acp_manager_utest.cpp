@@ -308,112 +308,6 @@ static void* dlsymStub(void* handle, const char* symbol)
     return (void*)0x87654321;
 }
 
-TEST_F(ACP_MANAGER_UTEST, AcpRtSetDeviceTest)
-{
-    // dlopen runtime failed
-    MOCKER(dlclose).stubs().will(invoke(dlcloseStub));
-    MOCKER(dlopen).stubs().will(invoke(dlopenStub));
-    MOCKER(dlsym).stubs().will(invoke(dlsymStub));
-    MOCKER_CPP(&AcpManager::TaskStart).stubs().will(returnValue(PROFILING_SUCCESS));
-    MOCKER_CPP(&AcpManager::TaskStop).stubs().will(returnValue(PROFILING_SUCCESS));
-    MOCKER_CPP(&AcpManager::PcSamplingIsEnable).stubs().will(returnValue(true));
-
-    int32_t devId = 0;
-    EXPECT_EQ(ACL_RT_SUCCESS, rtSetDevice(devId));
-
-    void* ptr = nullptr;
-    void** upPtr = reinterpret_cast<void**>(&ptr);
-    uint64_t size = static_cast<uint64_t>(sizeof(uint32_t));
-    rtMalloc(upPtr, size, 0, 0);
-
-    void* hdl = (void*)0x12345678;
-    void* kernelInfo = nullptr;
-    void* stubFunc = nullptr;
-    uint64_t tilingKey = 0;
-    uint32_t flags = 0;
-    uint32_t blockDim = 8;
-    void* args = nullptr;
-    uint32_t argsSize = 10;
-    rtSmDesc_t* smDesc = nullptr;
-    rtArgsEx_t* argsInfo = {0};
-    rtTaskCfgInfo_t* cfgInfo = {0};
-    rtStream_t stm = nullptr;
-    uint8_t data = 7;
-    rtDevBinary_t bin;
-    bin.data = nullptr;
-    bin.length = 0;
-    rtDevBinary_t bin2;
-    bin2.length = 1;
-    bin2.data = &data;
-    char_t* stubName = "stubName";
-    EXPECT_EQ(ACL_RT_SUCCESS, rtDevBinaryRegister(&bin, &hdl));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtDevBinaryRegister(&bin2, &hdl));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtDevBinaryUnRegister(&hdl));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtFunctionRegister(hdl, stubFunc, stubName, kernelInfo, 0));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtRegisterAllKernel(&bin, &hdl));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtKernelLaunch(stubFunc, blockDim, args, argsSize, smDesc, stm));
-    rtFree(ptr);
-    rtMalloc(upPtr, size, 0, 0);
-    EXPECT_EQ(ACL_RT_SUCCESS, rtKernelLaunchWithHandle(hdl, tilingKey, blockDim, argsInfo, smDesc, stm, kernelInfo));
-    rtFree(ptr);
-    rtMalloc(upPtr, size, 0, 0);
-    EXPECT_EQ(ACL_RT_SUCCESS, rtKernelLaunchWithHandleV2(hdl, tilingKey, blockDim, argsInfo, smDesc, stm, cfgInfo));
-    rtFree(ptr);
-    rtMalloc(upPtr, size, 0, 0);
-    EXPECT_EQ(ACL_RT_SUCCESS, rtKernelLaunchWithFlag(stubFunc, blockDim, argsInfo, smDesc, stm, flags));
-    rtFree(ptr);
-    rtMalloc(upPtr, size, 0, 0);
-    EXPECT_EQ(ACL_RT_SUCCESS, rtKernelLaunchWithFlagV2(stubFunc, blockDim, argsInfo, smDesc, stm, flags, cfgInfo));
-    rtFree(ptr);
-}
-
-TEST_F(ACP_MANAGER_UTEST, AcpNewLaunchKernelTest)
-{
-    MOCKER(dlclose).stubs().will(invoke(dlcloseStub));
-    MOCKER(dlopen).stubs().will(invoke(dlopenStub));
-    MOCKER(dlsym).stubs().will(invoke(dlsymStub));
-    MOCKER_CPP(&AcpManager::TaskStart).stubs().will(returnValue(PROFILING_SUCCESS));
-    MOCKER_CPP(&AcpManager::TaskStop).stubs().will(returnValue(PROFILING_SUCCESS));
-    MOCKER_CPP(&AcpManager::PcSamplingIsEnable).stubs().will(returnValue(true));
-
-    uint32_t numBlocks = 8;
-    rtFuncHandle funcHandle = nullptr;
-    rtStream_t stm = nullptr;
-    rtKernelLaunchCfg_t* cfg = nullptr;
-    rtArgsHandle argsHandle = nullptr;
-    void* reserve = nullptr;
-    const void* devArgs = nullptr;
-    uint32_t argsSize = 10;
-    void* hostArgs = nullptr;
-    rtPlaceHolderInfo_t* placeHolderArray = nullptr;
-    uint32_t placeHolderNum = 0;
-    void* func = nullptr;
-    void* argsArray = nullptr;
-    void** args = reinterpret_cast<void**>(&argsArray);
-
-    // Scenario 1: stub func resolved, full KernelExec path runs to success for each new launch entry
-    EXPECT_EQ(ACL_RT_SUCCESS, rtsLaunchKernelWithConfig(funcHandle, numBlocks, stm, cfg, argsHandle, reserve));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtsLaunchKernelWithDevArgs(funcHandle, numBlocks, stm, cfg, devArgs, argsSize, reserve));
-    EXPECT_EQ(
-        ACL_RT_SUCCESS, rtsLaunchKernelWithHostArgs(
-                            funcHandle, numBlocks, stm, cfg, hostArgs, argsSize, placeHolderArray, placeHolderNum));
-    EXPECT_EQ(ACL_RT_SUCCESS, rtLaunchKernelWithArgsArray(func, numBlocks, stm, cfg, args));
-
-    // Scenario 2: api stub func cannot be resolved, each entry returns the profiling error early
-    GlobalMockObject::verify();
-    MOCKER_CPP(&AcpApiPlugin::GetPluginApiStubFunc).stubs().will(returnValue((VOID_PTR) nullptr));
-    EXPECT_EQ(
-        ACL_ERROR_RT_PROFILING_ERROR, rtsLaunchKernelWithConfig(funcHandle, numBlocks, stm, cfg, argsHandle, reserve));
-    EXPECT_EQ(
-        ACL_ERROR_RT_PROFILING_ERROR,
-        rtsLaunchKernelWithDevArgs(funcHandle, numBlocks, stm, cfg, devArgs, argsSize, reserve));
-    EXPECT_EQ(
-        ACL_ERROR_RT_PROFILING_ERROR,
-        rtsLaunchKernelWithHostArgs(
-            funcHandle, numBlocks, stm, cfg, hostArgs, argsSize, placeHolderArray, placeHolderNum));
-    EXPECT_EQ(ACL_ERROR_RT_PROFILING_ERROR, rtLaunchKernelWithArgsArray(func, numBlocks, stm, cfg, args));
-}
-
 TEST_F(ACP_MANAGER_UTEST, AcpManagerTest)
 {
     MOCKER_CPP(analysis::dvvp::common::utils::Utils::CreateDir)
@@ -524,11 +418,8 @@ TEST_F(ACP_MANAGER_UTEST, DumpBinary)
 {
     GlobalMockObject::verify();
     void* hdl = (void*)0x12345678;
-    uint8_t data = 7;
-    rtDevBinary_t bin;
-    bin.length = 1;
-    bin.data = &data;
-    AcpManager::instance()->AddBinary(hdl, bin);
+    MOCKER_CPP(&AcpApiPlugin::ApiGetBinaryData).stubs().will(returnValue(RT_ERROR_NONE));
+    AcpManager::instance()->SaveBinaryHandle(hdl);
     MOCKER(Utils::CanonicalizePath).stubs().will(returnValue(std::string("./")));
     AcpManager::instance()->DumpBinary(hdl);
     remove(AcpManager::instance()->GetBinaryObjectPath().c_str());
@@ -536,15 +427,24 @@ TEST_F(ACP_MANAGER_UTEST, DumpBinary)
     AcpManager::instance()->UnInit();
 }
 
+TEST_F(ACP_MANAGER_UTEST, DumpBinaryUsesPublicRuntimeInterfaces)
+{
+    GlobalMockObject::verify();
+    void* hdl = reinterpret_cast<void*>(0x87654321);
+    AcpManager::instance()->SaveBinaryHandle(hdl);
+    MOCKER_CPP(&AcpApiPlugin::ApiGetBinaryData).stubs().will(returnValue(RT_ERROR_NONE));
+    MOCKER(Utils::CanonicalizePath).stubs().will(returnValue(std::string("./")));
+    AcpManager::instance()->DumpBinary(hdl);
+    remove(AcpManager::instance()->GetBinaryObjectPath().c_str());
+    AcpManager::instance()->UnInit();
+    GlobalMockObject::verify();
+}
+
 TEST_F(ACP_MANAGER_UTEST, AddBinaryBaseAddr)
 {
     GlobalMockObject::verify();
-    void* hdl = (void*)0x12345678;
-    uint8_t data = 7;
-    rtDevBinary_t bin;
-    bin.length = 1;
-    bin.data = &data;
-    AcpManager::instance()->AddBinary(hdl, bin);
+    void* hdl = reinterpret_cast<void*>(0x12345678);
+    AcpManager::instance()->SaveBinaryHandle(hdl);
     AcpManager::instance()->AddBinaryBaseAddr(hdl, (void*)0x123456);
     EXPECT_EQ(hdl, AcpManager::instance()->GetBinaryHandle());
     AcpManager::instance()->UnInit();

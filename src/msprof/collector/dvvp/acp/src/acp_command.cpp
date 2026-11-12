@@ -350,7 +350,7 @@ int32_t ProfileCommandRun(Argparser& profCommand)
         MSPROF_LOGE("Failed to write pipe");
         return PROFILING_FAILED;
     }
-    params->app_env += ";LD_PRELOAD=" + GetProfinjLibPath();
+    params->app_env += ";ACL_API_INJECTION=" + GetProfinjLibPath();
     params->app_env += ";ACP_PIPE_FD=" + std::to_string(fdPipe);
     MM_SYS_SET_ENV(MM_ENV_ACP_PIPE_FD, std::to_string(fdPipe).c_str(), 1, ret);
     FUNRET_CHECK_EXPR_ACTION(ret != EOK, return PROFILING_FAILED, "Failed to set environment variable ACP_PIPE_FD.");

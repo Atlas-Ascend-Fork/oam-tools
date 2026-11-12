@@ -45,6 +45,7 @@ AcpManager::AcpManager()
       jobAdapter_(nullptr),
       params_(nullptr),
       devBinaryMap_({}),
+      mallocMtx_(),
       mallocVec_({}),
       memoryVec_({}),
       metrics_({}),
@@ -184,31 +185,6 @@ int32_t AcpManager::JobStop()
     return ret;
 }
 
-void AcpManager::AddBinary(VOID_PTR handle, const RtDevBinary& binary)
-{
-    FUNRET_CHECK_EXPR_ACTION(handle == nullptr, return, "Add binary handle is invalid.");
-    FUNRET_CHECK_EXPR_ACTION(
-        ((binary.data == nullptr) || (binary.length == 0)), return,
-        "Binary is invalid, binary data is nullptr or length is 0");
-    AcpDevBinary bin;
-    bin.magic = binary.magic;
-    bin.version = binary.version;
-    bin.length = binary.length;
-    bin.data.reserve(binary.length);
-    const errno_t ret = memcpy_s(bin.data.data(), bin.data.capacity(), binary.data, binary.length);
-    FUNRET_CHECK_EXPR_ACTION(ret != EOK, return, "Binary memcpy_s failed with error.");
-    const std::lock_guard<std::mutex> lk(binaryMtx_);
-    auto it = devBinaryMap_.find(handle);
-    if (it != devBinaryMap_.cend()) {
-        bin.baseAddr = it->second.baseAddr;
-        it->second = std::move(bin);
-        MSPROF_LOGI("Update device binary with handle %p", handle);
-    } else {
-        MSPROF_LOGI("Associated device binary with handle %p", handle);
-        devBinaryMap_[handle] = std::move(bin);
-    }
-}
-
 void AcpManager::RemoveBinary(VOID_PTR handle)
 {
     const std::lock_guard<std::mutex> lk(binaryMtx_);
@@ -223,12 +199,12 @@ void AcpManager::RemoveBinary(VOID_PTR handle)
 
 void AcpManager::DumpBinary(VOID_PTR handle)
 {
-    const std::lock_guard<std::mutex> lk(binaryMtx_);
-    auto it = devBinaryMap_.find(handle);
-    if (it == devBinaryMap_.cend()) {
-        MSPROF_LOGE("Failed to find binary by handle[%p].", handle);
+    AcpDevBinary bin;
+    if (AcpApiPlugin::instance()->ApiGetBinaryData(handle, bin.data) != RT_ERROR_NONE) {
+        MSPROF_LOGE("Failed to get binary data by handle[%p].", handle);
         return;
     }
+    bin.length = bin.data.size();
 
     binaryObjectPath_ = Utils::CanonicalizePath(params_->result_dir);
     if (binaryObjectPath_.empty()) {
@@ -249,7 +225,7 @@ void AcpManager::DumpBinary(VOID_PTR handle)
         MSPROF_LOGE("Failed to open %s, errinfo:%s", binaryObjectPath_.c_str(), strerror(OsalGetErrorCode()));
         return;
     }
-    file.write(reinterpret_cast<const char*>(it->second.data.data()), it->second.length);
+    file.write(reinterpret_cast<const char*>(bin.data.data()), bin.length);
     file.flush();
     file.close();
     MSPROF_LOGI("Device binary file[%s] dump successfully.", binaryObjectPath_.c_str());
@@ -481,12 +457,13 @@ void AcpManager::RegisterRtMemcpyFunc(RtMemcpyAsyncFunc memcpyAsyncFunc)
  * @param [in] attr: back up attribute applied by the user
  * @return
  */
-void AcpManager::SaveRtMallocAttr(AcpBackupAttr& attr)
+void AcpManager::SaveRtMallocAttr(AcpBackupAttr attr)
 {
     if (attr.addr == nullptr) {
         MSPROF_LOGI("Acp malloc attribute is null; skip saving.");
         return;
     }
+    const std::lock_guard<std::mutex> lock(mallocMtx_);
     mallocVec_.emplace_back(attr);
     MSPROF_LOGI(
         "Acp save malloc attr, addr: %p, size: %llu bytes, type: %u, moduleId: %u.", attr.addr, attr.size, attr.type,
@@ -500,6 +477,7 @@ void AcpManager::SaveRtMallocAttr(AcpBackupAttr& attr)
  */
 void AcpManager::ReleaseRtMallocAddr(const void* ptr)
 {
+    const std::lock_guard<std::mutex> lock(mallocMtx_);
     for (auto& it : mallocVec_) {
         if (it.addr == ptr) {
             MSPROF_LOGI("Acp release malloc addr: %p.", it.addr);
@@ -528,6 +506,7 @@ void AcpManager::SaveMallocMemory(rtStream_t stream)
  */
 void AcpManager::SaveRtMallocMemory(rtStream_t stream)
 {
+    std::lock_guard<std::mutex> lock(mallocMtx_);
     rtError_t ret = ACL_RT_SUCCESS;
     for (auto& it : mallocVec_) {
         if (it.size == 0 || it.addr == nullptr) {
@@ -574,6 +553,7 @@ void AcpManager::ResetMallocMemory(rtStream_t stream)
  */
 void AcpManager::ResetRtMallocMemory(rtStream_t stream)
 {
+    std::lock_guard<std::mutex> lock(mallocMtx_);
     if (mallocVec_.size() != memoryVec_.size()) {
         MSPROF_LOGE("Malloc size %zu not match memory size %zu.", mallocVec_.size(), memoryVec_.size());
         return;
@@ -616,6 +596,7 @@ void AcpManager::ClearMallocMemory()
  */
 void AcpManager::ClearRtMallocMemory()
 {
+    std::lock_guard<std::mutex> lock(mallocMtx_);
     for (auto& it : memoryVec_) {
         if (it.addr != nullptr) {
             (void)rtFreeFunc_(it.addr);
@@ -642,6 +623,7 @@ void AcpManager::ClearMallocAddr()
  */
 void AcpManager::ClearRtMallocAddr()
 {
+    std::lock_guard<std::mutex> lock(mallocMtx_);
     for (auto& it : mallocVec_) {
         it.addr = nullptr;
     }
