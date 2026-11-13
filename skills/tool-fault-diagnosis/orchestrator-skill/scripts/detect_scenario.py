@@ -324,15 +324,40 @@ def _library(path):
         raise ValueError("Only the accepted cases.md library may be searched")
     try:
         raw = path.read_bytes()
-        return str(path), _hash(raw), raw.decode("utf-8-sig"), None
+        text = raw.decode("utf-8-sig")
+        # cases.md is the accepted index. Linked category files hold the full
+        # accepted CASE blocks, so load them into the searchable corpus without
+        # duplicating signatures in the index itself. The index table repeats
+        # each file link once per case, so keep the first occurrence only.
+        linked, digests, texts, missing = [], {}, {}, []
+        for rel in dict.fromkeys(re.findall(r"\]\((cases-[A-Za-z0-9_-]+\.md)\)", text)):
+            if rel == "cases-pending.md":
+                # Pending cases are intentionally excluded from accepted lookup.
+                continue
+            candidate = (path.parent / rel).resolve()
+            if candidate.parent != path.parent:
+                continue
+            try:
+                content = candidate.read_text(encoding="utf-8-sig")
+                linked.append(content)
+                texts[candidate.name] = content
+                digests[candidate.name] = _hash(content.encode("utf-8"))
+            except (OSError, UnicodeError) as exc:
+                missing.append("{}: {}".format(rel, exc))
+        if linked:
+            text = text + "\n" + "\n".join(linked)
+        corpus_digest = _hash({"index": _hash(raw), "categories": digests})
+        return (str(path), corpus_digest, text, None,
+                ", ".join(missing) if missing else None,
+                {"index": path.name, "index_text": raw.decode("utf-8-sig"),
+                 "categories": sorted(digests), "texts": texts})
     except (OSError, UnicodeError) as exc:
-        return str(path), None, "", "{}: {}".format(type(exc).__name__, exc)
+        return str(path), None, "", "{}: {}".format(type(exc).__name__, exc), None, None
 
 
-def _case_signatures(text):
-    """Parse only the explicit log-signature section, stopping before root cause/solution."""
-    versions = re.findall(r"\bCANN\s+([0-9]+(?:\.[0-9]+)+)", text[:1500], re.I)
-    header = re.compile(r"^##\s+(CASE-\d+)[：:]\s*(.+)$", re.M)
+def _case_signatures(text, source_file="cases.md"):
+    """Parse signatures with source file and real in-file line numbers."""
+    header = re.compile(r"^##\s+(CASE-[A-Z]+-\d+|CASE-\d+)[：:]\s*(.+)$", re.M)
     blocks = list(header.finditer(text))
     for index, match in enumerate(blocks):
         end = blocks[index + 1].start() if index + 1 < len(blocks) else len(text)
@@ -342,16 +367,20 @@ def _case_signatures(text):
             continue
         excerpt = signature.group(1).strip()
         lines = [line for line in excerpt.splitlines() if line.strip() and not line.strip().startswith("```")]
+        versions = sorted(set(re.findall(
+            r"(?:\bCANN\s+|\|\s*CANN\s*版本\s*\|\s*)([0-9]+(?:\.[0-9]+)+)",
+            block, re.I)))
         yield {"case_id": match.group(1), "title": match.group(2).strip(),
+               "source_file": source_file,
                "library_line": text[:match.start()].count("\n") + 1,
-               "signature": excerpt, "lines": lines, "applicable_versions": sorted(set(versions))}
+               "signature": excerpt, "lines": lines, "applicable_versions": versions}
 
 
 def lookup_cases(input_or_scan, request="", max_bytes=MAX_BYTES_DEFAULT,
                  max_files=MAX_FILES_DEFAULT, level="DEBUG", case_library=None):
     """Return candidate matches, not a diagnosis; only current raw log lines can match."""
     scan = input_or_scan if isinstance(input_or_scan, dict) else scan_input(input_or_scan, max_bytes, max_files)
-    path, digest, library_text, error = _library(case_library or DEFAULT_LIBRARY)
+    path, digest, library_text, error, missing_categories, corpus = _library(case_library or DEFAULT_LIBRARY)
     result = {"status": "miss", "library_path": path, "library_sha256": digest,
               "input_fingerprint": _input_fingerprint(scan, request), "query_features": _union_features(scan["events"]),
               "matches": [], "errors": scan.get("errors", []),
@@ -360,35 +389,49 @@ def lookup_cases(input_or_scan, request="", max_bytes=MAX_BYTES_DEFAULT,
         result["status"] = "unavailable"
         result["limitations"].append("Accepted case library unavailable: " + error)
         return result
+    if missing_categories:
+        result["limitations"].append(
+            "Linked category files missing or unreadable: " + missing_categories)
     indexed = [(event, extract_features(event["text"])) for event in scan["events"]]
-    for case in _case_signatures(library_text):
-        result["cases_examined"] += 1
-        sig_events = [{"text": line} for line in case["lines"]]
-        expected = _union_features(sig_events)
-        evidence, matched_features, methods = [], {key: set() for key in expected}, set()
-        for signature_line in case["lines"]:
-            signature = extract_features(signature_line)
-            for event, observed in indexed:
-                common = {key: set(signature[key]) & set(observed[key]) for key in signature}
-                # EZ9999 wraps multiple underlying failures; it cannot identify a case by itself.
-                strong_code = bool(common["codes"] - {"EZ9999"})
-                combination = all(common[key] for key in ("modules", "operations", "symptoms"))
-                if not (strong_code or combination):
-                    continue
-                methods.add("strong_error_code" if strong_code else "module_operation_symptom")
-                if event not in evidence and len(evidence) < 8:
-                    evidence.append(event)
-                for key in common:
-                    matched_features[key].update(common[key])
-        if not evidence:
-            continue
-        unmatched = {key: sorted(set(expected[key]) - matched_features[key]) for key in expected}
-        result["matches"].append({key: case[key] for key in ("case_id", "title", "library_line", "signature", "applicable_versions")})
-        result["matches"][-1].update({"match_methods": sorted(methods), "evidence": evidence,
-            "matched_features": {key: sorted(value) for key, value in matched_features.items()},
-            "differences": {"unmatched_signature_features": unmatched,
-                            "version_applicability": "unverified", "environment_applicability": "unverified"},
-            "root_cause_status": "candidate_only"})
+    # Category files hold the accepted case blocks; cases.md is normally a pure
+    # index. During migration a library may still carry inline `## CASE-...`
+    # blocks in cases.md itself — search them too (deduplicated by case_id) so
+    # they are not silently dropped.
+    source_texts = ([("cases.md", library_text)] if not corpus or not corpus.get("categories")
+                    else [(name, corpus["texts"][name]) for name in corpus["categories"]]
+                    + [("cases.md", corpus["index_text"])])
+    seen_ids = set()
+    for source_name, source_text in source_texts:
+        for case in _case_signatures(source_text, source_name):
+            if case["case_id"] in seen_ids:
+                continue
+            seen_ids.add(case["case_id"])
+            result["cases_examined"] += 1
+            sig_events = [{"text": line} for line in case["lines"]]
+            expected = _union_features(sig_events)
+            evidence, matched_features, methods = [], {key: set() for key in expected}, set()
+            for signature_line in case["lines"]:
+                signature = extract_features(signature_line)
+                for event, observed in indexed:
+                    common = {key: set(signature[key]) & set(observed[key]) for key in signature}
+                    strong_code = bool(common["codes"] - {"EZ9999"})
+                    combination = all(common[key] for key in ("modules", "operations", "symptoms"))
+                    if not (strong_code or combination):
+                        continue
+                    methods.add("strong_error_code" if strong_code else "module_operation_symptom")
+                    if event not in evidence and len(evidence) < 8:
+                        evidence.append(event)
+                    for key in common:
+                        matched_features[key].update(common[key])
+            if not evidence:
+                continue
+            unmatched = {key: sorted(set(expected[key]) - matched_features[key]) for key in expected}
+            result["matches"].append({key: case[key] for key in ("case_id", "title", "source_file", "library_line", "signature", "applicable_versions")})
+            result["matches"][-1].update({"match_methods": sorted(methods), "evidence": evidence,
+                "matched_features": {key: sorted(value) for key, value in matched_features.items()},
+                "differences": {"unmatched_signature_features": unmatched,
+                                "version_applicability": "unverified", "environment_applicability": "unverified"},
+                "root_cause_status": "candidate_only"})
 
     if result["matches"]:
         result["status"] = "hit"
@@ -400,7 +443,7 @@ def lookup_cases(input_or_scan, request="", max_bytes=MAX_BYTES_DEFAULT,
 
 
 def validate_case_result(scan, request, result, case_library):
-    path, digest, _, error = _library(case_library or DEFAULT_LIBRARY)
+    path, digest, _, error, _, _ = _library(case_library or DEFAULT_LIBRARY)
     if result.get("status") not in {"hit", "miss", "unavailable"}:
         raise ValueError("Invalid case_lookup result status")
     if result.get("input_fingerprint") != _input_fingerprint(scan, request):

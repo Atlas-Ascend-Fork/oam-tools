@@ -19,7 +19,7 @@
 promote_case.py — 将高可信诊断报告沉淀到案例库
 
 按 references/case-contribution.md 的门槛和格式，把诊断报告转换为规范案例块，
-写入 cases.md（accept）或 cases-pending.md（pending）。
+accept 写入对应分类文件（cases-*.md）并同步 cases.md 索引；pending 写入 cases-pending.md。
 
 用法：
   python3 promote_case.py --report report.md --confidence confidence_result.json --dry-run
@@ -30,23 +30,184 @@ promote_case.py — 将高可信诊断报告沉淀到案例库
 
 import argparse
 import json
+import os
 import re
 import sys
-from datetime import date
+import time
+import uuid
+from contextlib import contextmanager
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 CASES_FILE = "cases.md"
 PENDING_FILE = "cases-pending.md"
 
+CATEGORY_FILES = {
+    "AI Core Error": "cases-aicore-error.md",
+    "UB": "cases-ub.md",
+    "coredump": "cases-coredump.md",
+    "内存OOM": "cases-oom.md",
+    "掉卡挂死": "cases-card-drop.md",
+    "进程中断": "cases-crash.md",
+    "进程卡住": "cases-hang.md",
+}
+
+CATEGORY_PREFIXES = {
+    "AI Core Error": "CASE-AIC",
+    "UB": "CASE-UB",
+    "coredump": "CASE-CORE",
+    "内存OOM": "CASE-OOM",
+    "掉卡挂死": "CASE-DROP",
+    "进程中断": "CASE-EXIT",
+    "进程卡住": "CASE-HANG",
+}
+
 PENDING_HEADER = """# 候选案例库（待补证）
 
 > 可信度 70~84 或存在待补证据的诊断结论暂存于此，编号为 `PCASE-xxx`。
 > 补齐证据并重新评估达到 HIGH（≥85）且关键项全部满足后，
-> 用 `promote_case.py --promote PCASE-xxx` 转正到 [cases.md](cases.md)。
+> 用 `promote_case.py --promote PCASE-xxx` 转正到对应分类案例文件（cases-*.md）并同步 [cases.md](cases.md) 索引。
 > 入库规范见 [case-contribution.md](case-contribution.md)。
 
 ---
 """
+
+# 与 run_pipeline.acquire_lock 使用同一锁文件：直接 CLI 的 --promote 与流水线的
+# promote 阶段在同一个 cases_dir 上互斥，避免并发覆写丢失候选。
+LOCK_FILE = "pipeline.lock"
+
+
+class LibraryLockError(RuntimeError):
+    """Raised when the shared promotion/pipeline lock cannot be acquired."""
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _lock_payload() -> dict:
+    # Keep this shape identical to run_pipeline.acquire_lock(): host and at
+    # make --force-unlock meaningful, while token prevents deleting a newer
+    # owner's lock during release.
+    return {
+        "pid": os.getpid(),
+        "token": uuid.uuid4().hex,
+        "host": os.environ.get("COMPUTERNAME", os.environ.get("HOSTNAME", "")),
+        "at": _now_iso(),
+    }
+
+
+def _owner_is_running(pid: int) -> bool:
+    if os.name == "nt":
+        # Import lazily so read-only checks on non-Windows systems do not need
+        # platform-specific modules.
+        import subprocess
+        result = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+        )
+        return str(pid) in result.stdout.decode("utf-8", "replace") or result.returncode != 0
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _lock_file(fd: int) -> None:
+    # Use advisory byte locks so readers do not parse a partially written new
+    # lock while another process is releasing the previous one.
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+
+def _unlock_file(fd: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _read_locked_lock(path: Path) -> dict:
+    with path.open("r+b") as stream:
+        fd = stream.fileno()
+        _lock_file(fd)
+        try:
+            raw = os.read(fd, 4096)
+        finally:
+            _unlock_file(fd)
+    return json.loads(raw.decode("utf-8"))
+
+
+def _release_lock(path: Path, token: str) -> None:
+    try:
+        current = _read_locked_lock(path)
+        if current.get("token") == token:
+            path.unlink(missing_ok=True)
+    except (OSError, ValueError, TypeError, UnicodeError, ImportError, AttributeError):
+        pass
+
+
+@contextmanager
+def library_lock(cases_dir: Path, force: bool = False):
+    """Acquire the same pipeline.lock used by run_pipeline.promote()."""
+    cases_dir.mkdir(parents=True, exist_ok=True)
+    path = cases_dir / LOCK_FILE
+    payload = _lock_payload()
+    deadline = time.monotonic() + 30.0
+    while True:
+        try:
+            fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            break
+        except FileExistsError:
+            # The current owner may still be writing its JSON or executing its
+            # critical section. Wait for it instead of failing a concurrent
+            # promotion immediately.
+            try:
+                old = _read_locked_lock(path)
+                pid = int(old.get("pid", 0))
+            except (OSError, ValueError, TypeError, UnicodeError,
+                    ImportError, AttributeError):
+                if time.monotonic() < deadline:
+                    time.sleep(0.05)
+                    continue
+                raise LibraryLockError(
+                    f"案例库锁 {path} 正被占用或内容无效；请稍后重试。"
+                ) from None
+            if not force:
+                if (old.get("host") == payload["host"] and pid > 0
+                        and _owner_is_running(pid) and time.monotonic() < deadline):
+                    time.sleep(0.05)
+                    continue
+                raise LibraryLockError(
+                    f"案例库锁已存在：{path}。若属同主机且原进程已退出，"
+                    "可使用 --force-unlock 重试。"
+                )
+            if old.get("host") != payload["host"]:
+                raise LibraryLockError("案例库锁属其他主机，拒绝强制解锁。")
+            if pid <= 0 or _owner_is_running(pid):
+                raise LibraryLockError("案例库锁属主无效或仍在运行，拒绝强制解锁。")
+            path.unlink()
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        _release_lock(path, payload["token"])
+        raise
+    try:
+        yield
+    finally:
+        _release_lock(path, payload["token"])
 
 # 敏感信息模式：命中即中断，要求先脱敏
 SENSITIVE_PATTERNS = [
@@ -180,23 +341,85 @@ def scan_sensitive_lines(text: str):
 
 
 def next_case_id(content: str, prefix: str) -> str:
-    ids = [int(n) for n in re.findall(rf"{prefix}-(\d+)", content)]
+    # A word boundary prevents CASE-HANG-001 from matching CASE-HANG-0012,
+    # and the full accepted corpus covers migration-period cases that remain
+    # inline in cases.md before their category file exists.
+    ids = [int(n) for n in re.findall(rf"\b{re.escape(prefix)}-(\d+)\b", content)]
     return f"{prefix}-{max(ids) + 1 if ids else 1:03d}"
+
+
+def detect_category(fields: dict) -> str:
+    text = "\n".join(str(fields.get(key, "")) for key in ("problem", "log_block", "root_cause"))
+    if any(word in text for word in ("AI Core", "AICore", "aivec", "aicore")):
+        return "AI Core Error"
+    # 短词用词边界匹配，避免 SUBMIT 误判 UB、BOOM 误判 OOM、
+    # CRASH 误判 RAS、changed 误判 hang 等子串误命中。
+    if "Unified Bus" in text or "灵衢" in text or "Unified_Bus" in text \
+            or re.search(r"\bUB\b", text):
+        return "UB"
+    if "coredump" in text.lower() or "SIGSEGV" in text or "Segmentation fault" in text:
+        return "coredump"
+    if any(word in text for word in ("out of memory", "Insufficient_Host_Memory", "EL0004")) \
+            or re.search(r"\bOOM\b", text):
+        return "内存OOM"
+    if any(word in text for word in ("掉卡", "Device Absent", "link down", "heartbeat")) \
+            or re.search(r"\bRAS\b", text):
+        return "掉卡挂死"
+    if any(word in text for word in ("进程中断", "进程退出", "RuntimeError", "process exited")):
+        return "进程中断"
+    if any(word in text for word in ("进程卡住", "timeout", "timed out", "deadlock")) \
+            or re.search(r"\bhang\b", text, re.I):
+        return "进程卡住"
+    return "进程卡住"
+
+
+def category_library_paths(cases_dir: Path) -> list[Path]:
+    return [cases_dir / filename for filename in CATEGORY_FILES.values()]
+
+
+def accepted_library_content(cases_dir: Path) -> str:
+    parts = []
+    if (cases_dir / CASES_FILE).is_file():
+        parts.append((cases_dir / CASES_FILE).read_text(encoding="utf-8"))
+    for path in category_library_paths(cases_dir):
+        if path.is_file():
+            parts.append(path.read_text(encoding="utf-8"))
+    return "\n".join(parts)
+
+
+def _append_index_row(content: str, category: str, filename: str, case_id: str) -> str:
+    """返回追加了索引行的新索引内容；仅按索引表行判断已有编号，
+    迁移期 cases.md 正文内联引用不构成索引行，不应误跳过。"""
+    for line in content.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        if re.search(rf"(?<![A-Za-z0-9-]){re.escape(case_id)}(?![0-9])",
+                     re.sub(r"\[[^\]]*\]\([^)]*\)", "", line)):
+            return content
+    row = f"| {category} | [{filename}]({filename}) | {case_id} |"
+    content = content.rstrip()
+    if not content:
+        return row + "\n"
+    if content.endswith(("|", "---")):
+        return content + "\n" + row + "\n"
+    return content + "\n\n" + row + "\n"
 
 
 def find_duplicate(content: str, error_code: str, title: str) -> str | None:
     """按错误码或标题关键词查找已有案例"""
+    # 兼容三类编号：分类前缀 CASE-HANG-001、旧式 CASE-001、候选 PCASE-001
+    id_pattern = r"## ((?:CASE-(?:[A-Z]+-)?)?\d+|PCASE-\d+)[：:]?\s*(.*)"
     if error_code:
         for block in re.split(r"\n(?=## )", content):
             if error_code in block:
-                m = re.search(r"## ((?:P?CASE)-\d+)[：:]?\s*(.*)", block)
+                m = re.search(id_pattern, block)
                 if m:
                     return f"{m.group(1)}（{m.group(2).strip()}）"
     keywords = [w for w in re.split(r"[\s，,、（）()]+", title) if len(w) >= 4][:3]
     for kw in keywords:
         for block in re.split(r"\n(?=## )", content):
             if kw in block:
-                m = re.search(r"## ((?:P?CASE)-\d+)[：:]?\s*(.*)", block)
+                m = re.search(id_pattern, block)
                 if m:
                     return f"{m.group(1)}（{m.group(2).strip()}）— 关键词「{kw}」"
     return None
@@ -256,19 +479,25 @@ def build_case_block(case_id: str, fields: dict, conf: dict, report_name: str) -
     return "\n".join(parts) + "\n"
 
 
+def _append_block(content: str, block: str, header: str = "") -> str:
+    if content:
+        return content.rstrip() + "\n\n---\n\n" + block
+    return header.rstrip() + "\n\n" + block
+
+
 def append_case(target: Path, block: str, header: str = "") -> None:
-    if target.exists():
-        content = target.read_text(encoding="utf-8").rstrip()
-        new = content + "\n\n---\n\n" + block
-    else:
-        new = header.rstrip() + "\n\n" + block
-    target.write_text(new, encoding="utf-8")
+    content = target.read_text(encoding="utf-8") if target.exists() else ""
+    target.write_text(_append_block(content, block, header), encoding="utf-8")
 
 
 def do_promote(
-    case_ref: str, cases_dir: Path, conf: dict | None = None, dry_run: bool = False
+    case_ref: str,
+    cases_dir: Path,
+    conf: dict | None = None,
+    dry_run: bool = False,
+    force_unlock: bool = False,
 ) -> None:
-    """把候选案例从 cases-pending.md 转正到 cases.md"""
+    """把候选案例从 cases-pending.md 转正到对应分类文件并同步 cases.md 索引"""
     pending_path = cases_dir / PENDING_FILE
     cases_path = cases_dir / CASES_FILE
 
@@ -298,8 +527,12 @@ def do_promote(
         print(f"[ERROR] 在 {PENDING_FILE} 中未找到 {case_ref}", file=sys.stderr)
         sys.exit(1)
 
-    cases_content = cases_path.read_text(encoding="utf-8") if cases_path.exists() else ""
-    new_id = next_case_id(cases_content, "CASE")
+    category = detect_category({"problem": target_block, "log_block": target_block, "root_cause": target_block})
+    filename = CATEGORY_FILES[category]
+    category_path = cases_dir / filename
+    new_id = next_case_id(
+        accepted_library_content(cases_dir), CATEGORY_PREFIXES[category]
+    )
 
     promoted = re.sub(rf"##\s+{re.escape(case_ref)}", f"## {new_id}", target_block, count=1)
     # 清理候选专属字段，更新验证状态
@@ -323,15 +556,79 @@ def do_promote(
         sys.exit(3)
 
     if dry_run:
-        print(f"\n[DRY-RUN] {case_ref} → {new_id}，目标文件：{cases_path}")
+        print(f"\n[DRY-RUN] {case_ref} → {new_id}，目标分类文件：{category_path}；索引：{cases_path}")
         print("-" * 60)
         print(promoted)
         print("-" * 60)
         return
 
-    append_case(cases_path, promoted)
-    pending_path.write_text("\n---\n".join(b for b in rest).rstrip() + "\n", encoding="utf-8")
-    print(f"[DONE] {case_ref} → {new_id}，已写入 {cases_path}")
+    # 覆盖全写入路径的互斥锁：与 run_pipeline.promote 共用 pipeline.lock，
+    # 防止读取 pending 之后、覆写之前并发新增的候选被旧快照静默丢弃。
+    with library_lock(cases_dir, force=force_unlock):
+        if pending_path.read_text(encoding="utf-8") != pending:
+            raise RuntimeError("Pending library changed during --promote; re-run after review")
+        accepted = accepted_library_content(cases_dir)
+        new_id = next_case_id(accepted, CATEGORY_PREFIXES[category])
+        promoted = re.sub(
+            rf"##\s+{re.escape(case_ref)}", f"## {new_id}", target_block, count=1
+        )
+        promoted = "\n".join(
+            ln for ln in promoted.splitlines()
+            if not re.match(r"^- (待补证据|转正条件)[：:]", ln.strip())
+        )
+        promoted = re.sub("- 验证状态：.*", "- 验证状态：已验证修复有效", promoted)
+        if conf is not None:
+            promoted = re.sub(
+                r"- 可信度：.*",
+                f"- 可信度：{conf.get('final_score')}/100（{conf.get('level')}）",
+                promoted,
+            )
+        promoted = (
+            promoted.rstrip()
+            + f"\n- 转正日期：{date.today().isoformat()}（原 {case_ref}）\n"
+        )
+        category_new = category_path.read_text(encoding="utf-8") if category_path.exists() else ""
+        index_new = cases_path.read_text(encoding="utf-8") if cases_path.exists() else ""
+        # staging 只保证单个文件内容完整；跨 os.replace 的最终提交不是
+        # 真原子操作，失败时回滚已替换文件，避免半提交状态。
+        staging = cases_dir / f".promote-staging-{uuid.uuid4().hex}"
+        staging.mkdir()
+        replaced: list[tuple[Path, bytes | None]] = []
+        try:
+            staged_category = staging / filename
+            staged_category.write_text(
+                _append_block(category_new, promoted, f"# {category} 案例集\n"), encoding="utf-8"
+            )
+            staged_index = staging / CASES_FILE
+            staged_index.write_text(
+                _append_index_row(index_new, category, filename, new_id), encoding="utf-8"
+            )
+            staged_pending = staging / PENDING_FILE
+            staged_pending.write_text("\n---\n".join(b for b in rest).rstrip() + "\n", encoding="utf-8")
+            for staged, destination in (
+                (staged_category, category_path),
+                (staged_index, cases_path),
+                (staged_pending, pending_path),
+            ):
+                replaced.append(
+                    (destination, destination.read_bytes() if destination.exists() else None)
+                )
+                os.replace(staged, destination)
+        except BaseException:
+            for destination, old_content in reversed(replaced):
+                if old_content is None:
+                    destination.unlink(missing_ok=True)
+                else:
+                    destination.write_bytes(old_content)
+            raise
+        finally:
+            for leftover in staging.iterdir():
+                leftover.unlink()
+            staging.rmdir()
+    print(f"[TARGET] {filename}")
+    print(f"[TARGET] {CASES_FILE}")
+    print(f"[TARGET] {PENDING_FILE}")
+    print(f"[DONE] {case_ref} → {new_id}，已写入 {category_path}；索引 {cases_path} 已同步")
 
 
 def main():
@@ -347,9 +644,14 @@ def main():
     parser.add_argument(
         "--promote",
         metavar="PCASE-xxx",
-        help="将候选案例转正到 cases.md（可配合 --confidence 传入重评结果）",
+        help="将候选案例转正到对应分类文件并同步 cases.md 索引（可配合 --confidence 传入重评结果）",
     )
     parser.add_argument("--dry-run", action="store_true", help="只打印将写入的内容")
+    parser.add_argument(
+        "--force-unlock",
+        action="store_true",
+        help="同主机且原锁属主进程已退出时，清理残留 pipeline.lock 后重试",
+    )
     parser.add_argument("--force", action="store_true", help="跳过重复案例提示，强制新增")
     parser.add_argument("--check", action="store_true", help="只读扫描文件中的敏感信息")
     parser.add_argument("--files", nargs="+", type=Path, help="配合 --check 指定待扫描文件")
@@ -360,7 +662,13 @@ def main():
 
     if args.promote:
         conf = json.loads(read_text(args.confidence)) if args.confidence else None
-        do_promote(args.promote, args.cases_dir, conf, dry_run=args.dry_run)
+        do_promote(
+            args.promote,
+            args.cases_dir,
+            conf,
+            dry_run=args.dry_run,
+            force_unlock=args.force_unlock,
+        )
         return
 
     if args.check:
@@ -406,24 +714,40 @@ def main():
     fields["error_code"] = find_error_code(report_md)
 
     is_accept = gate == "accept"
-    target = args.cases_dir / (CASES_FILE if is_accept else PENDING_FILE)
-    prefix = "CASE" if is_accept else "PCASE"
+    category = detect_category(fields) if is_accept else None
+    filename = CATEGORY_FILES[category] if is_accept else PENDING_FILE
+    target = args.cases_dir / filename
+    prefix = CATEGORY_PREFIXES[category] if is_accept else "PCASE"
 
-    existing = target.read_text(encoding="utf-8") if target.exists() else ""
+    # 查重读取完整 accepted 库：分类文件之外，迁移期的 cases.md 内联
+    # 案例同样参与。编号分配必须延迟到写入锁内，避免并发进程复用 ID。
+    accepted = accepted_library_content(args.cases_dir)
+    existing = (accepted if is_accept
+                else (target.read_text(encoding="utf-8") if target.exists() else ""))
     case_id = next_case_id(existing, prefix)
 
-    # 重复检索（accept 时同时查主库）
-    dup_source = existing
+    # 重复检索：pending 在锁外仅作提示；accept 的最终查重必须在写入
+    # 锁内基于最新完整 accepted 库执行，避免并发新增案例后仍复用或重复收录。
     if not is_accept:
-        main_cases = args.cases_dir / CASES_FILE
-        if main_cases.exists():
-            dup_source += "\n" + main_cases.read_text(encoding="utf-8")
-    dup = find_duplicate(dup_source, fields.get("error_code", ""), fields.get("title", ""))
-    if dup and not args.force:
-        print(f"[WARN] 疑似重复案例：{dup}", file=sys.stderr)
-        print("[WARN] 按 case-contribution.md §4 优先合并到已有案例；", file=sys.stderr)
-        print("       确认为不同根因时用 --force 强制新增。", file=sys.stderr)
-        sys.exit(4)
+        dup = find_duplicate(
+            existing + "\n" + accepted,
+            fields.get("error_code", ""),
+            fields.get("title", ""),
+        )
+        if dup and not args.force:
+            print(f"[WARN] 疑似重复案例：{dup}", file=sys.stderr)
+            print("[WARN] 按 case-contribution.md §4 优先合并到已有案例；", file=sys.stderr)
+            print("       确认为不同根因时用 --force 强制新增。", file=sys.stderr)
+            sys.exit(4)
+    elif args.dry_run and not args.force:
+        dup = find_duplicate(
+            accepted, fields.get("error_code", ""), fields.get("title", "")
+        )
+        if dup:
+            print(f"[WARN] 疑似重复案例：{dup}", file=sys.stderr)
+            print("[WARN] 按 case-contribution.md §4 优先合并到已有案例；", file=sys.stderr)
+            print("       确认为不同根因时用 --force 强制新增。", file=sys.stderr)
+            sys.exit(4)
 
     # 脱敏检查必须覆盖最终写入正文，包括元信息和日志块。
     block = build_case_block(case_id, fields, conf, args.report.name)
@@ -445,11 +769,76 @@ def main():
         print("-" * 60)
         return
 
-    append_case(target, block, PENDING_HEADER if not is_accept else "# 常见问题案例库\n")
+    if is_accept:
+        # 与 run_pipeline.promote 相同的事务边界：先在 staging 内完成分类
+        # 文件与索引的全部改写，再逐一原子替换；失败时回滚已替换文件。
+        with library_lock(args.cases_dir, force=args.force_unlock):
+            accepted = accepted_library_content(args.cases_dir)
+            if not args.force:
+                dup = find_duplicate(
+                    accepted, fields.get("error_code", ""), fields.get("title", "")
+                )
+                if dup:
+                    print(f"[WARN] 疑似重复案例：{dup}", file=sys.stderr)
+                    print("[WARN] 按 case-contribution.md §4 优先合并到已有案例；", file=sys.stderr)
+                    print("       确认为不同根因时用 --force 强制新增。", file=sys.stderr)
+                    sys.exit(4)
+            case_id = next_case_id(accepted, prefix)
+            block = build_case_block(case_id, fields, conf, args.report.name)
+            staging = args.cases_dir / f".promote-staging-{uuid.uuid4().hex}"
+            staging.mkdir()
+            replaced: list[tuple[Path, bytes | None]] = []
+            try:
+                staged_category = staging / filename
+                staged_category.write_text(
+                    _append_block(target.read_text(encoding="utf-8") if target.exists() else "",
+                                  block, f"# {category} 案例集\n"),
+                    encoding="utf-8",
+                )
+                index_path = args.cases_dir / CASES_FILE
+                staged_index = staging / CASES_FILE
+                staged_index.write_text(
+                    _append_index_row(index_path.read_text(encoding="utf-8") if index_path.exists() else "",
+                                      category, filename, case_id),
+                    encoding="utf-8",
+                )
+                for staged, destination in (
+                    (staged_category, target),
+                    (staged_index, index_path),
+                ):
+                    replaced.append(
+                        (destination, destination.read_bytes() if destination.exists() else None)
+                    )
+                    os.replace(staged, destination)
+            except BaseException:
+                for destination, old_content in reversed(replaced):
+                    if old_content is None:
+                        destination.unlink(missing_ok=True)
+                    else:
+                        destination.write_bytes(old_content)
+                raise
+            finally:
+                for leftover in staging.iterdir():
+                    leftover.unlink()
+                staging.rmdir()
+        print(f"[TARGET] {filename}")
+        print(f"[TARGET] {CASES_FILE}")
+    else:
+        with library_lock(args.cases_dir, force=args.force_unlock):
+            case_id = next_case_id(
+                target.read_text(encoding="utf-8") if target.exists() else "", prefix
+            )
+            block = build_case_block(case_id, fields, conf, args.report.name)
+            append_case(target, block, PENDING_HEADER)
+        print(f"[TARGET] {PENDING_FILE}")
     print(f"[DONE] {case_id} 已写入 {target}")
     if not is_accept:
         print(f"[NEXT] 补齐证据后执行：promote_case.py --promote {case_id}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except LibraryLockError as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        sys.exit(1)

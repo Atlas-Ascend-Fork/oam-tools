@@ -108,7 +108,7 @@ O4 同步填充公共 `first_error/timeline/causal_chain/root_cause/alternatives
 - 只有 137：写"终止信号线索，OOM 未获证实"；把 OOM 与其他终止原因均保留为候选。
 - 缺故障时采样：写明无法核对容量分支，继续用分配器、配置和时间线证据评估，不裁剪诊断步骤、不封顶评分。
 - D1 首错需排除传播/清理日志并定位原文；D2 不能把同一 plog 的多份副本当多源；D3 不能用不存在的 dmesg 排除外部 kill/Host OOM；D4 只看已有验证记录。
-- [CASE-004](../cases.md) 的图加载 OOM、CASE-002 的 rank 退出后通信等待仅作候选，须分别核对内存构成、PID/rank 映射与原始 OOM Kill 证据。命中案例不自动填 `case_matched=true`。
+- 历史案例中的图加载 OOM、rank 退出后通信等待仅作候选，须分别核对内存构成、PID/rank 映射与原始 OOM Kill 证据。命中案例不自动填 `case_matched=true`。
 
 结论写法："已确认 <分配失败/被 OOM Kill>，证据 <原始引用>。<具体根因> 当前为 <confirmed/hypothesis/undetermined>；<缺口> 限制了 <哪项判断>。"无根因证据时仍交付完整诊断与可信度，案例准入按原评分门槛。
 

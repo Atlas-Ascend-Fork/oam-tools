@@ -191,7 +191,7 @@ def _gate(total: int, level: str, unmet_critical: list, checks: dict) -> tuple[s
             return "pending", "根因未定位到具体算子/模块，先进候选区"
         if not _flag(checks, "fix_verified"):
             return "pending", "修复未验证，先进候选区待验证后转正"
-        return "accept", f"可信度 {total}（HIGH），可写入 cases.md"
+        return "accept", f"可信度 {total}（HIGH），可写入对应分类文件并同步 cases.md 索引"
 
     return "pending", f"可信度 {total}（{level}），进候选区待补证"
 
@@ -241,7 +241,7 @@ def render(result: dict) -> str:
     lines.append(f"  理由: {result['case_gate_reason']}")
 
     action = {
-        "accept": "执行 promote_case.py 写入 cases.md",
+        "accept": "执行 promote_case.py 写入对应分类文件并同步 cases.md 索引",
         "pending": "执行 promote_case.py 写入 cases-pending.md（PCASE 候选）",
         "reject": "先补齐缺失证据并重新评估，暂不入库",
     }[result["case_gate"]]

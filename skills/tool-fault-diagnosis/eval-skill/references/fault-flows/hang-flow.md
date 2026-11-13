@@ -82,7 +82,7 @@ flowchart TD
 | 训推框架超时（MindSpore） | Worker 节点连接 Scheduler 超时 | 已有框架日志中 Scheduler 连接记录 |
 | HCCL 拓扑探测超时 | 通信域 rankSize 与实际不符 / 同一 Device 在同一通信域充当不同 rank / 超时时间内有卡未初始化（是否为固定卡）/ Host 防火墙未开放 / IP 或端口被占用 / 通信域内不同 rank 使用 Host 网卡不一样 | rank_table 配置、防火墙记录、端口占用记录、网卡配置、各 rank 初始化时间 |
 
-`EI0002`/AllReduce timeout 支持通信等待超时，不自动证明网络故障或某个 rank 是根因。`EE1002` 是 Stream 同步超时，结合实际任务和首错核对，不自动写"算子死循环"。核对同一任务中所有可用 rank 的早期异常与退出：较早 OOM/crash 可解释其他 rank 后续等待，但缺对端记录时不能假设对端已死。案例命中后仍核对通信类型、配置、版本、rank 映射与早期事件；不把 CASE-002 的 OOM 原因套给所有 HCCL timeout。
+`EI0002`/AllReduce timeout 支持通信等待超时，不自动证明网络故障或某个 rank 是根因。`EE1002` 是 Stream 同步超时，结合实际任务和首错核对，不自动写"算子死循环"。核对同一任务中所有可用 rank 的早期异常与退出：较早 OOM/crash 可解释其他 rank 后续等待，但缺对端记录时不能假设对端已死。案例命中后仍核对通信类型、配置、版本、rank 映射与早期事件；不把历史案例的 OOM 原因套给所有 HCCL timeout。
 
 ### 1.2 建链超时子流程（EI0006）
 
@@ -235,4 +235,4 @@ H4 填满公共诊断字段。`hang_confirmed=false` 不代表分析失败，仍
 - D4 仅已有修复/回归记录可加分。建议修改超时或启动方式必须注明条件和未验证状态，不执行改配置或重跑。
 - 没有现场堆栈不裁剪本流、不额外封顶；现有日志可支持到何种范围就写到何种范围。
 
-参考：[公共约定](common-flow.md)、[故障处理专题](../fault-handling.md)、[错误码](../err-messages.md)、[网络排查流](network-flow.md)、[CASE-002 与案例库](../cases.md)、[可信度规范](../confidence-assessment.md)；案例相似只形成候选，实际异同核对后才评估是否匹配。
+参考：[公共约定](common-flow.md)、[故障处理专题](../fault-handling.md)、[错误码](../err-messages.md)、[网络排查流](network-flow.md)、[案例库](../cases.md)、[可信度规范](../confidence-assessment.md)；案例相似只形成候选，实际异同核对后才评估是否匹配。

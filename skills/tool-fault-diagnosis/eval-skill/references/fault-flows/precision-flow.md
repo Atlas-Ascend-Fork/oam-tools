@@ -153,4 +153,4 @@ P4 填满公共诊断字段。精度问题的建议以算子优化、关闭/调�
 - D4 优化后达标验证才记 `fix_verified`；无验证不记。
 - D5 命中历史精度案例须核对算子、版本、融合配置异同。
 
-参考：[公共约定](common-flow.md)、[故障处理专题](../fault-handling.md)、[CASE-001/CASE-005](../cases.md)、[错误码](../err-messages.md)、[可信度规范](../confidence-assessment.md)。
+参考：[公共约定](common-flow.md)、[故障处理专题](../fault-handling.md)、[案例库](../cases.md)、[错误码](../err-messages.md)、[可信度规范](../confidence-assessment.md)。

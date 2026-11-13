@@ -141,7 +141,7 @@ python3 scripts/assess_confidence.py --input confidence.json
 python3 scripts/assess_confidence.py --input confidence.json --json > confidence_result.json
 ```
 
-评分结果中的 `case_gate` 字段给出入库判定：`accept`（写入 `cases.md`）、
+评分结果中的 `case_gate` 字段给出入库判定：`accept`（写入对应分类文件 `cases-*.md` 并同步 `cases.md` 索引）、
 `pending`（写入 `cases-pending.md`）、`reject`（不入库）。判定规则见
 [case-contribution.md](case-contribution.md) §2。
 

@@ -63,7 +63,7 @@
 | limitations | 检索覆盖范围、不可读材料、版本未知等限制 |
 | input_fingerprint | 检索所用原始扫描与用户描述的指纹，供 detect 核对前驱 |
 
-每个 match 包含 `case_id/title/library_line/signature/applicable_versions/evidence/matched_features/differences/root_cause_status`。
+每个 match 包含 `case_id/title/source_file/library_line/signature/applicable_versions/evidence/matched_features/differences/root_cause_status`；`source_file` 是分类案例文件名，`library_line` 是该分类文件内的真实行号。
 `evidence` 每项给出 `file/line/byte_start/text/at`；`differences` 包含未命中的签名特征及版本/环境适用性待核实状态。
 `root_cause_status=candidate_only`：历史结论不能直接作为当前结论。主库不可用时输出 unavailable 与具体原因，然后分类。
 

@@ -69,6 +69,14 @@ REPORT_DATA_FILE_NAME = 'report-data.json'
 CHECKS_FILE_NAME = 'checks.json'
 CONFIDENCE_FILE_NAME = 'confidence.json'
 DIAGNOSIS_FILE_NAME = 'diagnosis.md'
+CASES_FILE_NAME = 'cases.md'
+PENDING_FILE_NAME = 'cases-pending.md'
+# Fixed category file names the promotion script may create on first
+# publication; must mirror CATEGORY_FILES in eval-skill's promote_case.py.
+ACCEPTED_CATEGORY_FILE_NAMES = (
+    'cases-aicore-error.md', 'cases-ub.md', 'cases-coredump.md', 'cases-oom.md',
+    'cases-card-drop.md', 'cases-crash.md', 'cases-hang.md',
+)
 
 
 def digest(value):
@@ -84,6 +92,29 @@ def file_hash(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             checksum.update(chunk)
     return checksum.hexdigest()
+
+
+def library_hash(cases_md):
+    """Whole-library digest mirroring detect_scenario._library(): the accepted
+    library is the index plus its linked category files, so the case_lookup
+    dependency and publication receipts must hash the same domain."""
+    cases_md = Path(cases_md).resolve()
+    if not cases_md.is_file():
+        return None
+    raw = cases_md.read_bytes()
+    digests = {}
+    text = raw.decode('utf-8-sig', errors='replace')
+    for rel in dict.fromkeys(re.findall(r'\]\((cases-[A-Za-z0-9_-]+\.md)\)', text)):
+        if rel == PENDING_FILE_NAME:
+            continue
+        candidate = (cases_md.parent / rel).resolve()
+        if candidate.parent != cases_md.parent or not candidate.is_file():
+            continue
+        content = candidate.read_text(encoding="utf-8-sig")
+        digests[rel] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    payload = json.dumps({'index': hashlib.sha256(raw).hexdigest(),
+                          'categories': digests}, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
 
 
 def within(path, parent):
@@ -256,7 +287,7 @@ def inputs_for(sid, plan, state):
 
 def lookup_library_hash(plan, state):
     """A verified publication by this run does not invalidate its own earlier lookup."""
-    actual = file_hash(plan.library)
+    actual = library_hash(plan.library)
     try:
         lookup, _ = read_artifact(plan.artifact('case_lookup'), 'case_lookup', state['run_id'])
         if lookup['inputs']['dependencies']['revision'] != state['stages']['case_lookup']['revision']:
@@ -265,10 +296,25 @@ def lookup_library_hash(plan, state):
     except (OSError, ValueError, KeyError, TypeError):
         return actual
     receipts = []
+    library_name = plan.library.name
     for path in (plan.state_dir / 'mutations').glob('*.json'):
         try:
             receipt = json.loads(path.read_text(encoding='utf-8'))
-            if receipt.get('run_id') == state['run_id'] and receipt.get('target') == str(plan.library):
+            if receipt.get('run_id') != state['run_id']:
+                continue
+            # Current receipts record multi-file targets as
+            # {'targets': {name: {'before_sha256', 'after_sha256'}}}; legacy
+            # receipts used flat 'target'/'before_sha256'/'after_sha256'.
+            # Whole-library digests live in library_before/library_after and
+            # take precedence over the single-file hash chain.
+            if receipt.get('library_after') is not None:
+                receipts.append({'after_sha256': receipt.get('library_after'),
+                                 'before_sha256': receipt.get('library_before')})
+            elif library_name in receipt.get('targets', {}):
+                meta = receipt['targets'][library_name]
+                receipts.append({'after_sha256': meta.get('after_sha256'),
+                                 'before_sha256': meta.get('before_sha256')})
+            elif receipt.get('target') in (str(plan.library), library_name):
                 receipts.append(receipt)
         except (OSError, ValueError):
             continue
@@ -1068,33 +1114,68 @@ def promote(plan, state, artifact, work):
     operation = digest({'diagnosis': diagnosis['result'], 'confidence': score, 'target': str(cases_dir)})
     receipt_path = plan.state_dir / 'mutations' / (operation + '.json')
     artifact['result']['mutation_id'] = operation
-    target = cases_dir / ('cases.md' if score['case_gate'] == 'accept' else 'cases-pending.md')
-    artifact['result']['target'] = str(target)
+    artifact['result']['target'] = None
     lock = acquire_lock(cases_dir)
     try:
         if receipt_path.exists():
             receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
-            if file_hash(target) == receipt['after_sha256']:
+            targets = {name: meta for name, meta in receipt.get('targets', {}).items()}
+            if not targets and receipt.get('target') in (str(plan.library), plan.library.name):
+                # Upgrade path: older receipts used the flat target/before/after
+                # fields. Keep idempotent resume behavior aligned with
+                # lookup_library_hash instead of treating them as uncertain.
+                targets = {receipt['target'] if Path(receipt['target']).name == receipt['target']
+                           else plan.library.name: receipt}
+            if targets and all(
+                    file_hash(cases_dir / name) == meta.get('after_sha256')
+                    for name, meta in targets.items()):
                 receipt['status'] = 'committed'
                 mutation_write(receipt_path, receipt)
                 artifact['result'].update(decision='already_committed', reason='Existing mutation receipt verified.')
                 artifact['result']['case_id'] = receipt.get('case_id')
+                artifact['result']['target'] = sorted(targets)
                 artifact['summary'] = 'Verified the prior case publication; no second write.'
                 return ''
             raise Blocked('Publication receipt requires reconciliation; refusing a duplicate or uncertain write.')
-        # The real promotion script operates on an isolated copy. Only one verified file is committed.
+        # The real promotion script operates on an isolated copy. Record the
+        # accepted-library hashes before execution so concurrent real-library
+        # edits can be detected even though the child writes to staging first.
+        before = {
+            path.name: file_hash(path)
+            for path in cases_dir.glob('cases*.md')
+            if path.is_file()
+        }
+        # A clean deployment may not have the pending library yet; the pending
+        # gate is allowed to create this fixed file on first publication.
+        # file_hash() returns None for an absent file, preserving the same
+        # before/after and concurrent-change semantics.
+        if score['case_gate'] == 'pending' and PENDING_FILE_NAME not in before:
+            before[PENDING_FILE_NAME] = None
+        # Symmetrically, an accepted publication may be the first case of a
+        # category whose file does not exist yet; the child creates it via
+        # append_case. Only the fixed category names are pre-seeded, so any
+        # other absent target is still rejected below.
+        if score['case_gate'] == 'accept':
+            # The accepted writer also creates/syncs the fixed index on first
+            # publication; seed it with the same absent-file semantics.
+            if CASES_FILE_NAME not in before:
+                before[CASES_FILE_NAME] = None
+            for name in ACCEPTED_CATEGORY_FILE_NAMES:
+                if name not in before:
+                    before[name] = None
         staging = work / 'cases'
         staging.mkdir(parents=True, exist_ok=True)
-        for name in ('cases.md', 'cases-pending.md'):
-            source = cases_dir / name
+        for source in cases_dir.glob('cases*.md'):
             if source.is_file():
-                shutil.copy2(source, staging / name)
+                shutil.copy2(source, staging / source.name)
+        # Whole-library digest before execution, in the same combined
+        # index+categories domain detect_scenario uses for case_lookup.
+        library_before = library_hash(plan.library)
         score_path = work / CONFIDENCE_FILE_NAME
         report_path = work / DIAGNOSIS_FILE_NAME
         atomic_write(score_path, json.dumps(score, ensure_ascii=False))
         # Strip only the machine contract: the legacy script expects the diagnostic Markdown body.
         atomic_write(report_path, body)
-        before = file_hash(target)
         try:
             stdout = run_command(child('promote') + ['--report', str(report_path), '--confidence', str(score_path),
                                                      '--cases-dir', str(staging)])
@@ -1103,18 +1184,34 @@ def promote(plan, state, artifact, work):
                 artifact['result']['reason'] = str(exc)
                 raise Blocked('Promotion needs report redaction or duplicate-case review: ' + str(exc)) from exc
             raise
-        candidate = staging / target.name
-        if not candidate.is_file():
-            raise StepError('Promotion script did not produce a candidate case file')
-        match = re.search(r'\[DONE\]\s+(P?CASE-\d+)', stdout)
+        targets = re.findall(r'^\[TARGET\]\s+([^\s]+)$', stdout, re.M)
+        if not targets:
+            raise StepError('Promotion script did not report machine-readable target files')
+        targets = list(dict.fromkeys(targets))
+        for name in targets:
+            if Path(name).name != name or name not in before:
+                raise StepError('Promotion script reported an unsafe or unknown target: ' + name)
+        artifact['result']['target'] = targets
+        match = re.search(r'\[DONE\]\s+(CASE-(?:[A-Z]+-)?\d+|PCASE-\d+)', stdout)
         case_id = match.group(1) if match else None
-        receipt = {'mutation_id': operation, 'run_id': state['run_id'], 'target': str(target),
-                   'before_sha256': before, 'case_id': case_id,
-                   'after_sha256': file_hash(candidate), 'status': 'prepared', 'at': now_iso()}
+        target_records = {}
+        for name in targets:
+            candidate = staging / name
+            if not candidate.is_file():
+                raise StepError('Promotion script did not produce a candidate case file: ' + name)
+            target_records[name] = {
+                'before_sha256': before[name],
+                'after_sha256': file_hash(candidate),
+            }
+        receipt = {'mutation_id': operation, 'run_id': state['run_id'], 'targets': target_records,
+                   'library_before': library_before, 'library_after': library_hash(staging / plan.library.name),
+                   'case_id': case_id, 'status': 'prepared', 'at': now_iso()}
         mutation_write(receipt_path, receipt)
-        if file_hash(target) != before:
+        if any(file_hash(cases_dir / name) != meta['before_sha256']
+               for name, meta in target_records.items()):
             raise Blocked('Case library changed before commit; reconcile the prepared mutation.')
-        commit_candidate(candidate, target)
+        for name in targets:
+            commit_candidate(staging / name, cases_dir / name)
         receipt['status'] = 'committed'
         mutation_write(receipt_path, receipt)
         artifact['result'].update(decision='committed', reason=stdout.strip(), case_id=case_id)

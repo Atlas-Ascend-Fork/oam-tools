@@ -151,7 +151,7 @@ Use the evidence and analysis sections to structure the final answer. Write in C
 按 [case-contribution.md](case-contribution.md) 判定：
 
 - 入库判定：`<accept / pending / reject>`
-- 去向：`<cases.md CASE-xxx / cases-pending.md PCASE-xxx / 不入库>`
+- 去向：`<cases-*.md 分类文件 CASE-xxx（同步 cases.md 索引）/ cases-pending.md PCASE-xxx / 不入库>`
 - 判定理由：`<可信度等级、关键项、修复验证状态>`
 - 脱敏确认：`<已清理 IP/主机名/家目录/凭据 / 无敏感信息>`
 - 重复检查：`<无同类案例 / 已合并到 CASE-xxx>`

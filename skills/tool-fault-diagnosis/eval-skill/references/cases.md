@@ -1,79 +1,36 @@
 # 常见问题案例库
 
-## 来源与使用边界
+本库按七大分类场景拆分。本文件只作为分类和案例编号索引；完整案例内容见分类文件。
 
-下列 CASE-001～006 沿用旧版检索ID。旧记录没有附原始日志、环境、复现或修复验证来源，现明确作为**机制示例**，不能作为已验证历史案例或本次根因的独立证据。示例中的数值和日志形式均非通用规格。
-
-新增正式案例须遵循[可信度规范](confidence-assessment.md)与[案例沉淀规范](case-contribution.md)，关键因果证据和修复验证齐备后再入库；待补证材料进入[候选区](cases-pending.md)。综合分数不能替代实际验证记录。
-
----
-
-## CASE-001：训练过程中 loss 突变为 NaN
-
-**机制示例，未验证。** FP16训练出现NaN，可由前向溢出、输入非有限值、非法数值运算、梯度异常等引起。LayerNorm输出含NaN只定位到观测点；不能单凭它确认LayerNorm内部溢出。算子耗时短也不证明短路。
-
-**区分证据与条件修复**
-
-- 比较首个异常算子的输入、中间值和输出，核对实际计算及累加类型；以匹配的高精度参考检查数值范围。
-- 已证实前向FP16范围不足时，评估敏感路径的FP32计算或受支持的BF16路径，并复验精度与性能。BF16指数范围更大，但尾数位更少，不能保证误差更小。
-- Loss Scaling主要缓解低精度反向梯度下溢；动态缩放可检测非有限梯度并调整缩放，不修复已发生的前向溢出。梯度或学习率调整须有相应证据。
-
----
-
-## CASE-002：HCCL AllReduce 超时导致训练挂死
-
-**机制示例，未验证。** 某rank等待其他rank超时，说明对应通信阶段未在预算内完成。内存使用率95%不能证明对端已被OOM Killer杀死；报超时rank可能是等待方。
-
-**区分证据与条件修复**
-
-- 对齐通信域、rank、操作序列与时间范围，回查对端的退出码、应用异常、内核OOM记录和cgroup内存事件。
-- 只有杀进程记录与该任务关联后，才按Host内存耗尽处置；核对预处理worker、预取缓存等实际贡献，再调整资源或负载。
-- 建链、执行和网络故障分别分析。延长对应超时仅在确认进展及合理预算后使用，不能替代修复进程退出、死锁或序列不一致。
-
----
-
-## CASE-003：算子编译失败（UB 内存溢出）
-
-**机制示例，未验证。** 若匹配编译目标的错误明确给出所需UB超过可用UB，可确认当前规划不满足该目标容量；不能将示例256KB用作所有芯片上限。
-
-**区分证据与条件修复**
-
-- 按实际shape、dtype、对齐、padding、队列/双缓冲、同时存活的中间tensor及保留空间核算峰值，而非只比较tile边长。
-- 在工具链与算子约束允许时调整分块、缓冲复用或流水深度，重新编译并检查尾块与边界输入。
-- tile从1024改256只是可能的实验点，没有完整容量推导不能称为确定修复或最优配置。
-
----
-
-## CASE-004：图加载失败（HBM OOM）
-
-**机制示例，未验证。** HBM申请失败需要保留请求、资源类型、设备、配额与时刻。总量、已用、空闲、框架保留和最大连续可分配块不是同一指标，不能由一条申请失败日志断定参数、激活和KV cache各占多少。
-
-**区分证据与条件修复**
-
-- 先量化故障阶段的实际占用和生命周期，区分容量不足、框架预算、碎片、泄漏及其他进程占用。
-- 参数或KV占用已证实时，再评估模型分片、受支持的量化或KV预算调整；检查精度、通信和延迟影响。
-- 重计算适用于可重计算的训练激活，不能作为推理图加载或任意OOM的通用解法。具体配置使用现场框架/工具版本已支持的接口。
-
----
-
-## CASE-005：算子精度不达标（FP16 与参考结果差异过大）
-
-**机制示例，未验证。** 单个max_diff数值不证明累加误差，也没有跨算子通用的1%合格线；需明确误差定义、参考实现、输入范围、计算/累加类型和业务容限。
-
-**区分证据与条件修复**
-
-- 检查首次偏差、绝对/相对误差、近零点与非有限值，并核对参考值本身及算法等价性。
-- 已证实低精度累加主导误差时，测试当前后端支持的高精度累加/计算路径；不要假设同名PyTorch设置控制所有NPU算子。
-- BF16范围更大不等于尾数精度更高。比较实际误差后选择类型，不能为了通过测试放宽既定atol/rtol。
-
----
-
-## CASE-006：plog 日志轮转导致早期材料缺失
-
-**机制示例，未验证。** 现有文件只覆盖近期，可能由轮转、采集路径/用户错误、过滤或日志未开启造成；需核对配置和文件覆盖后才能归因。
-
-**区分证据与条件修复**
-
-- 盘点原始文件、轮转/压缩文件和实际进程日志路径，保留时间、大小与来源；不能通用假设10个100MB文件。
-- 按现场版本支持的日志配置扩大留存或配置持续归档，并核对磁盘预算。一次`rsync`不是持续采集，`--delete`可能删除归档中的旧证据。
-- 调高日志级别会丢失后续分析需要的上下文；根据目标选择范围，并记录配置变更及影响。现有缺失日志不能由配置调整补回。
+| 分类 | 案例文件 | 编号 |
+| --- | --- | --- |
+| AI Core Error | [cases-aicore-error.md](cases-aicore-error.md) | CASE-AIC-001 |
+| AI Core Error | [cases-aicore-error.md](cases-aicore-error.md) | CASE-AIC-002 |
+| AI Core Error | [cases-aicore-error.md](cases-aicore-error.md) | CASE-AIC-003 |
+| AI Core Error | [cases-aicore-error.md](cases-aicore-error.md) | CASE-AIC-004 |
+| AI Core Error | [cases-aicore-error.md](cases-aicore-error.md) | CASE-AIC-005 |
+| UB | [cases-ub.md](cases-ub.md) | CASE-UB-001 |
+| UB | [cases-ub.md](cases-ub.md) | CASE-UB-002 |
+| UB | [cases-ub.md](cases-ub.md) | CASE-UB-003 |
+| UB | [cases-ub.md](cases-ub.md) | CASE-UB-004 |
+| coredump | [cases-coredump.md](cases-coredump.md) | CASE-CORE-001 |
+| coredump | [cases-coredump.md](cases-coredump.md) | CASE-CORE-002 |
+| coredump | [cases-coredump.md](cases-coredump.md) | CASE-CORE-003 |
+| coredump | [cases-coredump.md](cases-coredump.md) | CASE-CORE-004 |
+| 内存OOM | [cases-oom.md](cases-oom.md) | CASE-OOM-001 |
+| 内存OOM | [cases-oom.md](cases-oom.md) | CASE-OOM-002 |
+| 内存OOM | [cases-oom.md](cases-oom.md) | CASE-OOM-003 |
+| 掉卡挂死 | [cases-card-drop.md](cases-card-drop.md) | CASE-DROP-001 |
+| 掉卡挂死 | [cases-card-drop.md](cases-card-drop.md) | CASE-DROP-002 |
+| 掉卡挂死 | [cases-card-drop.md](cases-card-drop.md) | CASE-DROP-003 |
+| 掉卡挂死 | [cases-card-drop.md](cases-card-drop.md) | CASE-DROP-004 |
+| 掉卡挂死 | [cases-card-drop.md](cases-card-drop.md) | CASE-DROP-005 |
+| 进程中断 | [cases-crash.md](cases-crash.md) | CASE-EXIT-001 |
+| 进程中断 | [cases-crash.md](cases-crash.md) | CASE-EXIT-002 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-001 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-002 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-003 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-004 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-005 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-006 |
+| 进程卡住 | [cases-hang.md](cases-hang.md) | CASE-HANG-007 |

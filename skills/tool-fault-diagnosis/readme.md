@@ -413,7 +413,7 @@ LLM 输出的评估结论应具备如下结构（来自 [eval-skill/SKILL.md](ev
 2. ...
 
 ### 关联案例
-- 参考案例：cases.md#CASE-xxx
+- 参考案例：cases.md 索引对应的分类案例文件 CASE-xxx
 
 ### 诊断可信度
 - 综合可信度：<score>/100（<HIGH/MEDIUM/LOW/INSUFFICIENT>）
@@ -475,7 +475,7 @@ python3 eval-skill/scripts/promote_case.py \
     --confidence ./confidence_result.json \
     --dry-run
 
-# 正式写入（accept → cases.md，pending → cases-pending.md）
+# 正式写入（accept → 对应分类文件并同步索引，pending → cases-pending.md）
 python3 eval-skill/scripts/promote_case.py \
     --report ./diagnosis_report.md \
     --confidence ./confidence_result.json
@@ -489,7 +489,7 @@ python3 eval-skill/scripts/promote_case.py \
 
 | 判定 | 条件 | 去向 |
 |------|------|------|
-| **accept** | ≥ 85（HIGH）且关键项满足且根因已定位且修复已验证 | `cases.md`（`CASE-xxx`）|
+| **accept** | ≥ 85（HIGH）且关键项满足且根因已定位且修复已验证 | 对应分类文件 `cases-*.md`（`CASE-<类别>-xxx`），并同步 `cases.md` 索引 |
 | **pending** | 70–84（MEDIUM），或 HIGH 但修复未验证 | `cases-pending.md`（`PCASE-xxx`）|
 | **reject** | < 70，或命中首报错缺失/因果链跳跃 | 不入库，先补证 |
 
@@ -589,7 +589,8 @@ tool-fault-diagnosis/
 │   │   ├── coredump-command-playbook.md   # coredump/Stackcore 命令手册
 │   │   ├── coredump-report-template.md    # 崩溃专项报告模板（含可信度与入库章节）
 │   │   ├── code-repos.md       # CANN 相关代码仓库地址
-│   │   ├── cases.md            # 典型问题案例库（CASE-001~006）
+│   │   ├── cases.md            # 案例库索引（CASE-<分类>-xxx，链接各分类案例文件）
+│   │   ├── cases-*.md          # 分类案例文件（AI Core Error/UB/coredump/OOM/掉卡/中断/卡住）
 │   │   ├── cases-pending.md    # 候选案例库（PCASE，首次沉淀时自动创建）
 │   │   ├── confidence-assessment.md  # 诊断可信度评估规范（五维评分 + 入库关键项）
 │   │   └── case-contribution.md      # 案例沉淀规范（入库门槛 + 格式 + 脱敏）

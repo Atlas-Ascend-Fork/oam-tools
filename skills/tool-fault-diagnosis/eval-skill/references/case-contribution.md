@@ -37,7 +37,7 @@ cases.md  cases-pending.md  补证后重评
 
 | 判定 | 条件 | 去向 |
 | --- | --- | --- |
-| **accept** | 可信度 ≥ 85（HIGH）**且** 关键项全部满足 **且** 根因已定位 **且** 修复已验证 | 写入 `cases.md`，分配 `CASE-xxx` |
+| **accept** | 可信度 ≥ 85（HIGH）**且** 关键项全部满足 **且** 根因已定位 **且** 修复已验证 | 写入对应分类文件 `cases-*.md`，分配 `CASE-<类别>-xxx`，并同步 `cases.md` 索引 |
 | **pending** | 可信度 70–84（MEDIUM），或 HIGH 但根因未定位 / 修复未验证 | 写入 `cases-pending.md`，分配 `PCASE-xxx` |
 | **reject** | 可信度 < 70，或关键项（首报错已定位、因果链无跳跃）未满足 | 不入库，先补证据 |
 
@@ -51,7 +51,7 @@ cases.md  cases-pending.md  补证后重评
 
 ## 3. 案例格式
 
-案例应包含问题现象与版本信息、问题分析、问题根因、解决方案四部分，解决方案应说明临时规避措施和长期解决措施。新案例追加到 `cases.md` 末尾，与既有 CASE-001~006 保持同一结构，并附来源元信息：
+案例应包含问题现象与版本信息、问题分析、问题根因、解决方案四部分，解决方案应说明临时规避措施和长期解决措施。新案例追加到对应分类案例文件末尾，保持同一结构，并附来源元信息：
 
 ````markdown
 ## CASE-xxx：<一句话问题标题>
@@ -92,13 +92,14 @@ cases.md  cases-pending.md  补证后重评
 
 **元信息**
 - 可信度：<score>/100（HIGH）
-- 首报错错误码：<ExxYYYY>
+- 首报错错误码：<ExxYYYY 或 —>
+- 首报错特征：<一句关键错误特征>
 - 验证状态：已验证修复有效
 - 来源报告：<报告文件名或链接>
 - 收录日期：<YYYY-MM-DD>
 ````
 
-候选区 `cases-pending.md` 用相同 4 段式结构，编号为 `PCASE-xxx`，并在元信息后额外写明：
+候选区 `cases-pending.md` 用相同 6 段式结构，编号为 `PCASE-xxx`，并在元信息后额外写明：
 
 ```markdown
 - 待补证据：<缺什么材料 / 哪个维度未达标>
@@ -109,14 +110,14 @@ cases.md  cases-pending.md  补证后重评
 
 ## 4. 去重与合并
 
-入库前先在 `cases.md` 中检索是否已有同类案例：
+入库前先在已受理库（`cases.md` 索引 + 各分类文件 `cases-*.md`）中检索是否已有同类案例：
 
 ```bash
-# 按错误码检索
-grep -n "EZ9999" eval-skill/references/cases.md
+# 按错误码检索（索引 + 全部分类文件）
+grep -n "EZ9999" eval-skill/references/cases*.md
 
 # 按算子名或关键现象检索
-grep -ni "layernorm\|allreduce timeout" eval-skill/references/cases.md
+grep -ni "layernorm\|allreduce timeout" eval-skill/references/cases*.md
 ```
 
 | 情形 | 处理 |
@@ -172,7 +173,7 @@ python3 scripts/promote_case.py \
     --confidence ./confidence_result.json \
     --dry-run
 
-# 正式写入（自动分配编号、按 gate 选择 cases.md 或 cases-pending.md）
+# 正式写入（accept 追加到对应分类文件并同步索引，pending 写入 cases-pending.md）
 python3 scripts/promote_case.py \
     --report ./diagnosis.md \
     --confidence ./confidence_result.json \
