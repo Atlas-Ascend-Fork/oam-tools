@@ -67,6 +67,74 @@ class TestRCEnvType(AssertTest):
         self.assertTrue(LoadSoType().get_env_type() == env_type)
         LoadSoType.clear()
 
+    def test_get_env_type_failed_when_hal_missing(self, mocker):
+        """
+        The HAL library cannot be loaded, the environment type is unknown.
+        An empty string would be indistinguishable from a valid platform,
+        so the failure must be reported explicitly.
+        """
+        mocker.patch.object(
+            LoadSoType, "get_drvhal_env_type", return_value=RetCode.FAILED
+        )
+        self.assertTrue(LoadSoType().get_env_type() == RetCode.FAILED)
+        LoadSoType.clear()
+
+    def test_get_env_type_failed_when_platform_info_failed(self, mocker):
+        """
+        drvGetPlatformInfo returns an error, the environment type is
+        unknown and must be reported as a failure.
+        """
+        mock_dev = MagicMock()
+        mock_dev.drvGetPlatformInfo.return_value = -1
+        mocker.patch.object(LoadSoType, "get_drvhal_env_type", return_value=mock_dev)
+        self.assertTrue(LoadSoType().get_env_type() == RetCode.FAILED)
+        LoadSoType.clear()
+
+    def test_get_env_type_failed_when_platform_code_unsupported(self, mocker, caplog):
+        """
+        drvGetPlatformInfo returns success but writes an unsupported
+        platform code, the failure must be reported instead of falling
+        back to an empty string.
+        """
+
+        def write_unsupported_code(num_ptr):
+            num_ptr[0] = 2
+            return 0
+
+        mock_dev = MagicMock()
+        mock_dev.drvGetPlatformInfo.side_effect = write_unsupported_code
+        mocker.patch.object(LoadSoType, "get_drvhal_env_type", return_value=mock_dev)
+        self.assertTrue(LoadSoType().get_env_type() == RetCode.FAILED)
+        self.assertTrue("unsupported platform code 2." in caplog.text)
+        LoadSoType.clear()
+
+    def test_get_env_type_failed_when_platform_code_not_written(self, mocker, caplog):
+        """
+        drvGetPlatformInfo returns success without writing the out-param,
+        the sentinel value must be reported as a failure too.
+        """
+
+        def skip_writing(num_ptr):
+            return 0
+
+        mock_dev = MagicMock()
+        mock_dev.drvGetPlatformInfo.side_effect = skip_writing
+        mocker.patch.object(LoadSoType, "get_drvhal_env_type", return_value=mock_dev)
+        self.assertTrue(LoadSoType().get_env_type() == RetCode.FAILED)
+        self.assertTrue("unsupported platform code -1." in caplog.text)
+        LoadSoType.clear()
+
+    def test_get_drvdsmi_env_type_fails_on_env_probe_failure(self, mocker):
+        """
+        When the environment type is unknown, the DSMI library must not be
+        selected at all: either flavor could be wrong on this machine.
+        """
+        mocker.patch.object(LoadSoType, "get_env_type", return_value=RetCode.FAILED)
+        load_mock = mocker.patch.object(LoadSoType, "load_dll")
+        self.assertTrue(LoadSoType().get_drvdsmi_env_type() == RetCode.FAILED)
+        load_mock.assert_not_called()
+        LoadSoType.clear()
+
 
 class TestAicoreStlSoPath(AssertTest):
     """libaml_aicore_stl.so 装在 tools/aml/lib64/aicore_stl/,不在 LD_LIBRARY_PATH 中,

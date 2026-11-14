@@ -30,6 +30,7 @@ from cmdline.arg_checker import check_arg_executable, check_arg_device_id
 from cmdline.arg_checker import check_arg_exist_or_read_permissibale
 from cmdline.arg_checker import check_core_file, check_symbol_path
 from common.const import RetCode
+from params import ParamDict
 from common import DeviceInfo
 from ..conftest import AssertTest
 
@@ -239,7 +240,24 @@ class TestArgChecker(AssertTest):
     )
     def test_check_arg_device(self, mocker, arg_name, arg_val, test_res):
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=64)
+        mocker.patch.object(ParamDict, "get_env_type", return_value="EP")
         self.assertTrue(check_arg_device_id(arg_name, arg_val) == test_res)
+
+    def test_check_arg_device_fails_before_device_query_on_env_error(
+        self, mocker, caplog
+    ):
+        """
+        A failed environment probe must fail the -d check with its own
+        reason, before any DeviceInfo (and DSMI library selection) happens.
+        """
+        mocker.patch.object(ParamDict, "get_env_type", return_value=RetCode.FAILED)
+        device_mock = mocker.patch("cmdline.arg_checker.DeviceInfo")
+        self.assertTrue(check_arg_device_id("d", 0) == RetCode.FAILED)
+        self.assertTrue(
+            "Failed to obtain the execution environment type." in caplog.text
+        )
+        self.assertTrue("'-d' value should be in" not in caplog.text)
+        device_mock.assert_not_called()
 
     @pytest.mark.parametrize(
         ["arg_name", "arg_val", "test_res"],

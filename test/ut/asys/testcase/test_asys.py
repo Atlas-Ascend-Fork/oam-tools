@@ -123,6 +123,24 @@ class TestAsysMain(AssertTest):
             "Failed to obtain the execution environment type." in caplog.text
         )
 
+    def test_main_env_type_failed_code(self, mocker, caplog):
+        """
+        RetCode.FAILED is a truthy enum member, so a plain truthiness check
+        would let the command continue with an unknown environment type.
+        """
+        mocker.patch("common.FileOperate.create_dir", return_value=RetCode.SUCCESS)
+        mocker.patch("cmdline.cmd_parser.CommandLineParser.parse", return_value=True)
+        mocker.patch("config.config_parser.AsysConfigParser.parse", return_value=True)
+        mocker.patch("params.param_dict.ParamDict.get_command", return_value="collect")
+        mocker.patch(self.sub_cmd_class["collect"], return_value=False)
+        mocker.patch(
+            "params.param_dict.ParamDict.get_env_type", return_value=RetCode.FAILED
+        )
+        self.assertTrue(not asys.main())
+        self.assertTrue(
+            "Failed to obtain the execution environment type." in caplog.text
+        )
+
     def test_main_conf_parser_error(self, mocker, caplog):
         mocker.patch("common.FileOperate.create_dir", return_value=RetCode.SUCCESS)
         mocker.patch("cmdline.cmd_parser.CommandLineParser.parse", return_value=True)

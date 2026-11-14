@@ -70,7 +70,12 @@ class LoadSoType(metaclass=Singleton):
 
     def get_drvdsmi_env_type(self):
         if self.drvdsmi is None:
-            if self.get_env_type() == "EP":
+            env_type = self.get_env_type()
+            if env_type == RetCode.FAILED:
+                # The platform type is unknown: picking either DSMI flavor
+                # could silently load the wrong library on this machine.
+                return RetCode.FAILED
+            if env_type == "EP":
                 so_name = "libdrvdsmi_host.so"
             else:
                 so_name = "libdrvdsmi.so"
@@ -121,15 +126,34 @@ class LoadSoType(metaclass=Singleton):
         if self.env_type:
             return self.env_type
         dev = self.get_drvhal_env_type()
-        if dev != RetCode.FAILED:
-            dev.drvGetPlatformInfo.argtypes = [ctypes.POINTER(ctypes.c_int)]
-            num = ctypes.c_int(-1)
-            ret = dev.drvGetPlatformInfo(ctypes.pointer(num))
-            if ret == 0:
-                if num.value == 0:
-                    self.env_type = "RC"
-                elif num.value == 1:
-                    self.env_type = "EP"
+        if dev == RetCode.FAILED:
+            # The platform type cannot be detected, report the failure explicitly
+            # instead of returning an empty string that is indistinguishable
+            # from a valid "RC" platform.
+            log_error("Failed to obtain the execution environment type.")
+            return RetCode.FAILED
+        dev.drvGetPlatformInfo.argtypes = [ctypes.POINTER(ctypes.c_int)]
+        num = ctypes.c_int(-1)
+        ret = dev.drvGetPlatformInfo(ctypes.pointer(num))
+        if ret == 0:
+            if num.value == 0:
+                self.env_type = "RC"
+            elif num.value == 1:
+                self.env_type = "EP"
+            else:
+                # Covers both an unsupported platform code and a driver that
+                # returns success without writing the out-param (num stays -1).
+                log_error(
+                    "Failed to obtain the execution environment type, "
+                    "unsupported platform code {}.".format(num.value)
+                )
+                return RetCode.FAILED
+        else:
+            log_error(
+                "Failed to obtain the execution environment type, "
+                "drvGetPlatformInfo returned {}.".format(ret)
+            )
+            return RetCode.FAILED
         return self.env_type
 
     def dll_close(self):

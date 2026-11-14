@@ -222,6 +222,18 @@ def check_arg_device_id(arg_name, arg_val):
             )
         )
         return RetCode.FAILED
+    # The device count needs a DSMI handle, whose flavor is selected by the
+    # environment type. Probe the type first so a failed detection fails with
+    # its own reason instead of loading a wrong library and reporting the
+    # misleading "'-d' value should be in [0, 0)" error. The import stays
+    # local: a module-level one would cycle params -> common -> interface
+    # -> params. Going through ParamDict also honors the env type already
+    # set by the callers (tests set it explicitly) instead of probing again.
+    from params import ParamDict
+
+    if ParamDict().get_env_type() == RetCode.FAILED:
+        log_error("Failed to obtain the execution environment type.")
+        return RetCode.FAILED
     devices_num = DeviceInfo().get_device_count()
     if arg_val >= devices_num:
         log_error(

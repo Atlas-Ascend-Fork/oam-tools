@@ -108,7 +108,7 @@ def main():
 
     # 2. check the environment type
     env_ret = param_dict.get_env_type()
-    if not env_ret:
+    if not env_ret or env_ret == RetCode.FAILED:
         log_error("Failed to obtain the execution environment type.")
         return False
     if env_ret == "RC":

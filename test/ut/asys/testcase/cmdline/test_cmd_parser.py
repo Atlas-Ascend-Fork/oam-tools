@@ -131,6 +131,7 @@ class TestCmdParser(AssertTest):
         )
         mocker.patch("argparse.ArgumentParser.parse_args", return_value=fake_namespace)
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
+        mocker.patch.object(ParamDict, "get_env_type", return_value="EP")
         self.assertTrue(self.parser.parse() == RetCode.SUCCESS)
 
     def test_parse_analyze_path(self, mocker):
@@ -149,5 +150,6 @@ class TestCmdParser(AssertTest):
             d=0,
         )
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
+        mocker.patch.object(ParamDict, "get_env_type", return_value="EP")
         mocker.patch("argparse.ArgumentParser.parse_args", return_value=fake_namespace)
         self.assertTrue(self.parser.parse() == RetCode.SUCCESS)
