@@ -1189,6 +1189,68 @@ class TestUtilsMethods(CommonAssert):
         res = getattr(parser, "_get_tiling_l0")()
         self.assertEqual(res, (0, 0))
 
+    def test_get_tiling_l0_ffts_kernel0_suffix(self, mocker):
+        # ffts 命中 plog kernel_name= 且名称带 __kernel0 后缀时，
+        # 须剔除后缀后取末段，否则末段为 kernel0 解析失败误置 0
+        log = (
+            "fftsplus aivector error, kernel_name=Foo_10330__kernel0, "
+            "blockDim=7, other info."
+        )
+        mocker.patch("ms_interface.utils.execute_command", return_value=("", log))
+        parser = AicoreErrorParser("")
+        mocker.patch.object(parser, "ffts_flag", True)
+        res = getattr(parser, "_get_tiling_l0")()
+        self.assertEqual(res, (10330, 7))
+
+    @pytest.mark.parametrize(
+        "kernel_name, expected_tiling_key",
+        [
+            (
+                "GatherV3_9e31943a1a48bf81ddff1fc6379e0be3_high_performance_10330",
+                10330,
+            ),
+            (
+                "FlashAttentionScore_5881aeec01e51adb01fb1db8be1c04f0_"
+                "10000000000022420943_mix_aic",
+                10000000000022420943,
+            ),
+            (
+                "GatherV3_9e31943a1a48bf81ddff1fc6379e0be3_high_performance"
+                "_10330__kernel0",
+                10330,
+            ),
+            ("2_0_11_GatherV2", 0),
+        ],
+    )
+    def test_get_tiling_info_l0_fallback_from_kernel_name(
+        self, mocker, kernel_name, expected_tiling_key
+    ):
+        # tilingKey 日志仅在 L1 dump 打印；L0 dump 下取不到时按命名约定
+        # 从 kernelName 兜底解析："_"分隔的最后一段即 tilingKey
+        log = (
+            "Aicore kernel execute failed, device_id=0, stream_id=2, report_stream_id=2, "
+            "task_id=6, flip_num=0, fault kernel_name=2_0_11_GatherV2, program id=1, "
+            "hash=15656883929986130445."
+        )
+        mocker.patch("ms_interface.utils.execute_command", return_value=("", log))
+        parser = AicoreErrorParser("")
+        res = parser.get_tiling_info(kernel_name)
+        self.assertEqual(res, (expected_tiling_key, 0))
+
+    def test_get_tiling_info_l0_plog_priority(self, mocker):
+        # plog 中能取到 tilingKey 时优先使用日志值，不从 kernelName 兜底
+        log = (
+            "[ERROR] RUNTIME(155320,python3):2025-05-08-09:56:18.527.836 "
+            "[davinci_kernel_task.cc:1321]155320 GetArgsInfo:[INIT][DEFAULT]"
+            "tilingKey = 10330, print 2 Times totalLen=(35*8), argsSize=280, blockDim=48"
+        )
+        mocker.patch("ms_interface.utils.execute_command", return_value=("", log))
+        parser = AicoreErrorParser("")
+        res = parser.get_tiling_info(
+            "GatherV3_9e31943a1a48bf81ddff1fc6379e0be3_high_performance_99999"
+        )
+        self.assertEqual(res, (10330, 48))
+
     def test_get_tiling_l1_success(self, mocker):
         log = (
             r"[INFO] IDEDD(200280,python3):2025-07-07-10:12:17.093.111 [dump_operator.cpp:139][tid:201695] [AIC_INFO] dev_func:GatherV2_daad10a93d32be95786cd6e84e734751_high_precision"

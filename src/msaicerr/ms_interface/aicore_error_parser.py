@@ -998,7 +998,7 @@ class AicoreErrorParser:
             block_dim = utils.get_str_value(block_dim_ret[0])
         return tiling_key, block_dim
 
-    def _get_tiling_l0(self) -> tuple:
+    def _get_tiling_l0(self, kernel_name="") -> tuple:
         if not self.ffts_flag:
             plog_path = os.path.join(self.collect_path, "collection", "plog")
             aic_info_cmd = ["grep", "-r", "tilingKey =", plog_path]
@@ -1006,8 +1006,12 @@ class AicoreErrorParser:
             tiling_key_regexp = r"tilingKey = (.*?),"
             tiling_key_ret = re.findall(tiling_key_regexp, aic_info, re.M)
             if not tiling_key_ret:
-                utils.print_warn_log("Unable to get tilingKey in plog, set tilingKey=0")
-                tiling_key = 0
+                # tilingKey 日志仅在 L1 dump 时打印，L0 dump 取不到时按命名约定
+                # 从 kernelName 兜底解析："_"分隔的最后一段即 tilingKey
+                utils.print_warn_log(
+                    "Unable to get tilingKey in plog, fallback to kernel_name suffix"
+                )
+                tiling_key = self._get_tiling_key_from_kernel_name(kernel_name)
             else:
                 tiling_key = utils.get_str_value(tiling_key_ret[0])
                 tiling_key = 0 if tiling_key == -1 else tiling_key
@@ -1026,12 +1030,15 @@ class AicoreErrorParser:
             kernel_name_regexp = r"kernel_name=(.*?),"
             kernel_name_ret = re.findall(kernel_name_regexp, aic_info, re.M)
             if not kernel_name_ret:
-                utils.print_warn_log("Unable to get tilingKey in plog, set tilingKey=0")
-                tiling_key = 0
-            else:
-                kernel_name = (
-                    kernel_name_ret[0].replace("_mix_aic", "").replace("_mix_aiv", "")
+                utils.print_warn_log(
+                    "Unable to get tilingKey in plog, fallback to kernel_name suffix"
                 )
+                tiling_key = self._get_tiling_key_from_kernel_name(kernel_name)
+            else:
+                # 后缀清洗口径与 _strip_kernel_name_suffix 一致，剔除
+                # __kernel0/_mix_aic/_mix_aiv 后再取末段，否则 kernel0 等
+                # 后缀会顶替 tilingKey 导致解析失败误置 0
+                kernel_name = self._strip_kernel_name_suffix(kernel_name_ret[0])
                 tiling_key = utils.get_str_value((kernel_name.split("_")[-1]))
                 tiling_key = 0 if tiling_key == -1 else tiling_key
             block_dim_regexp = r"blockDim=(\d+)"
@@ -1042,6 +1049,27 @@ class AicoreErrorParser:
             else:
                 block_dim = utils.get_str_value(block_dim_ret[0])
             return tiling_key, block_dim
+
+    @staticmethod
+    def _get_tiling_key_from_kernel_name(kernel_name: str) -> int:
+        # kernelName 按"_"分隔，最后一段即 tilingKey；解析失败时回退默认值 0
+        if not kernel_name:
+            return 0
+        # __kernel0/_mix_aic/_mix_aiv 是算子类型后缀而非 tilingKey，须先剔除
+        # 再取末段，口径与 _strip_kernel_name_suffix 一致
+        kernel_name = (
+            kernel_name.replace("__kernel0", "")
+            .replace("_mix_aic", "")
+            .replace("_mix_aiv", "")
+        )
+        tiling_key = utils.get_str_value(kernel_name.split("_")[-1])
+        if tiling_key == -1:
+            utils.print_warn_log(
+                f"Failed to get tilingKey from kernel_name {kernel_name}, "
+                "set tilingKey=0"
+            )
+            return 0
+        return tiling_key
 
     def _get_tiling_data_l1(self, kerel_name):
         aic_info = self._get_aic_info(kerel_name)
@@ -1073,7 +1101,7 @@ class AicoreErrorParser:
 
     def get_tiling_info(self, kernel_name=""):
         if self.parse_level == 0:
-            return self._get_tiling_l0()
+            return self._get_tiling_l0(kernel_name)
         else:
             return self._get_tiling_l1(kernel_name)
 
