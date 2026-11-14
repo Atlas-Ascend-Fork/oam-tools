@@ -311,8 +311,41 @@ class TestAsysConfig(AssertTest):
         ParamDict().set_args(args)
         self.assertTrue(AsysConfig().run() is False)
         self.assertTrue(
-            "The config command must be executed as the root user." in caplog.text
+            "The config --restore command must be executed as the root user."
+            in caplog.text
         )
+
+    def test_asys_config_get_mode_as_normal_user(self, mocker, capsys, caplog):
+        """The get mode is a read-only query and must not require the root user."""
+        args = Namespace(
+            d=1, get=True, restore=False, stress_detect=True, subparser_name="config"
+        )
+        mocker.patch("config_cmd.asys_config.run_linux_cmd", return_value=True)
+        mocker.patch("config_cmd.asys_config.check_command", return_value=True)
+        mocker.patch.object(DeviceInfo, "get_device_count", return_value=2)
+        mocker.patch("os.getuid", return_value=1000)
+        mocker.patch.object(DeviceInfo, "get_chip_info", return_value="Ascend 910B1 V1")
+        mocker.patch.object(DeviceInfo, "get_device_aic_info", return_value=[0, 850, 0])
+        mocker.patch.object(
+            DeviceInfo, "get_device_bus_info", return_value=[900, 0, 0, 0, 0]
+        )
+        ParamDict().set_env_type("EP")
+        ParamDict().set_args(args)
+        self.assertTrue(AsysConfig().run() is True)
+        self.assertTrue(
+            "The config --restore command must be executed as the root user."
+            not in caplog.text
+        )
+        captured = capsys.readouterr()
+        expect_ret = """
+ +---------------------------+----------------------------+
+ | Device ID: 1              | CURRENT CONFIGURATION      |
+ +===========================+============================+
+ | AI Core Voltage (MV)      | 850                        |
+ | Bus Voltage (MV)          | 900                        |
+ +---------------------------+----------------------------+
+"""
+        self.assertTrue(captured.out == expect_ret)
 
     def test_asys_config_chip_error(self, mocker, caplog):
         args = Namespace(

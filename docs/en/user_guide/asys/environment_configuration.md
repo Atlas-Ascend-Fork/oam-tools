@@ -6,7 +6,7 @@ Obtain or restore the specified configuration.
 
 ## Notes
 
-You must run the commands related to environment configuration as the  **root**  user on a physical machine.
+You must run the commands related to environment configuration on a physical machine. Among them, `config --restore` writes configurations back and must be run as the  **root**  user, while `config --get` is a read-only query that does not require the root user.
 
 <!-- npu="910,310p,310b" id1 -->
 Atlas 200I/500 A2 inference products,  Atlas inference products, and  Atlas training products  do not support environment configuration.
