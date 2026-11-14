@@ -18,6 +18,7 @@
 
 import os
 import re
+import stat
 import time
 
 from common import (
@@ -112,12 +113,6 @@ class AsysStackTrace(AscendTraceDll):
             )
         return
 
-    def _get_bin_file_path(self, all_exists_bin):
-        for bin_file_path in self._iter_bin_files():
-            if bin_file_path in all_exists_bin:
-                continue
-            return bin_file_path
-
     def _iter_bin_files(self):
         """Yield the stackcore .bin files of the remote pid below the work path.
 
@@ -134,22 +129,24 @@ class AsysStackTrace(AscendTraceDll):
                     continue
                 yield os.path.join(path, file)
 
+    def _get_stackcore_bin_files(self):
+        files = {}
+        for path in self._iter_bin_files():
+            try:
+                file_stat = os.stat(path)
+            except OSError:
+                # A file may disappear while the trace producer updates its directory.
+                continue
+            if stat.S_ISREG(file_stat.st_mode):
+                files[path] = file_stat.st_mtime
+        return files
+
     def _get_exists_bin_file_num(self):
-        return sum(1 for _ in self._iter_bin_files())
+        return len(self._get_stackcore_bin_files())
 
     def _get_last_bin_file_name(self):
-        newest_file = None
-        newest_mtime = None
-        for bin_file_path in self._iter_bin_files():
-            try:
-                mtime = os.path.getmtime(bin_file_path)
-            except OSError:
-                # The file vanished between the walk and the stat; a removed
-                # candidate must not crash the wait loop.
-                continue
-            if newest_mtime is None or mtime > newest_mtime:
-                newest_file, newest_mtime = bin_file_path, mtime
-        return newest_file
+        files = self._get_stackcore_bin_files()
+        return max(files, key=files.get, default="")
 
     def _wait_bin_file_generate(self, exists_bin_file_num):
         bin_file_name = None
