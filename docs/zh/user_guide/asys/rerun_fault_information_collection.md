@@ -31,15 +31,22 @@ asys launch --task="sh ../app_run.sh" --tar="True" --output=path
 
     默认配置如下，可通过修改asys工具目录下的“ascend\_system\_advisor/asys/conf/asys.ini”文件中的参数，从而开启或关闭算子编译文件和dump图收集等功能：
 
-    ```bash
+    ```ini
     [launch]
-    graph = TRUE                    // 控制是否收集Graph图信息，取值范围：TRUE收集、FALSE不收集，若设置为FALSE，则dump_ge_graph、dump_graph_level配置不生效
-    ops = TRUE                      // 控制是否收集算子编译信息，取值范围：TRUE收集、FALSE不收集
-    dump_ge_graph = 2               // 控制dump图的内容多少，取值为2，不含有权重等数据的基础版dump，对应环境变量DUMP_GE_GRAPH
-    dump_graph_level = 3            // 控制dump图的数量，取值为3，dump最后阶段的生成图，对应环境变量DUMP_GRAPH_LEVEL
-    log_level = INFO                // 应用类日志的全局日志级别及各模块日志级别，对应环境变量ASCEND_GLOBAL_LOG_LEVEL
-    log_event_enable = TRUE         // 应用类日志是否开启Event日志，取值范围：TRUE开启、FALSE不开启，对应环境变量ASCEND_GLOBAL_EVENT_ENABLE
-    log_print_to_stdout = FALSE     // 是否开启在终端屏幕打印日志，取值范围：TRUE开启、FALSE不开启，对应环境变量ASCEND_SLOG_PRINT_TO_STDOUT
+    # 控制是否收集Graph图信息，取值范围：TRUE收集、FALSE不收集，若设置为FALSE，则dump_ge_graph、dump_graph_level配置不生效
+    graph = TRUE
+    # 控制是否收集算子编译信息，取值范围：TRUE收集、FALSE不收集
+    ops = TRUE
+    # 控制dump图的内容多少，取值为2，不含有权重等数据的基础版dump，对应环境变量DUMP_GE_GRAPH
+    dump_ge_graph = 2
+    # 控制dump图的数量，取值为3，dump最后阶段的生成图，对应环境变量DUMP_GRAPH_LEVEL
+    dump_graph_level = 3
+    # 应用类日志的全局日志级别及各模块日志级别，对应环境变量ASCEND_GLOBAL_LOG_LEVEL
+    log_level = INFO
+    # 应用类日志是否开启Event日志，取值范围：TRUE开启、FALSE不开启，对应环境变量ASCEND_GLOBAL_EVENT_ENABLE
+    log_event_enable = TRUE
+    # 是否开启在终端屏幕打印日志，取值范围：TRUE开启、FALSE不开启，对应环境变量ASCEND_SLOG_PRINT_TO_STDOUT
+    log_print_to_stdout = FALSE
     ```
 
     asys工具启动时，环境变量默认使用该文件里的配置值，但如果复跑任务脚本中将这些环境变量配置为其它值，则会发生环境变量覆盖，以复跑任务脚本中设置的值为准。因此，可能造成收集到的维测信息不满足定位需求。

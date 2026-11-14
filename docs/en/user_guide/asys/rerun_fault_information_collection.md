@@ -31,15 +31,22 @@ asys launch --task="sh ../app_run.sh" --tar="True" --output=path
 
     The default configurations are as follows. You can modify specific parameters in the  **ascend\_system\_advisor/asys/conf/asys.ini**  file in the asys tool directory to enable or disable the functions of collecting operator compilation files and dump graphs.
 
-    ```text
+    ```ini
     [launch]
-    graph = TRUE                    // Specifying whether to collect graph information. The value range is as follows: TRUE: collect; FALSE: not collect. If this parameter is set to FALSE, the settings of dump_ge_graph and dump_graph_level do not take effect.
-    ops = TRUE                      // Specifying whether to collect operator compilation information. The value range is as follows: TRUE: collect; FALSE: not collect.
-    dump_ge_graph = 2               // Specifying the content of the dump graph, which is the basic version without data like weights. The value is 2, and the corresponding environment variable is DUMP_GE_GRAPH.
-    dump_graph_level = 3            // Specifying the number of the dump graph. The value is 3. Graphs generated in the last dump phase correspond to the environment variable DUMP_GRAPH_LEVEL.
-    log_level = INFO                // Indicating the global log level for application logs and the log level for each module, corresponding to the environment variable ASCEND_GLOBAL_LOG_LEVEL.
-    log_event_enable = TRUE         // Determining whether to enable the event log for application logs. The value range is as follows: TRUE: enabled; FALSE: disabled. The corresponding environment variable is ASCEND_GLOBAL_EVENT_ENABLE.
-    log_print_to_stdout = FALSE     // Determining whether to enable log printing to the terminal screen. The value range is as follows: TRUE: enabled; FALSE: disabled. The corresponding environment variable is ASCEND_SLOG_PRINT_TO_STDOUT.
+    # Specifying whether to collect graph information. The value range is as follows: TRUE: collect; FALSE: not collect. If this parameter is set to FALSE, the settings of dump_ge_graph and dump_graph_level do not take effect.
+    graph = TRUE
+    # Specifying whether to collect operator compilation information. The value range is as follows: TRUE: collect; FALSE: not collect.
+    ops = TRUE
+    # Specifying the content of the dump graph, which is the basic version without data like weights. The value is 2, and the corresponding environment variable is DUMP_GE_GRAPH.
+    dump_ge_graph = 2
+    # Specifying the number of the dump graph. The value is 3. Graphs generated in the last dump phase correspond to the environment variable DUMP_GRAPH_LEVEL.
+    dump_graph_level = 3
+    # Indicating the global log level for application logs and the log level for each module, corresponding to the environment variable ASCEND_GLOBAL_LOG_LEVEL.
+    log_level = INFO
+    # Determining whether to enable the event log for application logs. The value range is as follows: TRUE: enabled; FALSE: disabled. The corresponding environment variable is ASCEND_GLOBAL_EVENT_ENABLE.
+    log_event_enable = TRUE
+    # Determining whether to enable log printing to the terminal screen. The value range is as follows: TRUE: enabled; FALSE: disabled. The corresponding environment variable is ASCEND_SLOG_PRINT_TO_STDOUT.
+    log_print_to_stdout = FALSE
     ```
 
     By default, the environment variables upon asys startup use the values configured in this file. If these environment variables are set to other values in the script of the re-run task, the environment variables will be overwritten, and the values set in the re-run task script will be used. Therefore, the collected maintenance and debugging information may not meet the fault locating requirements.
