@@ -33,6 +33,32 @@ from common.const import (
 )
 from params import ParamDict
 
+# How long to let gdb react to SIGTERM before it is killed outright (#336).
+GDB_EXIT_TIMEOUT = 5
+
+
+def _release_gdb(gdb_process):
+    """Close gdb's pipes and reap it.
+
+    Called on every exit path of a gdb child: a quit that never gets an
+    answer must not leave the child and its three pipes behind, per thread
+    and per stack (#336). The timeout bounds the wait for a stubborn child;
+    kill then guarantees the reaping.
+    """
+    for stream in (gdb_process.stdin, gdb_process.stdout, gdb_process.stderr):
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass
+    if gdb_process.poll() is None:
+        gdb_process.terminate()
+    try:
+        gdb_process.wait(timeout=GDB_EXIT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        gdb_process.kill()
+        gdb_process.wait()
+
 
 def _get_reg_info_cmd():
     sys_type = machine()
@@ -60,43 +86,48 @@ def thread_stacks_reg_info(cmd, thread, stacks, queue_reg_info):
         errors="ignore",
         text=True,
     )
-    _reg_info = {thread: dict()}
-    gdb_process.stdin.write(f"thread {thread_id}\n")
+    # try/finally releases gdb on every path: early return, normal return
+    # and a pipe/write failure in between (#336).
+    try:
+        _reg_info = {thread: dict()}
+        gdb_process.stdin.write(f"thread {thread_id}\n")
 
-    reg_cmd = _get_reg_info_cmd()
-    if not reg_cmd:
-        return False
+        reg_cmd = _get_reg_info_cmd()
+        if not reg_cmd:
+            return False
 
-    for stack in stacks:
-        stack_id = stack.split(" ")[0][1:]
-        reg_list = [None, None, None]
-        gdb_process.stdin.write(f"frame {stack_id}\n")
-        gdb_process.stdin.write(reg_cmd)
-        while True:
-            line = gdb_process.stdout.readline().rstrip()
-            gdb_process.stdout.flush()
-            data_list = line.strip("\n").strip(" ").split()
-            if line.startswith("(gdb) rbp ") or line.startswith("(gdb) x29 "):
-                reg_list[0] = data_list[2]
-                continue
-            if line.startswith("rsp ") or line.startswith("sp "):
-                reg_list[1] = data_list[1]
-                continue
-            if line.startswith("rip ") or line.startswith("pc "):
-                reg_list[2] = data_list[1]
+        for stack in stacks:
+            stack_id = stack.split(" ")[0][1:]
+            reg_list = [None, None, None]
+            gdb_process.stdin.write(f"frame {stack_id}\n")
+            gdb_process.stdin.write(reg_cmd)
+            while True:
+                line = gdb_process.stdout.readline().rstrip()
+                gdb_process.stdout.flush()
+                data_list = line.strip("\n").strip(" ").split()
+                if line.startswith("(gdb) rbp ") or line.startswith("(gdb) x29 "):
+                    reg_list[0] = data_list[2]
+                    continue
+                if line.startswith("rsp ") or line.startswith("sp "):
+                    reg_list[1] = data_list[1]
+                    continue
+                if line.startswith("rip ") or line.startswith("pc "):
+                    reg_list[2] = data_list[1]
 
-            if all(reg_list):
-                line_num = f"#{stack_id}"
-                # #0 -> #00
-                if len(line_num) == 2:
-                    line_num = f"#0{stack_id}"
-                _reg_info[thread][line_num] = reg_list
-                break
-    gdb_process.stdin.write("quit\n")
-    gdb_process.stdin.write("y\n")
+                if all(reg_list):
+                    line_num = f"#{stack_id}"
+                    # #0 -> #00
+                    if len(line_num) == 2:
+                        line_num = f"#0{stack_id}"
+                    _reg_info[thread][line_num] = reg_list
+                    break
+        gdb_process.stdin.write("quit\n")
+        gdb_process.stdin.write("y\n")
 
-    queue_reg_info.put(_reg_info)
-    return True
+        queue_reg_info.put(_reg_info)
+        return True
+    finally:
+        _release_gdb(gdb_process)
 
 
 class CoreDump:
@@ -258,36 +289,40 @@ class CoreDump:
             text=True,
             bufsize=1,
         )
-        _reg_info = dict()
-        reg_cmd = _get_reg_info_cmd()
-        if not reg_cmd:
+        # Same release contract as thread_stacks_reg_info above (#336).
+        try:
+            _reg_info = dict()
+            reg_cmd = _get_reg_info_cmd()
+            if not reg_cmd:
+                return _reg_info
+
+            for thread in self.bt_info.keys():
+                thread_id = thread.split(" ")[1]
+                gdb_process.stdin.write(f"thread {thread_id}\n")
+                gdb_process.stdin.write(reg_cmd)
+                reg_list = [None, None, None]
+                while True:
+                    line = gdb_process.stdout.readline().rstrip()
+                    gdb_process.stdout.flush()
+                    data_list = line.strip("\n").strip(" ").split()
+                    if line.startswith("(gdb) rbp ") or line.startswith("(gdb) x29 "):
+                        reg_list[0] = data_list[2]
+                        continue
+                    if line.startswith("rsp ") or line.startswith("sp "):
+                        reg_list[1] = data_list[1]
+                        continue
+                    if line.startswith("rip ") or line.startswith("pc "):
+                        reg_list[2] = data_list[1]
+
+                    if all(reg_list):
+                        _reg_info[thread] = reg_list
+                        break
+            gdb_process.stdin.write("quit\n")
+            gdb_process.stdin.write("y\n")
+
             return _reg_info
-
-        for thread in self.bt_info.keys():
-            thread_id = thread.split(" ")[1]
-            gdb_process.stdin.write(f"thread {thread_id}\n")
-            gdb_process.stdin.write(reg_cmd)
-            reg_list = [None, None, None]
-            while True:
-                line = gdb_process.stdout.readline().rstrip()
-                gdb_process.stdout.flush()
-                data_list = line.strip("\n").strip(" ").split()
-                if line.startswith("(gdb) rbp ") or line.startswith("(gdb) x29 "):
-                    reg_list[0] = data_list[2]
-                    continue
-                if line.startswith("rsp ") or line.startswith("sp "):
-                    reg_list[1] = data_list[1]
-                    continue
-                if line.startswith("rip ") or line.startswith("pc "):
-                    reg_list[2] = data_list[1]
-
-                if all(reg_list):
-                    _reg_info[thread] = reg_list
-                    break
-        gdb_process.stdin.write("quit\n")
-        gdb_process.stdin.write("y\n")
-
-        return _reg_info
+        finally:
+            _release_gdb(gdb_process)
 
     def get_threads_stacks_reg_info(self):
         if self.reg_level == REG_OFF:

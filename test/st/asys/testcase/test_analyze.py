@@ -73,12 +73,36 @@ class Stdin:
     def write(self, a):
         pass
 
+    def close(self):
+        pass
 
-class PopenMock:
+
+class ReapingPopen:
+    """The process-side surface coredump analysis needs to release a child."""
+
+    stderr = None
+
+    # The subset of Popen that _release_gdb touches.
+    returncode = 0
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        self.returncode = -15
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+    def kill(self):
+        self.returncode = -9
+
     def __init__(self, *_args, **_kwargs):
         self.stdin = Stdin()
         self.stdout = None
 
+
+class PopenMock(ReapingPopen):
     def communicate(self):
         with open(
             f"{st_root_path}/data/coredump/core-coredump-8032-1717033942.txt",
@@ -89,11 +113,7 @@ class PopenMock:
         return gdb_str, 0
 
 
-class PopenMockError1:
-    def __init__(self, *_args, **_kwargs):
-        self.stdin = Stdin()
-        self.stdout = None
-
+class PopenMockError1(ReapingPopen):
     def communicate(self):
         with open(
             f"{st_root_path}/data/coredump/core-coredump-8032-1717033943_error.txt",
@@ -104,11 +124,7 @@ class PopenMockError1:
         return gdb_str, 0
 
 
-class PopenMockError2:
-    def __init__(self, *_args, **_kwargs):
-        self.stdin = Stdin()
-        self.stdout = None
-
+class PopenMockError2(ReapingPopen):
     def communicate(self):
         with open(
             f"{st_root_path}/data/coredump/core-coredump-8032-1717033944_error.txt",

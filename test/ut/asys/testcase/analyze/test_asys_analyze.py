@@ -34,7 +34,7 @@ from testcase.conftest import test_trace_tmp, ut_root_path, great_bin
 from analyze import AsysAnalyze
 from collect import AsysCollect
 from common.task_common import create_out_timestamp_dir
-from analyze.coredump_analyze import CoreDump, thread_stacks_reg_info
+from analyze.coredump_analyze import CoreDump, _release_gdb, thread_stacks_reg_info
 from collect.stackcore.stackcore_collect import ParseStackCore
 from params import ParamDict
 from common import DeviceInfo
@@ -50,8 +50,75 @@ class Stdin:
     def write(self, a):
         pass
 
+    def close(self):
+        pass
 
-class PopenMock:
+
+class ReapingPopen:
+    """The process-side surface coredump analysis needs to release a child."""
+
+    stderr = None
+
+    def poll(self):
+        return 0
+
+    def wait(self, timeout=None):
+        return 0
+
+    def terminate(self):
+        pass
+
+    def kill(self):
+        pass
+
+
+class RecordingStdin(Stdin):
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class RecordingPopen(ReapingPopen):
+    """Stays alive until released, and records how that happened."""
+
+    def __init__(self, *_args, **_kwargs):
+        self.stdin = RecordingStdin()
+        self.stdout = None
+        self.terminated = False
+        self.waited = False
+
+    def poll(self):
+        return None
+
+    def terminate(self):
+        self.terminated = True
+
+    def wait(self, timeout=None):
+        self.waited = True
+        return 0
+
+
+class TimeoutThenKillPopen(RecordingPopen):
+    """A child that ignores SIGTERM, so _release_gdb has to kill it."""
+
+    def __init__(self, *_args, **_kwargs):
+        super().__init__(*_args, **_kwargs)
+        self.killed = False
+
+    def wait(self, timeout=None):
+        self.waited = True
+        if timeout is None:
+            return 0
+        raise subprocess.TimeoutExpired(cmd="gdb", timeout=timeout)
+
+    def kill(self):
+        self.killed = True
+        return -9
+
+
+class PopenMock(ReapingPopen):
     def __init__(self, *_args, **_kwargs):
         self.stdin = Stdin()
         self.stdout = None
@@ -66,7 +133,7 @@ class PopenMock:
         return gdb_str, 0
 
 
-class PopenMockError:
+class PopenMockError(ReapingPopen):
     def __init__(self, *_args, **_kwargs):
         self.stdin = Stdin()
         self.stdout = None
@@ -294,6 +361,121 @@ class TestAsysAnalyze(AssertTest):
                 }
             }
         )
+
+    def test_unsupported_arch_releases_gdb_in_thread_path(self, mocker):
+        # _get_reg_info_cmd() has no register set for this architecture, so the
+        # worker returns right after starting gdb. It used to leave the child
+        # and its pipes behind on exactly that path (#336).
+        mocker.patch("analyze.coredump_analyze.machine", return_value="riscv64")
+        proc = RecordingPopen()
+        mocker.patch("subprocess.Popen", return_value=proc)
+
+        result = thread_stacks_reg_info(
+            ["gdb", "-q"], "Thread 2 (40896)", ["#0 0x1 0x2 x.so"], Put()
+        )
+
+        assert result is False
+        assert proc.terminated, "the started gdb was never terminated"
+        assert proc.waited, "the started gdb was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
+
+    def test_unsupported_arch_releases_gdb_in_level_path(self, mocker):
+        mocker.patch("analyze.coredump_analyze.machine", return_value="riscv64")
+        proc = RecordingPopen()
+        mocker.patch("subprocess.Popen", return_value=proc)
+        mocker.patch("params.param_dict.ParamDict.get_arg", return_value=1)
+
+        obj = CoreDump("", "", "", "")
+        obj.bt_info = {"Thread 2 (40896)": ["#0 0x1 0x2 x.so"]}
+        reg_info = obj._get_reg_info_level_thread()
+
+        assert reg_info == {}
+        assert proc.terminated, "the started gdb was never terminated"
+        assert proc.waited, "the started gdb was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
+
+    def test_supported_arch_releases_gdb_in_thread_path(self, mocker):
+        # The normal exit: the register set is known, so the worker walks the
+        # whole stack list and only then asks gdb to quit. The release call
+        # has to be there as well, otherwise the child and its pipes outlive
+        # the call (#336).
+        mocker.patch("analyze.coredump_analyze.machine", return_value="x86_64")
+        coredump_file = os.path.join(
+            ut_root_path, "data/coredump/coredump_reg_info.txt"
+        )
+        proc = RecordingPopen()
+        proc.stdout = open(coredump_file, "r", encoding="utf-8")
+        mocker.patch("subprocess.Popen", return_value=proc)
+        q_reg_info = Queue()
+        try:
+            result = thread_stacks_reg_info(
+                "",
+                "Thread 2 (40896)",
+                ["#0 0x7f05887750a3 0x7f058876a000 xxxx.so"],
+                q_reg_info,
+            )
+        finally:
+            proc.stdout.close()
+
+        assert result is True
+        assert proc.terminated, "the started gdb was never terminated"
+        assert proc.waited, "the started gdb was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
+
+    def test_supported_arch_releases_gdb_in_level_path(self, mocker):
+        # Same as above, but for the per-thread register path (#336).
+        mocker.patch("analyze.coredump_analyze.machine", return_value="x86_64")
+        mocker.patch("params.param_dict.ParamDict.get_arg", return_value=1)
+        coredump_file = os.path.join(
+            ut_root_path, "data/coredump/coredump_reg_info.txt"
+        )
+        proc = RecordingPopen()
+        proc.stdout = open(coredump_file, "r", encoding="utf-8")
+        mocker.patch("subprocess.Popen", return_value=proc)
+
+        obj = CoreDump("", "", "", "")
+        obj.bt_info = {"Thread 2 (40896)": ["#0 0x7f05887750a3 0x7f058876a000 xxxx.so"]}
+        try:
+            reg_info = obj._get_reg_info_level_thread()
+        finally:
+            proc.stdout.close()
+
+        assert reg_info != {}
+        assert proc.terminated, "the started gdb was never terminated"
+        assert proc.waited, "the started gdb was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
+
+    def test_write_error_releases_gdb_in_thread_path(self, mocker):
+        # A broken pipe on stdin must not leak the child either: the release
+        # runs in finally, so the exception path is covered as well (#336).
+        mocker.patch("analyze.coredump_analyze.machine", return_value="x86_64")
+        proc = RecordingPopen()
+        proc.poll = lambda: None  # still alive when the write fails
+        mocker.patch("subprocess.Popen", return_value=proc)
+
+        def broken_write(_data):
+            raise OSError("broken pipe")
+
+        proc.stdin.write = broken_write
+        with pytest.raises(OSError):
+            thread_stacks_reg_info(
+                ["gdb", "-q"], "Thread 2 (40896)", ["#0 0x1 0x2 x.so"], Put()
+            )
+
+        assert proc.terminated, "the started gdb was never terminated"
+        assert proc.waited, "the started gdb was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
+
+    def test_release_gdb_kills_a_child_that_ignores_sigterm(self, mocker):
+        # wait() timing out means the child ignored SIGTERM; it has to be
+        # killed, otherwise the child stays alive (#336).
+        proc = TimeoutThenKillPopen()
+        _release_gdb(proc)
+
+        assert proc.terminated, "the child was never terminated"
+        assert proc.killed, "the child ignored SIGTERM and was never killed"
+        assert proc.waited, "the child was never reaped"
+        assert proc.stdin.closed, "the gdb stdin pipe was left open"
 
     def test_asys_analyze_coredump_threads(self, mocker, capsys):
         mocker.patch("analyze.coredump_analyze.machine", return_value="x86_64")
