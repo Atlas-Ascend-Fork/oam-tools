@@ -70,12 +70,20 @@ class AsysDiagnose:
                 and ScreenResult.WARN.value in devices_ret
             ) or len(devices_ret) == 1:
                 devices_str = ", ".join(devices_ret)
-            else:
+            elif devices_ret:
                 devices_str = f"{devices_ret[0]} - All"
+            else:
+                # No device answered: nothing to summarise.
+                devices_str = UNKNOWN
         else:
             devices_str = ret[device_id][0]
 
         hbm_table = "HBM Detect"
+        if device_id is False and not devices_ret:
+            # Nothing answered: say so once instead of emitting a dangling '()'
+            # built from an empty error-code list.
+            log_warning("No device responded to the HBM detect.", force=True)
+            return [[hbm_table, devices_str]]
         if device_id is False and len(devices_ecc) != 1:
             devices_hbm = "(" + link_symbol.join(devices_ecc) + ")"
             ret_data_str = [[hbm_table, devices_str], ["", devices_hbm]]
@@ -95,8 +103,10 @@ class AsysDiagnose:
             devices_ret = [ret[key] for key in sorted(ret.keys())]
             if len(set(devices_ret)) > 1 or len(devices_ret) == 1:
                 devices_str = ", ".join(devices_ret)
-            else:
+            elif devices_ret:
                 devices_str = f"{devices_ret[0]} - All"
+            else:
+                devices_str = UNKNOWN
         else:
             # with '-d', displays information about the input device.
             devices_str = ret[device_id]

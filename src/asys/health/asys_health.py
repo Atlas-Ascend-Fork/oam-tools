@@ -39,7 +39,15 @@ class AsysHealth:
         alarm = "Alarm"
         warn = "Warning"
         healthy = "Healthy"
-        all_device_status = [info[0] for info in ret.values()]
+        # ret[device_id] is [status, err_info] (run_health_check), so info[0]
+        # is the whole status string. Keep taking it exactly as before and only
+        # guard the shape, so a malformed entry degrades instead of raising.
+        all_device_status = [
+            info[0]
+            if isinstance(info, (list, tuple)) and info and isinstance(info[0], str)
+            else ""
+            for info in ret.values()
+        ]
 
         if UNKNOWN in all_device_status:
             return UNKNOWN
