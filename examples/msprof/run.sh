@@ -22,4 +22,4 @@ SETENV="$CANN_ROOT/bin/setenv.bash"
 [ -f "$SETENV" ] && source "$SETENV"
 OUTPUT_DIR="./msprof_output"
 mkdir -p "$OUTPUT_DIR"
-"$CANN_ROOT/tools/profiler/bin/msprof" --output="$OUTPUT_DIR" --host-sys-usage=cpu,mem --sys-period=5
+"$CANN_ROOT/tools/profiler/bin/msprof" --output="$OUTPUT_DIR" --sys-devices=0 --sys-period=5 --ai-core=on --host-sys-usage=cpu,mem
