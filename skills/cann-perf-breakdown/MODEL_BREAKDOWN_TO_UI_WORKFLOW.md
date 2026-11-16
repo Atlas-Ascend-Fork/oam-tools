@@ -80,8 +80,8 @@ CSV + 源码 + trace  →  perf-breakdown-skill  →  adapt-breakdown-to-ui-json
 | 段 | 目录 / skill 名 | 输入 | 产出 |
 |---|---|---|---|
 | ① | `<skills>/1-perf-breakdown`<br>`perf-breakdown-skill` | profiling CSV、模型源码、runtime YAML | `analysis_config.json`、`raw_ops*.json`、拆解 HTML |
-| ② | `<skills>/2-adapt-breakdown-to-ui-json`<br>`adapt-breakdown-to-ui-json` | ① 的产物 | `*_analysis_config.json`、`*_perf_data.json`、`*_timeline.json`、`model_architecture_graph.json` |
-| ③ | `<skills>/3-generate-ui-json-report`<br>`generate-ui-json-report` | ② 的产物 + `trace_view.json` | `report/` 运行时、`trace_index`、`overlay`、`trace_bindings` |
+| ② | `<skills>/2-adapt-breakdown-to-ui-json`<br>`adapt-breakdown-to-ui-json` | ① 的产物 | `*_analysis_config.json`、`*_perf_data.json`、`*_timeline.json`、`model_architecture_graph.json`、`architecture_overlay_map.json`、`trace_bindings.json`、`hbm_series.json`（找到 HBM 采样时是真序列，找不到时是 schema 合法的空占位） |
+| ③ | `<skills>/3-generate-ui-json-report`<br>`generate-ui-json-report` | ② 的产物 + `trace_view.json` | `report/` 运行时（`report-config.js`、`report-embedded-data.js`）、`outputs/` 下的 `operator_details.json`、`validation_manifest.json`、`metrics_findings.json`、`expert_inventory.json`（后两个找不到来源时写空占位），以及传 `--hbm-dir` 时重写的 `hbm_series.json` |
 
 各段入口（细节看各自 `SKILL.md`，这里只为定位）：
 
@@ -122,12 +122,14 @@ node <skills>/3-generate-ui-json-report/scripts/generate-report.mjs --repo <repo
 **① → ②**
 
 ```
-validation_report.json   status: passed（或 passed_with_warnings 且仅含数据可用性 warning）
-breakdown_score.json     convertible: true（status 表达证据层级，不写死 passed）
-analysis_config.json     unmapped_ops: []
+validation_report.json    status: passed（精确等于 passed，passed_with_warnings 不放行）
+critique_report.json      status: passed，且记录的 config SHA256 与当前 config 一致
+critique_validation.json  status: passed 且 detail.clears_candidate: true
+breakdown_score.json      convertible: true（status 表达证据层级，不写死 passed）
+analysis_config.json      unmapped_ops: []、schema_version: 2、trace_scope.kind 已声明
 ```
 
-`unmapped_ops` 非空、评分未过、语义审查过期或哈希失配，② 的就绪门禁会直接拒绝。不要绕过它。
+`unmapped_ops` 非空、评分未过、批判（critique）复核未通过、或批判与当前 config 的哈希绑定失配，② 的就绪门禁会直接拒绝。不要绕过它。
 
 **② → ③**
 
@@ -143,7 +145,14 @@ analysis_config.json     unmapped_ops: []
 
 **`perf_data.json` 和 `timeline.json` 不是 ③ 生成的。**
 
-它们是 ③ 的**输入**，由 ② 产出。③ 只写 `trace_index` / `graph` / `overlay` / `trace_bindings` 四个 outputs。想让 ③ 生成它们会白费功夫。
+它们是 ③ 的**输入**，由 ② 产出。`model_architecture_graph.json` / `architecture_overlay_map.json` / `trace_bindings.json` 同样由 ② 写，③ 只读取并校验它们（`trace_bindings.json` 缺失直接抛错）。③ 自己写进 `outputs/` 的是 `operator_details.json`、`validation_manifest.json`、可选的 `metrics_findings.json` / `expert_inventory.json`（找不到来源时写空占位），以及**只在传 `--hbm-dir` 时**重写的 `hbm_series.json`；`report-config.js` / `report-embedded-data.js` 落在 `report/` 根而不是 `outputs/`。想让 ③ 生成 ② 的那三个文件会白费功夫。
+
+`hbm_series.json` 和 `report-config.js` 两段都会写，顺序是「② 先写、③ 再覆盖」：
+
+- `hbm_series.json`：② 找到四个 HBM 采样（`hbm_bandwidth_timeline.csv`、`hbm_occupancy_timeline.csv`、`sample_op_mix.csv`、`hbm_summary.json`）时调 ③ 的 `build-hbm-data.mjs` 写真序列，找不到就退回 schema 合法的空占位；③ 只在传 `--hbm-dir` 时用同一个脚本重写它，`--check` 模式一律不写。所以「面板是空序列」既可能是 ② 没找到采样，也可能是 ③ 单独重建时没给目录。
+- `report-config.js`：② 由 `build_overlay_and_config.py` 写一版，③ 再依据 `ui-report-handoff.json` 重新生成（没有 handoff 的老报告则就地归一 legacy 版本）。改它请改 handoff 的来源，不要在 ② 之后手改成品。
+
+`report-embedded-data.js` 只有 ③ 写。
 
 **① 段末尾的 HTML 不是 ③ 段的报告。**
 
@@ -163,11 +172,12 @@ checkpoint `config.json` 不可达时以代码为准，记 evidence gap、降 ma
 |---|---|---|
 | 算子覆盖率不足 100% | ① | `validation_report.json` |
 | 层数 / 架构标量校验失败 | ① | `model_manifest.json` 的置信度与 gap 记录 |
-| 语义审查过期 | ① | `semantic_review_validation.json` |
-| ② 拒绝启动 | ① | 上面的 ①→② 门禁三项 |
+| 批判复核未通过或与 config 哈希失配 | ① | `critique_validation.json`、`critique_report.json` |
+| ② 拒绝启动 | ① | 上面的 ①→② 门禁各项 |
 | kernel 归属计数不符 | ② | `kernel_attribution.json` |
 | 节点 ID 与报告对不上 | ② | 重复组的角色名重命名声明 |
 | timeline owner 无法解析 | ② | 转换校验输出 |
+| HBM 面板是空序列 | ② | `run_pipeline` 输出里 `hbm` 阶段的状态（缺哪几个采样、在哪些目录找过）；补齐后用 `--hbm-dir` 重跑 ②，或只给 ③ 传 `--hbm-dir` 单独重建 |
 | 身份 / 不变量校验失败 | ③ | ③ 的校验器输出 |
 | 源码哈希不匹配 | ③ | 视为重新提取架构的请求，不要只换哈希 |
 
