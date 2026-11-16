@@ -43,6 +43,29 @@ test_case_tmp = os.path.join(st_root_path, "test_tmp")
 path_env = os.environ["PATH"]
 home_env = os.environ["HOME"]
 
+_saved_cwd = os.getcwd()
+
+
+def enter_test_tmp():
+    """记录当前工作目录并切入 test_case_tmp。
+
+    与 restore_cwd 配对使用；若 teardown 不恢复，rmtree(test_case_tmp) 后
+    进程 cwd 将指向已删除目录（#235）。
+    """
+    global _saved_cwd
+    _saved_cwd = os.getcwd()
+    os.chdir(test_case_tmp)
+
+
+def restore_cwd():
+    """恢复 enter_test_tmp() 记录的工作目录。
+
+    必须在 teardown_method 删除 test_case_tmp 之前调用，否则后续用例或
+    pytest 自身调用 os.getcwd()/相对路径操作会抛 FileNotFoundError。
+    """
+    if os.path.isdir(_saved_cwd):
+        os.chdir(_saved_cwd)
+
 
 def set_env():
     os.environ["PATH"] = "{}/data/scripts".format(st_root_path) + os.pathsep + path_env

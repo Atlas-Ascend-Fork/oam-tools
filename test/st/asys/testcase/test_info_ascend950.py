@@ -27,6 +27,7 @@ import pytest
 import shutil
 from .conftest import CONF_SRC_PATH, test_case_tmp
 from .conftest import AssertTest
+from .conftest import enter_test_tmp, restore_cwd
 
 
 import asys
@@ -42,12 +43,13 @@ class TestInfo(AssertTest):
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
         os.mkdir(test_case_tmp)
-        os.chdir(test_case_tmp)
+        enter_test_tmp()
         ParamDict.clear()
         g_device_map.clear()
 
     def teardown_method(self):
         print("clean test environment.")  # noqa: T201  # test diagnostic output
+        restore_cwd()
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
 

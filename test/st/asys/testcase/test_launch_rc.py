@@ -27,6 +27,7 @@ import shutil
 
 from .conftest import CONF_SRC_PATH, st_root_path, test_case_tmp, set_env, unset_env
 from .conftest import AssertTest
+from .conftest import enter_test_tmp, restore_cwd
 
 
 from params import ParamDict
@@ -50,11 +51,12 @@ class TestLaunchRC(AssertTest):
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
         os.mkdir(test_case_tmp)
-        os.chdir(test_case_tmp)
+        enter_test_tmp()
         ParamDict.clear()
 
     def teardown_method(self):
         print("clean test environment.")  # noqa: T201  # test diagnostic output
+        restore_cwd()
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
 

@@ -45,6 +45,7 @@ from .conftest import (
     find_dir,
 )
 from .conftest import AssertTest
+from .conftest import enter_test_tmp, restore_cwd
 
 
 import asys
@@ -80,7 +81,7 @@ class TestCollect(AssertTest):
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
         os.mkdir(test_case_tmp)
-        os.chdir(test_case_tmp)
+        enter_test_tmp()
         ParamDict.clear()
         for env in [
             "ASCEND_PROCESS_LOG_PATH",
@@ -94,6 +95,7 @@ class TestCollect(AssertTest):
 
     def teardown_method(self):
         print("clean test environment.")  # noqa: T201  # test diagnostic output
+        restore_cwd()
         if os.path.exists(
             f"{st_root_path}/data/asys_test_dir/ascend/atrace/trace_17965_17965_20240302100542653636/stackcore_tracer_35_12345_202411.bin"
         ):

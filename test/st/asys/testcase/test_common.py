@@ -26,6 +26,7 @@ import pytest
 import shutil
 from .conftest import test_case_tmp
 from .conftest import AssertTest
+from .conftest import enter_test_tmp, restore_cwd
 
 
 from params import ParamDict
@@ -41,12 +42,13 @@ class TestCommon(AssertTest):
         if os.path.exists(test_case_tmp):
             shutil.rmtree(test_case_tmp)
         os.mkdir(test_case_tmp)
-        os.chdir(test_case_tmp)
+        enter_test_tmp()
         ParamDict.clear()
 
     @staticmethod
     def teardown_method():
         print("clean test environment.")  # noqa: T201  # test diagnostic output
+        restore_cwd()
         if os.path.exists(test_case_tmp):
             os.chmod(test_case_tmp, 0o777)  # nosec B103  # test asserts permission-mask behavior
             shutil.rmtree(test_case_tmp)

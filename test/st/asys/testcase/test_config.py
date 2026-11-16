@@ -20,6 +20,7 @@
 
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
+import os
 import sys
 
 import pytest
@@ -52,6 +53,14 @@ class TestAsysConfig(AssertTest):
     def teardown_method(self):
         ParamDict.clear()
         g_device_map.clear()
+
+    def test_cwd_valid_after_preceding_chdir_tests(self):
+        # 顺序回归（#235）：test_analyze / test_asys 等类 setup 会 chdir 进
+        # test_case_tmp 并在 teardown 中删除它；若 teardown 未先恢复 cwd，
+        # 此处 os.getcwd() 将抛 FileNotFoundError，相对路径操作亦失效。
+        cwd = os.getcwd()
+        self.assertTrue(os.path.isdir(cwd))
+        self.assertTrue(isinstance(os.listdir("."), list))
 
     @pytest.mark.skip(
         reason="was shadowed by parametrized test_asys_config_get_mode below; fails on VM (config cmd unexecutable)"
