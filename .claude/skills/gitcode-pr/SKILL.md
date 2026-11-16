@@ -321,9 +321,9 @@ git push origin <新分支名> -u
 
 > **提交前本地检查（强烈建议，按顺序执行）——先检查、后推送**：
 > 1. **首次克隆后装钩子**：`pre-commit install`（`.git/hooks/` 不随仓库走，每个 clone 各装一次）；之后每次 `git commit` 自动对改动文件检查。
-> 2. **保持 diff 精准**：本仓配置已不启用 `ruff-format`（本仓存量代码不符合其风格，它会重排被碰到的整个文件、把存量代码写进 diff，既污染改动又触发云端增量 codecheck 误报）。提交前用 `git diff --cached` 核对暂存内容，确认只含本次意图改动、无任何工具自动重排混入。
-> 3. **增量门禁本地预演**：`.pre-commit-config.yaml` 的 `incremental-codecheck` 钩子用 ruff 只对**本次改动行**跑云端关注的规则（行宽 E501、超大函数 PLR0915、staticmethod PLR6301、print→logging T201、外部程序绝对路径 S607、裸 sys.exit PLR1722），复现云端"只查增量行"的行为——push 前预警自己引入的违规，又不被存量违规淹没。
-> 4. **以云端为准**：本地与云端 codecheck 存在粒度错配（云端按 PR 增量行、本地 pylint/ruff 按整文件，故本仓为避免被存量淹没用 `--disable=C,R`，这几类只能靠上面的增量钩子补回）；ruff 不查的跨文件规则（如重复代码 R0801）及其他华为专有规则仍以云端结果为准。
+> 2. **保持 diff 精准**：本地钩子及其排除目录以 `.pre-commit-config.yaml` 为准，其中包含 Ruff 检查和格式化。自动修复与格式化可能修改文件；检查后用 `git diff` 和 `git diff --cached` 核对工作区及暂存区，确认只保留本次意图改动。
+> 3. **运行本地检查**：提交前执行 `pre-commit run --files <本次修改文件>`，运行当前配置中适用于这些文件的钩子。若钩子修改了文件，核对差异后重新暂存并运行检查。
+> 4. **核对云端结果**：本地钩子与云端 CodeCheck 的规则和扫描范围可能不同，提交后仍需确认流水线对应当前 PR 的 HEAD，并按具体检查日志处理失败项。
 > 5. **改动文档必须中英文同步（强制）**：本仓文档成对维护（中文 + `_en` 英文版）。**每改一个文档，先查它有无对应语言版本，有则在同一个 commit 里一并改**——只改单语会让两版内容长期背离，评审会要求补齐。
 >
 >    改完中文（或英文）后，用下面命令列出本次改动文档的对应版本，逐个同步。判据是**整个 PR 范围**（已提交 + 暂存 + 工作区），而非只看暂存区——否则先提交的那一版会被误报成"未同步"：
@@ -627,7 +627,7 @@ python3 .claude/skills/gitcode-pr/scripts/pr_ops.py get-codecheck \
   --pr <PR_NUMBER> --owner <parent_owner> --repo <parent_repo>
 ```
 
-返回 `{codecheck_pass, codecheck_result, precommit_result, commit_id, detail_url}`。`commit_id` 可确认结论对应哪次提交。但**逐条告警明细只能由用户提供**：明细在 `detail_url`（openlibing 看板）需登录查看、有 WAF 拦截程序化访问，且严禁把 token 发往该第三方域名——`get-codecheck` 只能告诉你 pass/fail，**拿不到逐条明细**。codecheck 失败时**直接请用户把报错明细贴给你**（用户在浏览器看板复制，或导出 xlsx 后贴关键行），不要自己反复尝试下载/解析（既拿不到又耗 token）。拿到明细后再定位修复。codecheck 是 Python 增量检查，编码须守仓库规范（print→logging、避免函数内 sys.exit、subprocess 用绝对路径、返回值一致、推导式不超两子句等），可优先用第 7 节 `incremental-codecheck` 钩子本地预演自查。
+返回 `{codecheck_pass, codecheck_result, precommit_result, commit_id, detail_url}`。`commit_id` 可确认结论对应哪次提交。但**逐条告警明细只能由用户提供**：明细在 `detail_url`（openlibing 看板）需登录查看、有 WAF 拦截程序化访问，且严禁把 token 发往该第三方域名——`get-codecheck` 只能告诉你 pass/fail，**拿不到逐条明细**。codecheck 失败时**直接请用户把报错明细贴给你**（用户在浏览器看板复制，或导出 xlsx 后贴关键行），不要自己反复尝试下载/解析（既拿不到又耗 token）。拿到明细后再定位修复。codecheck 是 Python 增量检查，编码须守仓库规范（print→logging、避免函数内 sys.exit、subprocess 用绝对路径、返回值一致、推导式不超两子句等），可先按第 7 节运行当前配置的本地检查，再结合云端明细定位。
 
 #### 12.2 评审意见：标准处理流程
 
