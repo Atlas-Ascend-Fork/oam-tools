@@ -41,7 +41,7 @@ OAM-Tools 采用模块化设计，四大组件相互独立又协同工作：asys
 ```text
 oam-tools/
 ├── cmake/                      # 构建配置（CMake 模块、第三方库下载脚本）
-├── scripts/                    # 辅助构建与检查脚本（oat_check.sh 等）
+├── scripts/                    # 辅助构建与测试脚本
 ├── src/                        # 源代码
 │   ├── asys/                   # asys：故障信息收集工具（Python）
 │   ├── msaicerr/               # msaicerr：AI Core Error 分析工具（Python）
@@ -220,7 +220,7 @@ rm -rf build_out/ build/
 ## 🅿️ Pre-commit
 
 pre-commit 是一个用于管理和维护 Git 预提交钩子（hooks）的框架，通过在代码提交前自动化执行代码检查、格式化和安全扫描，确保代码质量并统一团队规范，显著减少 CI/CD 流水线失败并提升协作效率。
-本仓已配置 pre-commit，用户可以参考 CANN 社区的[pre-commit 配置指导书中第 3 章节](https://gitcode.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md#3-%E7%A4%BE%E5%8C%BA%E8%B4%A1%E7%8C%AE%E8%80%85%E4%BD%BF%E7%94%A8pre-commit%E8%83%BD%E5%8A%9B)安装 pre-commit。OAT 检查工具已改用 Python 版本 oat-py（通过 `pip install oat-py>=1.0.0` 安装），无需配置 Java/Maven 环境；首次运行时 pre-commit 会为各 hook 创建隔离的虚拟环境，耗时稍长。
+本仓已配置 pre-commit，用户可以参考 CANN 社区的[pre-commit 配置指导书中第 3 章节](https://gitcode.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md#3-%E7%A4%BE%E5%8C%BA%E8%B4%A1%E7%8C%AE%E8%80%85%E4%BD%BF%E7%94%A8pre-commit%E8%83%BD%E5%8A%9B)安装 pre-commit。OAT 合规检查采用远程 Python hook（由 pre-commit 自动克隆 compliance 仓并在 hook 虚拟环境中安装 OAT，无需手动安装、无需配置 Java/Maven 环境）；首次运行时 pre-commit 会为各 hook 创建隔离的虚拟环境，耗时稍长。
 
 ## ℹ️ 相关信息
 

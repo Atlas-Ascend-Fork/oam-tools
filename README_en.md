@@ -43,7 +43,7 @@ OAM-Tools adopts a modular design where the four components are independent yet 
 ```text
 oam-tools/
 ├── cmake/                      # Build configuration (CMake modules, third-party library download scripts)
-├── scripts/                    # Auxiliary build and check scripts (oat_check.sh, etc.)
+├── scripts/                    # Auxiliary build and test scripts
 ├── src/                        # Source code
 │   ├── asys/                   # asys: fault information collection tool (Python)
 │   ├── msaicerr/               # msaicerr: AI Core Error analysis tool (Python)
@@ -225,7 +225,7 @@ rm -rf build_out/ build/
 
 Pre-commit is a framework for managing and maintaining Git pre-commit hooks. By automatically executing code checks, formatting, and security scans before code submission, pre-commit ensures code quality and unifies team standards. This significantly reduces CI/CD pipeline failures and improves collaboration efficiency.
 
-This repository has configured pre-commit. Users can refer to [Chapter 3 of the pre-commit configuration guide](https://gitcode.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md#3-%E7%A4%BE%E5%8C%BA%E8%B4%A1%E7%8C%AE%E8%80%85%E4%BD%BF%E7%94%A8pre-commit%E8%83%BD%E5%8A%9B) in the CANN community to install pre-commit. The OAT check tool has switched to the Python version oat-py (installed via `pip install oat-py>=1.0.0`), eliminating the need for Java/Maven environment configuration. The first run takes slightly longer as pre-commit creates isolated virtual environments for each hook.
+This repository has configured pre-commit. Users can refer to [Chapter 3 of the pre-commit configuration guide](https://gitcode.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md#3-%E7%A4%BE%E5%8C%BA%E8%B4%A1%E7%8C%AE%E8%80%85%E4%BD%BF%E7%94%A8pre-commit%E8%83%BD%E5%8A%9B) in the CANN community to install pre-commit. The OAT compliance check uses a remote Python hook (pre-commit automatically clones the compliance repository and installs OAT in the hook virtual environment; no manual installation or Java/Maven environment configuration is required). The first run takes slightly longer as pre-commit creates isolated virtual environments for each hook.
 
 ## ℹ️ Related Information
 

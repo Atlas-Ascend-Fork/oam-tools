@@ -146,17 +146,15 @@ repos:
             | test/(ut|st)/msaicerr/res/
           )
 
-  # OAT 合规性检查 (Open Source Audit Tool)
-  # require_serial + pass_filenames=false：oat_check.sh 内部自行收集 staged
-  # 文件，只调用一次。避免 pass_filenames=true 时每文件单独触发一次 OAT
-  # 扫描，导致 oat-py 在 CI 环境中偶发不生成 PlainReport 报告而误报失败。
-  - repo: local
+  # OAT 合规性检查 (Open Source Audit Tool) — 远程 Python hook
+  # pre-commit 自动克隆 compliance 仓、在 hook 虚拟环境中安装 OAT 并执行
+  # oat-precommit，本仓无需维护 oat_check.sh 脚本，依赖和版本由 rev 标签
+  # 统一管控；升级 rev 后如本地缓存未更新，可执行 pre-commit clean 后重新
+  # pre-commit install。OAT.xml 位于仓库根目录，工具会自动查找。
+  - repo: https://gitcode.com/HiAgent/compliance
+    rev: v1.0.6
     hooks:
       - id: oat-check
-        name: OAT Compliance Check
-        entry: bash scripts/oat_check.sh
-        language: system
-        pass_filenames: false
-        require_serial: true
+        pass_filenames: true
         stages: [pre-commit]
         verbose: true
