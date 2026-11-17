@@ -301,9 +301,11 @@ bool ParamValidation::CheckOpTypeIsValid(
         return false;
     }
 
+    static const std::string emptyOpTypeErr = "Argument --optype: the value is empty. Please enter valid operator "
+                                              "types in the format \"op_type1,op_type2\".";
     if (opTypeInput.empty()) {
-        MSPROF_LOGE("Failed to check empty opType.");
-        errInfo = "Failed to check empty opType.";
+        MSPROF_LOGE("%s", emptyOpTypeErr.c_str());
+        errInfo = emptyOpTypeErr;
         return false;
     }
 
@@ -311,22 +313,27 @@ bool ParamValidation::CheckOpTypeIsValid(
     static size_t opTypePrintLen = 128;
     if (opTypeInput.size() > maxOpTypeLen) {
         MSPROF_LOGE(
-            "Failed to check overflow opType: %s..., the max input size is %zu.",
+            "Argument --optype: the value %s... exceeds the maximum size, please enter no more than %zu characters.",
             opTypeInput.substr(0, opTypePrintLen).c_str(), maxOpTypeLen);
-        errInfo = "Failed to check overflow opType: " + opTypeInput.substr(0, opTypePrintLen) +
-                  "..., the max input size is 256.";
+        errInfo = "Argument --optype: the value " + opTypeInput.substr(0, opTypePrintLen) +
+                  "... exceeds the maximum size, please enter no more than 256 characters.";
         return false;
     }
 
     std::vector<std::string> opTypeList = Utils::Split(opTypeInput, false, "", ",");
     std::set<std::string> opTypeSet;
     for (const auto& item : opTypeList) {
-        if (item.empty()) {
-            MSPROF_LOGE("Failed to check empty opType item in input.");
-            errInfo = "Failed to check empty opType item in input.";
-            return false;
+        std::string opTypeItem = Utils::Trim(item);
+        if (opTypeItem.empty()) {
+            MSPROF_LOGW("The opType contains an empty value and will skip it.");
+            continue;
         }
-        opTypeSet.insert(item);
+        opTypeSet.insert(opTypeItem);
+    }
+    if (opTypeSet.empty()) {
+        MSPROF_LOGE("%s", emptyOpTypeErr.c_str());
+        errInfo = emptyOpTypeErr;
+        return false;
     }
 
     std::string deduplicatedOpType;

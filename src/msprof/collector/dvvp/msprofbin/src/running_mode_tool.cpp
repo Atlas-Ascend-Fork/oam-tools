@@ -1164,7 +1164,12 @@ int32_t SystemMode::StartSysTaskByProfApi()
         originalValue = originalEnv;
         originalValueExist = true;
     }
-    if (setenv(PROFILER_SAMPLE_CONFIG_ENV, params_->ToString().c_str(), ENV_OVERWRITE) != 0) {
+    const std::string sampleConfig = params_->ToString();
+    if (sampleConfig.empty()) {
+        CmdLog::CmdErrorLog("Generate sample config failed.");
+        return PROFILING_FAILED;
+    }
+    if (setenv(PROFILER_SAMPLE_CONFIG_ENV, sampleConfig.c_str(), ENV_OVERWRITE) != 0) {
         CmdLog::CmdErrorLog("Set PROFILER_SAMPLECONFIG failed.");
         return PROFILING_FAILED;
     }

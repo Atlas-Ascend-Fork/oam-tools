@@ -53,8 +53,12 @@ namespace {
 constexpr uintptr_t FAKE_PROF_API_HANDLE = 1;
 constexpr int ENV_OVERWRITE_FOR_TEST = 1;
 
+std::string g_sampleConfigForTest;
+
 int32_t FakeMsprofInitSuccess(uint32_t dataType, void* data, uint32_t dataLen)
 {
+    CONST_CHAR_PTR sampleConfig = getenv(PROFILER_SAMPLE_CONFIG_ENV);
+    g_sampleConfigForTest = sampleConfig == nullptr ? "" : sampleConfig;
     return ((dataType == MSPROF_CTRL_INIT_ACL_ENV) && (data == nullptr) && (dataLen == 0)) ? PROFILING_SUCCESS :
                                                                                              PROFILING_FAILED;
 }
@@ -994,6 +998,31 @@ TEST_F(RUNNING_MODE_UTEST, SystemModeStartSysTaskByProfApiRestoresMissingEnv)
 
     if (originalExist) {
         (void)setenv(PROFILER_SAMPLE_CONFIG_ENV, originalValue.c_str(), ENV_OVERWRITE_FOR_TEST);
+    }
+}
+
+TEST_F(RUNNING_MODE_UTEST, SystemModeStartSysTaskByProfApiContainsOpType)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    params->opType = "MatMul,Index";
+    Collector::Dvvp::Msprofbin::SystemMode rMode("system", params);
+    CONST_CHAR_PTR originalEnv = getenv(PROFILER_SAMPLE_CONFIG_ENV);
+    const bool originalExist = originalEnv != nullptr;
+    const std::string originalValue = originalExist ? originalEnv : "";
+
+    (void)unsetenv(PROFILER_SAMPLE_CONFIG_ENV);
+    g_sampleConfigForTest.clear();
+    MOCKER(dlopen).stubs().will(returnValue((void*)FAKE_PROF_API_HANDLE));
+    MOCKER(dlsym).stubs().will(returnValue((void*)&FakeMsprofInitSuccess));
+    MOCKER(dlclose).stubs().will(returnValue(0));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartSysTaskByProfApi());
+    EXPECT_NE(std::string::npos, g_sampleConfigForTest.find("opType"));
+    EXPECT_NE(std::string::npos, g_sampleConfigForTest.find("MatMul,Index"));
+    if (originalExist) {
+        (void)setenv(PROFILER_SAMPLE_CONFIG_ENV, originalValue.c_str(), ENV_OVERWRITE_FOR_TEST);
+    } else {
+        (void)unsetenv(PROFILER_SAMPLE_CONFIG_ENV);
     }
 }
 

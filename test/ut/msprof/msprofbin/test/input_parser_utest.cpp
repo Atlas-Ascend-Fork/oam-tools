@@ -951,7 +951,8 @@ TEST_F(INPUT_PARSER_UTEST, CheckBaseInfo)
     EXPECT_EQ(PROFILING_FAILED, parser.CheckCmdOpTypeIsValid(cmdInfo));
     parser.params_->opType.clear();
     cmdInfo.args[ARGS_OP_TYPE] = "Index,,MatMul";
-    EXPECT_EQ(PROFILING_FAILED, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ(PROFILING_SUCCESS, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ("Index,MatMul", parser.params_->opType);
     parser.params_->opType.clear();
     std::string opType(257, 't');
     cmdInfo.args[ARGS_OP_TYPE] = const_cast<char*>(opType.c_str());
@@ -1456,6 +1457,7 @@ TEST_F(INPUT_PARSER_UTEST, CheckCmdOpTypeIsValid)
 
     cmdInfo.args[ARGS_OP_TYPE] = "";
     EXPECT_EQ(MSPROF_DAEMON_ERROR, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_TRUE(parser.params_->opType.empty());
 
     std::vector<char> longOpType(OP_TYPE_EXCEED_MAX_LEN + 1, 'a');
     longOpType[OP_TYPE_EXCEED_MAX_LEN] = '\0';
@@ -1463,7 +1465,12 @@ TEST_F(INPUT_PARSER_UTEST, CheckCmdOpTypeIsValid)
     EXPECT_EQ(MSPROF_DAEMON_ERROR, parser.CheckCmdOpTypeIsValid(cmdInfo));
 
     cmdInfo.args[ARGS_OP_TYPE] = "MatMul,,Add";
-    EXPECT_EQ(MSPROF_DAEMON_ERROR, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ("Add,MatMul", parser.params_->opType);
+
+    cmdInfo.args[ARGS_OP_TYPE] = "MatMul, ,Add";
+    EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ("Add,MatMul", parser.params_->opType);
 
     cmdInfo.args[ARGS_OP_TYPE] = "MatMul,MatMul";
     EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
@@ -1477,9 +1484,19 @@ TEST_F(INPUT_PARSER_UTEST, CheckCmdOpTypeIsValid)
     EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
     EXPECT_EQ("MatMul", parser.params_->opType);
 
+    cmdInfo.args[ARGS_OP_TYPE] = "MatMul, ";
+    EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
+    EXPECT_EQ("MatMul", parser.params_->opType);
+
     cmdInfo.args[ARGS_OP_TYPE] = "MatMul,Add,Softmax";
     EXPECT_EQ(MSPROF_DAEMON_OK, parser.CheckCmdOpTypeIsValid(cmdInfo));
     EXPECT_EQ("Add,MatMul,Softmax", parser.params_->opType);
+
+    cmdInfo.args[ARGS_OP_TYPE] = ",";
+    EXPECT_EQ(MSPROF_DAEMON_ERROR, parser.CheckCmdOpTypeIsValid(cmdInfo));
+
+    cmdInfo.args[ARGS_OP_TYPE] = " ";
+    EXPECT_EQ(MSPROF_DAEMON_ERROR, parser.CheckCmdOpTypeIsValid(cmdInfo));
 }
 
 TEST_F(INPUT_PARSER_UTEST, CheckMstxValidWillReturnErrorWhenmstxDomainIncludeAndmstxDomainExcludeAndMstxAllSet)
@@ -1722,6 +1739,34 @@ TEST_F(INPUT_PARSER_UTEST, AddInstrArgs)
     EXPECT_EQ("instr-profiling", argsManager.argsList_[0].name_);
     EXPECT_EQ("instr-profiling-freq", argsManager.argsList_[1].name_);
     GlobalMockObject::verify();
+}
+
+TEST_F(INPUT_PARSER_UTEST, PrintHelpWarnsInstrProfilingDeprecated)
+{
+    const std::string help = CaptureHelpForPlatform(PlatformType::CHIP_V4_1_0);
+    EXPECT_NE(std::string::npos, help.find("--instr-profiling"));
+    EXPECT_NE(std::string::npos, help.find("--instr-profiling-freq"));
+    EXPECT_NE(std::string::npos, help.find("[instr-profiling] This option will be discarded in later versions."));
+    EXPECT_NE(std::string::npos, help.find("[instr-profiling-freq] This option will be discarded in later versions."));
+}
+
+TEST_F(INPUT_PARSER_UTEST, UseInstrProfilingWarnsDeprecated)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_INSTR_PROFILING] = "on";
+    cmdInfo.args[ARGS_INSTR_PROFILING_FREQ] = "1000";
+
+    testing::internal::CaptureStdout();
+    testing::internal::CaptureStderr();
+    parser.ParamsSwitchValid3(cmdInfo, ARGS_INSTR_PROFILING);
+    parser.MsprofFreqUpdateParams(cmdInfo, ARGS_INSTR_PROFILING_FREQ);
+    const std::string output = testing::internal::GetCapturedStdout() + testing::internal::GetCapturedStderr();
+
+    EXPECT_NE(std::string::npos, output.find("[Note] [instr-profiling] This option will be discarded"));
+    EXPECT_NE(std::string::npos, output.find("[Note] [instr-profiling-freq] This option will be discarded"));
+    EXPECT_EQ("on", parser.params_->instrProfiling);
+    EXPECT_EQ(1000, parser.params_->instrProfilingFreq);
 }
 
 } // namespace

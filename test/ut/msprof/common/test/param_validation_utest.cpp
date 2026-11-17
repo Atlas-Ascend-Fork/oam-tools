@@ -876,6 +876,10 @@ TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckOpTypeIsValid)
     MOCKER_CPP(&Platform::CheckIfSupport, bool(Platform::*)(const PlatformFeature) const)
         .stubs()
         .will(returnValue(false))
+        .then(returnValue(true))
+        .then(returnValue(true))
+        .then(returnValue(true))
+        .then(returnValue(true))
         .then(returnValue(true));
     std::string opType;
     std::string errInfo;
@@ -890,18 +894,29 @@ TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckOpTypeIsValid)
     opType.clear();
     opTypeInput = "";
     EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
-    EXPECT_EQ("Failed to check empty opType.", errInfo);
+    EXPECT_EQ(
+        "Argument --optype: the value is empty. Please enter valid operator types in the format \"op_type1,op_type2\".",
+        errInfo);
 
     opType.clear();
     opTypeInput = "MatMul,,Index";
-    EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
-    EXPECT_EQ("Failed to check empty opType item in input.", errInfo);
+    EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ("Index,MatMul", opType);
+    errInfo.clear();
+
+    opType.clear();
+    opTypeInput = "MatMul, ,Index";
+    EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ("Index,MatMul", opType);
+    errInfo.clear();
 
     opType.clear();
     std::string longOpType(257, 't');
     EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(longOpType, opType, errInfo));
     EXPECT_EQ(
-        "Failed to check overflow opType: " + longOpType.substr(0, 128) + "..., the max input size is 256.", errInfo);
+        "Argument --optype: the value " + longOpType.substr(0, 128) +
+            "... exceeds the maximum size, please enter no more than 256 characters.",
+        errInfo);
 
     opType.clear();
     std::string criticalOpType(256, 't');
@@ -920,18 +935,41 @@ TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckOpTypeIsValid)
 
     opType.clear();
     opTypeInput = ",MatMul";
-    EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
-    EXPECT_EQ("Failed to check empty opType item in input.", errInfo);
+    EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ("MatMul", opType);
 
     opType.clear();
     opTypeInput = "MatMul,";
-    EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
-    EXPECT_EQ("Failed to check empty opType item in input.", errInfo);
+    EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ("MatMul", opType);
+
+    opType.clear();
+    opTypeInput = "MatMul, ";
+    EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ("MatMul", opType);
 
     opType.clear();
     opTypeInput = "MatMul,MatMul,MatMul";
     EXPECT_EQ(true, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
     EXPECT_EQ("MatMul", opType);
+
+    opType.clear();
+    opTypeInput = ",";
+    EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ(
+        "Argument --optype: the value is empty. Please enter valid operator types in the format \"op_type1,op_type2\".",
+        errInfo);
+    EXPECT_TRUE(opType.empty());
+    errInfo.clear();
+
+    opType.clear();
+    opTypeInput = " ";
+    EXPECT_EQ(false, ParamValidation::instance()->CheckOpTypeIsValid(opTypeInput, opType, errInfo));
+    EXPECT_EQ(
+        "Argument --optype: the value is empty. Please enter valid operator types in the format \"op_type1,op_type2\".",
+        errInfo);
+    EXPECT_TRUE(opType.empty());
+    errInfo.clear();
 
     GlobalMockObject::verify();
 }
