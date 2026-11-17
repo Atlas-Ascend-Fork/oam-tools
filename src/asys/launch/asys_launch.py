@@ -109,7 +109,6 @@ class AsysLaunch:
             os.killpg(os.getpgid(0), signal.SIGINT)
 
         log_info("launch task start, running:")
-        signal.signal(signal.SIGINT, interrupt_handler)
         pro = subprocess.Popen(
             [BASH, "-c", self.user_cmd],
             shell=False,
@@ -120,18 +119,39 @@ class AsysLaunch:
             env=os.environ,
             errors="ignore",
         )
-        t = threading.Thread(target=self.wait_view, daemon=True)
-        t.start()
+        # Install the handler only once the child exists: installed before
+        # Popen, it stayed behind pointing at an unbound `pro` when the launch
+        # failed, so the next Ctrl-C raised NameError and asys could not exit.
+        signal.signal(signal.SIGINT, interrupt_handler)
+        t = None
+        try:
+            t = threading.Thread(target=self.wait_view, daemon=True)
+            t.start()
 
-        ParamDict().set_task_pid(pid=pro.pid)
+            ParamDict().set_task_pid(pid=pro.pid)
 
-        self.console_output, _ = pro.communicate()
-        # subprocess end, restore the default SIGINT signal
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
+            self.console_output, _ = pro.communicate()
+        except BaseException:
+            # communicate() was interrupted or the thread setup failed: the
+            # spinner thread and the child must not outlive this function.
+            self.finish_flag = True
+            if t is not None:
+                t.join()
+            if pro.poll() is None:
+                log_warning("Task thread failed, terminate the task process.")
+                pro.terminate()
+                try:
+                    pro.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pro.kill()
+                    pro.wait()
+            raise
+        finally:
+            # subprocess end or failure, restore the default SIGINT signal
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
 
         self.finish_flag = True
         t.join()  # wait print process_display end
-
         if pro.returncode == 0:
             log_info("Task execute finished, output:\n{0}".format(self.console_output))
         else:

@@ -85,14 +85,32 @@ class AsysInfo:
         }
         for query_name, query_cmds in pcie_info_query_cmds.items():
             count = run_command(query_cmds, timeout=CMD_TIMEOUT)
-            if not count.isdigit() or (query_name == "PCIe Dev Count" and count == "0"):
+            if query_name == "PCIe Dev Count" and count == "0":
+                # No PCIe device at all: the whole section is meaningless.
                 table_data[PCIE_INFO] = []
                 break
+            if not count.isdigit():
+                # A failed probe is not a zero count: keep the rows that did
+                # answer instead of dropping the whole section (#345).
+                continue
             table_data[PCIE_INFO].append([query_name, count])
-        if table_data[PCIE_INFO]:
-            table_data[PCIE_INFO][1][1] = int(table_data[PCIE_INFO][0][1]) - int(
-                table_data[PCIE_INFO][2][1]
-            )
+        # Decide by which probes answered, not by row count: (normal) and the
+        # total run the same lspci, so the raw (normal) row carries no extra
+        # information and is only shown once it is replaced by total -
+        # abnormal. Showing the raw count would assert every device is
+        # normal while rev ff was never counted.
+        counts = dict(table_data[PCIE_INFO])
+        total = counts.get("PCIe Dev Count")
+        abnormal = counts.get("PCIe Dev Count(abnormal)")
+        rows = []
+        if total is not None:
+            rows.append(["PCIe Dev Count", total])
+        if total is not None and abnormal is not None:
+            rows.append(["PCIe Dev Count(normal)", int(total) - int(abnormal)])
+        if abnormal is not None:
+            rows.append(["PCIe Dev Count(abnormal)", abnormal])
+        if rows:
+            table_data[PCIE_INFO] = rows
         else:
             del table_data[PCIE_INFO]
 

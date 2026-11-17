@@ -20,6 +20,7 @@ import os
 import shutil
 import tarfile
 from common import FileOperate as f
+from common import log_warning
 from params import ParamDict
 
 
@@ -39,5 +40,10 @@ def compress_output_dir_tar():
     ) as tar:
         tar.add(output_dir, arcname=os.path.basename(output_dir))
 
-    # remove output dir
-    shutil.rmtree(output_dir)
+    # remove output dir. The archive is already complete, so an undeletable
+    # directory (read-only files, another process holding it) must not turn
+    # the whole collection into a failure.
+    try:
+        shutil.rmtree(output_dir)
+    except OSError as err:
+        log_warning(f"Compressed {output_dir} but failed to remove it: {err}")

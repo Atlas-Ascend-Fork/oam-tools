@@ -336,7 +336,16 @@ class ParseTrace:
         msg_txt = self.parse(trace_file)
         if msg_txt:
             self.write_res_txt(msg_txt, trace_file)
-            os.remove(trace_file)
+            # The result .txt is already on disk, so a failed cleanup must not
+            # fail the command. The batch path is unaffected either way: run()
+            # gives every .bin its own daemon thread, so a failing os.remove
+            # only leaves a traceback inside that thread. This guards the
+            # single-file path (asys analyze -r trace --file), which hands the
+            # return value of start_parse_file to the CLI.
+            try:
+                os.remove(trace_file)
+            except OSError as err:
+                log_warning(f"Remove {trace_file} failed: {err}")
             return True
         return False
 
