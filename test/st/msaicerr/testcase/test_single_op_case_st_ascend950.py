@@ -25,7 +25,7 @@ import pytest
 from conftest import MSAICERR_PATH, TEST_CASE_TMP, cur_abspath
 
 sys.path.append(MSAICERR_PATH)
-sys.path.append(f'{cur_abspath}/../res/package')
+sys.path.append(f"{cur_abspath}/../res/package")
 
 from ms_interface.ascend950.compile_op import CompileOP
 from ms_interface.single_op_test_frame.runtime import AscendRTSApi
@@ -56,7 +56,7 @@ if _soc is None or "950" not in str(_soc):
     )
 
 
-class TestUtilsMethods():
+class TestUtilsMethods:
     @staticmethod
     def setup_method(method):
         # 创建临时执行目录
@@ -72,45 +72,67 @@ class TestUtilsMethods():
 
     def test_run(self, mocker):
         aic_err_info = AicErrorInfo()
-        aic_err_info.kernel_path = '../res/ori_data/asys_output_20230713074104794/dfx/ops/0/'
+        aic_err_info.kernel_path = (
+            "../res/ori_data/asys_output_20230713074104794/dfx/ops/0/"
+        )
         aic_err_info.kernel_name = "te_gatherv2_657cb48fa1743a43209d7bc779fe8c294760a5b09b3079a3323fdf18376fc408_1"
-        single_op_case = SingleOpCase(aic_err_info, 'op_test')
+        single_op_case = SingleOpCase(aic_err_info, "op_test")
         config_file = single_op_case.generate_config()
         run_dirty_ub(config_file, "Ascend950", 0)
-        mocker.patch('ms_interface.single_op_test_frame.single_op_case.run_dirty_ub',
-                     return_value=True)
+        mocker.patch(
+            "ms_interface.single_op_test_frame.single_op_case.run_dirty_ub",
+            return_value=True,
+        )
         mocker.patch(
             "ms_interface.single_op_test_frame.single_op_case.DSMIInterface",
             side_effect=Exception("mock dsmi unavailable"),
         )
-        mocker.patch.object(SingleOpCase, "get_soc_version_from_cce", return_value="Ascend950")
-        mocker.patch.object(SingleOpCase, 'run_kernel', return_value=None)
-        res = single_op_case.run(config_file, 'op_test')
+        mocker.patch.object(
+            SingleOpCase, "get_soc_version_from_cce", return_value="Ascend950"
+        )
+        mocker.patch.object(SingleOpCase, "run_kernel", return_value=None)
+        res = single_op_case.run(config_file, "op_test")
         assert "None" in res
 
-    @pytest.mark.parametrize("compile_file, log_content", [
-        ([["test.o", os.path.join(cur_abspath, "../res/ori_data/collect_milan/collection/DirtyCustom_ab1b6750d7f510985325b603cb06dc8b.json")]], "Find bin_file test.o and json_file"),
-        (Exception('test'), "Compile dirty_ub op failed, skip dirty ub"),
-        ([[]], "Compile dirty_ub op failed, skip dirty ub")
-    ])
+    @pytest.mark.parametrize(
+        "compile_file, log_content",
+        [
+            (
+                [
+                    [
+                        "test.o",
+                        os.path.join(
+                            cur_abspath,
+                            "../res/ori_data/collect_milan/collection/DirtyCustom_ab1b6750d7f510985325b603cb06dc8b.json",
+                        ),
+                    ]
+                ],
+                "Find bin_file test.o and json_file",
+            ),
+            (Exception("test"), "Compile dirty_ub op failed, skip dirty ub"),
+            ([[]], "Compile dirty_ub op failed, skip dirty ub"),
+        ],
+    )
     @staticmethod
     def test_run_ascendc(mocker, compile_file, log_content):
-        mocker.patch('os.path.exists', return_value=True)
-        mocker.patch.object(AscendOpKernelRunner, 'run', return_value=None)
-        mocker.patch.object(AscendOpKernelRunner, 'run')
-        mocker.patch.object(AscendRTSApi, '_load_runtime_so')
-        mocker.patch.object(AscendRTSApi, 'register_kernel_launch_fill_func')
-        mocker.patch.object(AscendRTSApi, 'set_device')
-        mocker.patch.object(AscendRTSApi, 'create_stream')
-        mocker.patch.object(AscendRTSApi, 'reset')
-        mocker.patch.object(AscendRTSApi, 'destroy_stream')
+        mocker.patch("os.path.exists", return_value=True)
+        mocker.patch.object(AscendOpKernelRunner, "run", return_value=None)
+        mocker.patch.object(AscendOpKernelRunner, "run")
+        mocker.patch.object(AscendRTSApi, "_load_runtime_so")
+        mocker.patch.object(AscendRTSApi, "register_kernel_launch_fill_func")
+        mocker.patch.object(AscendRTSApi, "set_device")
+        mocker.patch.object(AscendRTSApi, "create_stream")
+        mocker.patch.object(AscendRTSApi, "reset")
+        mocker.patch.object(AscendRTSApi, "destroy_stream")
         mocker.patch.object(CompileOP, "get_ub_size", return_value=1)
-        mocker.patch.object(CompileOP, 'get_compile_file', side_effect=compile_file)
+        mocker.patch.object(CompileOP, "get_compile_file", side_effect=compile_file)
         aic_err_info = AicErrorInfo()
-        aic_err_info.kernel_path = '../res/ori_data/asys_output_20230713074104794/dfx/ops/0/'
+        aic_err_info.kernel_path = (
+            "../res/ori_data/asys_output_20230713074104794/dfx/ops/0/"
+        )
         aic_err_info.kernel_name = "te_gatherv2_657cb48fa1743a43209d7bc779fe8c294760a5b09b3079a3323fdf18376fc408_1"
-        single_op_case = SingleOpCase(aic_err_info, 'op_test')
+        single_op_case = SingleOpCase(aic_err_info, "op_test")
         config_file = single_op_case.generate_config()
         run_dirty_ub(config_file, "Ascend950", 0)
         debug_info = Path(f"{os.getcwd()}/debug_info.txt")
-        assert log_content in debug_info.read_text(encoding='utf-8')
+        assert log_content in debug_info.read_text(encoding="utf-8")

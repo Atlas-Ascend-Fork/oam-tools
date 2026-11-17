@@ -41,33 +41,54 @@ class rtDevBinary_t(ctypes.Structure):
     """
     Class rtDevBinary_t
     """
-    _fields_ = [('magic', ctypes.c_uint32),
-                ('version', ctypes.c_uint32),
-                ('data', ctypes.c_char_p),
-                ('length', ctypes.c_uint64)]
+
+    _fields_ = [
+        ("magic", ctypes.c_uint32),
+        ("version", ctypes.c_uint32),
+        ("data", ctypes.c_char_p),
+        ("length", ctypes.c_uint64),
+    ]
 
 
 class rtProfDataInfo_t(ctypes.Structure):
     """
     Class rtProfDataInfo_t
     """
+
     ONLINE_PROF_MAX_PMU_NUM = 8
-    _fields_ = [('stubfunc', ctypes.c_void_p),
-                ('blockDim', ctypes.c_uint32),
-                ('args', ctypes.c_void_p),
-                ('argsSize', ctypes.c_uint32),
-                ('smDesc', ctypes.c_void_p),
-                ('stream', ctypes.c_uint64),
-                ('totalcycle', ctypes.c_uint64),
-                ('ovcycle', ctypes.c_uint64),
-                ('pmu_cnt', ctypes.c_uint64 * ONLINE_PROF_MAX_PMU_NUM)]
+    _fields_ = [
+        ("stubfunc", ctypes.c_void_p),
+        ("blockDim", ctypes.c_uint32),
+        ("args", ctypes.c_void_p),
+        ("argsSize", ctypes.c_uint32),
+        ("smDesc", ctypes.c_void_p),
+        ("stream", ctypes.c_uint64),
+        ("totalcycle", ctypes.c_uint64),
+        ("ovcycle", ctypes.c_uint64),
+        ("pmu_cnt", ctypes.c_uint64 * ONLINE_PROF_MAX_PMU_NUM),
+    ]
 
 
 _MODEL_SO_LIST = {
-    "pv": ("lib_pvmodel.so", "libtsch.so", "libnpu_drv_pvmodel.so", "libruntime_cmodel.so"),
-    "ca": ("libcamodel.so", "libtsch_camodel.so", "libnpu_drv_camodel.so", "libruntime_camodel.so"),
-    "tm": ("libpem_davinci.so", "libtsch.so", "libnpu_drv_pvmodel.so", "libruntime_cmodel.so"),
-    "esl": ("libnpu_drv_camodel.so", "libruntime_camodel.so")
+    "pv": (
+        "lib_pvmodel.so",
+        "libtsch.so",
+        "libnpu_drv_pvmodel.so",
+        "libruntime_cmodel.so",
+    ),
+    "ca": (
+        "libcamodel.so",
+        "libtsch_camodel.so",
+        "libnpu_drv_camodel.so",
+        "libruntime_camodel.so",
+    ),
+    "tm": (
+        "libpem_davinci.so",
+        "libtsch.so",
+        "libnpu_drv_pvmodel.so",
+        "libruntime_cmodel.so",
+    ),
+    "esl": ("libnpu_drv_camodel.so", "libruntime_camodel.so"),
 }
 
 # to avoid release kernel name pointer
@@ -79,8 +100,13 @@ class AscendRTSApi:
     Class AscendRTSApi
     """
 
-    def __init__(self, simulator_mode: str = None, soc_version: str = None, simulator_lib_path: str = None,
-                 simulator_dump_path: str = "./model"):
+    def __init__(
+        self,
+        simulator_mode: str = None,
+        soc_version: str = None,
+        simulator_lib_path: str = None,
+        simulator_dump_path: str = "./model",
+    ):
         """
         call rts by this api
         if simulator mode is None, will call real ascend device
@@ -105,7 +131,9 @@ class AscendRTSApi:
             self._load_runtime_so()
         else:
             self._simulator_dlls = []
-            self._load_simulator_so(simulator_mode, soc_version, simulator_lib_path, simulator_dump_path)
+            self._load_simulator_so(
+                simulator_mode, soc_version, simulator_lib_path, simulator_dump_path
+            )
         self.device_id = None
         self.context = None
         self.camodel = simulator_mode == "ca"
@@ -116,15 +144,15 @@ class AscendRTSApi:
 
     def _clear_env(self):
         if self._simulator_mode:
-            all_ld_path = os.environ['LD_LIBRARY_PATH']
+            all_ld_path = os.environ["LD_LIBRARY_PATH"]
             all_ld_paths = all_ld_path.split(":")
             if len(all_ld_paths) > 2:
                 all_ld_paths = all_ld_paths[:-2]
-            os.environ['LD_LIBRARY_PATH'] = ":".join(all_ld_paths)
+            os.environ["LD_LIBRARY_PATH"] = ":".join(all_ld_paths)
 
     def _load_runtime_so(self):
         def _find_runtime_so():
-            ld_lib_paths = os.environ['LD_LIBRARY_PATH']
+            ld_lib_paths = os.environ["LD_LIBRARY_PATH"]
             if not ld_lib_paths:
                 raise RuntimeError("LD_LIBRARY_PATH is empty can't find runtime.so")
             ld_lib_path_list = ld_lib_paths.split(":")
@@ -132,13 +160,17 @@ class AscendRTSApi:
                 runtime_so_path_tmp = os.path.join(ld_lib_path, "libruntime.so")
                 if os.path.exists(runtime_so_path_tmp):
                     return runtime_so_path_tmp
-                elif os.path.exists("/usr/local/Ascend/latest/runtime/lib64/libruntime.so"):
+                elif os.path.exists(
+                    "/usr/local/Ascend/latest/runtime/lib64/libruntime.so"
+                ):
                     return "/usr/local/Ascend/latest/runtime/lib64/libruntime.so"
             return None
 
         rts_so_path = _find_runtime_so()
         if not rts_so_path:
-            raise RuntimeError("Not found libruntime.so, please check your LD_LIBRARY_PATH")
+            raise RuntimeError(
+                "Not found libruntime.so, please check your LD_LIBRARY_PATH"
+            )
         logger.log_info("find runtime so path is: %s" % rts_so_path)
         self.rtsdll = ctypes.CDLL(rts_so_path)
 
@@ -147,8 +179,8 @@ class AscendRTSApi:
         simulator_lib_dir = os.path.join(simulator_lib_realpath, soc_version, "lib")
         if not os.path.exists(simulator_lib_dir):
             raise RuntimeError(
-                "Simulator lib path([simulator_lib_path]/[soc_version]/lib) is not exist, path: %s." %
-                simulator_lib_dir
+                "Simulator lib path([simulator_lib_path]/[soc_version]/lib) is not exist, path: %s."
+                % simulator_lib_dir
             )
 
         simulator_so_list = _MODEL_SO_LIST[simulator_mode]
@@ -160,19 +192,25 @@ class AscendRTSApi:
             so_full_path_list.append(so_path)
         common_data_path = os.path.join(simulator_lib_realpath, "common", "data")
         if not os.path.exists(common_data_path):
-            raise RuntimeError("Simulator common data path is not exist, path: %s" % common_data_path)
+            raise RuntimeError(
+                "Simulator common data path is not exist, path: %s" % common_data_path
+            )
         addition_ld_lib_path = simulator_lib_dir + ":" + common_data_path
         return so_full_path_list, addition_ld_lib_path
 
-    def _dll_simulator_so(self, so_path_list, addition_ld_lib_paths, simulator_dump_path):
-        os.environ['LD_LIBRARY_PATH'] += ":" + addition_ld_lib_paths
-        os.environ['CAMODEL_LOG_PATH'] = simulator_dump_path
-        so_path = ''
+    def _dll_simulator_so(
+        self, so_path_list, addition_ld_lib_paths, simulator_dump_path
+    ):
+        os.environ["LD_LIBRARY_PATH"] += ":" + addition_ld_lib_paths
+        os.environ["CAMODEL_LOG_PATH"] = simulator_dump_path
+        so_path = ""
         for so_path in so_path_list[:-1]:
             try:
                 so_handler = ctypes.CDLL(so_path, mode=ctypes.RTLD_GLOBAL)
             except BaseException as cdll_err:
-                raise RuntimeError("CDLL so failed, so_path: %s" % so_path) from cdll_err
+                raise RuntimeError(
+                    "CDLL so failed, so_path: %s" % so_path
+                ) from cdll_err
             self._simulator_dlls.append(so_handler)
 
         try:
@@ -181,19 +219,31 @@ class AscendRTSApi:
             raise RuntimeError("CDLL so failed, so_path: %s" % so_path) from cdll_err
         self.rtsdll = so_handler
 
-    def _load_simulator_so(self, simulator_mode: str = None, soc_version: str = None, simulator_lib_path: str = None,
-                           simulator_dump_path: str = "./model"):
+    def _load_simulator_so(
+        self,
+        simulator_mode: str = None,
+        soc_version: str = None,
+        simulator_lib_path: str = None,
+        simulator_dump_path: str = "./model",
+    ):
         logger.log_info("start load ascend simulator")
         if not isinstance(simulator_mode, str):
-            raise TypeError("simulator_mode need to be a str, actual is: %s." % str(type(simulator_mode)))
+            raise TypeError(
+                "simulator_mode need to be a str, actual is: %s."
+                % str(type(simulator_mode))
+            )
         if simulator_mode not in _MODEL_SO_LIST.keys():
             raise ValueError(
-                "simulator_mode need to be %s, actual is %s" % ("/".join(_MODEL_SO_LIST.keys()), simulator_mode))
+                "simulator_mode need to be %s, actual is %s"
+                % ("/".join(_MODEL_SO_LIST.keys()), simulator_mode)
+            )
         simulator_dump_path = os.path.realpath(simulator_dump_path)
         if not os.path.exists(simulator_dump_path):
             raise RuntimeError("simulator_dump_path is not exist.")
 
-        so_path_list, addition_ld_paths = self._init_simulator_so_path(simulator_mode, soc_version, simulator_lib_path)
+        so_path_list, addition_ld_paths = self._init_simulator_so_path(
+            simulator_mode, soc_version, simulator_lib_path
+        )
         self._dll_simulator_so(so_path_list, addition_ld_paths, simulator_dump_path)
         logger.log_info("Load ascend simulator success.")
 
@@ -224,19 +274,16 @@ class AscendRTSApi:
         module_type = rts_info.RT_MODULE_TYPE[module_type]
         info_type = rts_info.RT_INFO_TYPE[info_type]
         self.rtsdll.rtGetDeviceInfo.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtGetDeviceInfo(ctypes.c_uint32(device_id),
-                                               ctypes.c_int32(module_type),
-                                               ctypes.c_int32(info_type),
-                                               c_info)
+        rt_error = self.rtsdll.rtGetDeviceInfo(
+            ctypes.c_uint32(device_id),
+            ctypes.c_int32(module_type),
+            ctypes.c_int32(info_type),
+            c_info,
+        )
         self.parse_error(rt_error, "rtGetDeviceInfo")
         result = int(c_info[0])
         if info_type == rts_info.RT_INFO_TYPE["INFO_TYPE_ENV"]:
-            info_dict = {
-                0: "FPGA",
-                1: "EMU",
-                2: "ESL",
-                3: "ASIC"
-            }
+            info_dict = {0: "FPGA", 1: "EMU", 2: "ESL", 3: "ASIC"}
             if result in info_dict:
                 return info_dict[result]
         return result
@@ -257,9 +304,11 @@ class AscendRTSApi:
         c_context = ctypes.c_void_p()
         c_context_p = ctypes.c_void_p(ctypes.addressof(c_context))
         self.rtsdll.rtCtxCreate.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtCtxCreate(c_context_p,
-                                           ctypes.c_uint32(rts_info.RT_CONTEXT_MODE[context_mode]),
-                                           ctypes.c_int32(self.device_id))
+        rt_error = self.rtsdll.rtCtxCreate(
+            c_context_p,
+            ctypes.c_uint32(rts_info.RT_CONTEXT_MODE[context_mode]),
+            ctypes.c_int32(self.device_id),
+        )
         self.parse_error(rt_error, "rtCtxCreate")
         self.context = c_context
         self.context_storage.append(c_context)
@@ -281,11 +330,15 @@ class AscendRTSApi:
         self.rtsdll.rtCtxDestroy.restype = ctypes.c_uint64
         if c_context is None:
             if self.context not in self.context_storage:
-                raise ValueError("Input context does not exist in current interface's context storage")
+                raise ValueError(
+                    "Input context does not exist in current interface's context storage"
+                )
             rt_error = self.rtsdll.rtCtxDestroy(self.context)
         else:
             if c_context not in self.context_storage:
-                raise ValueError("Input context does not exist in current interface's context storage")
+                raise ValueError(
+                    "Input context does not exist in current interface's context storage"
+                )
             rt_error = self.rtsdll.rtCtxDestroy(c_context)
         self.parse_error(rt_error, "rtCtxDestroy")
         self.context = None
@@ -304,7 +357,9 @@ class AscendRTSApi:
         None
         """
         if c_context not in self.context_storage:
-            raise ValueError("Input context does not exist in current interface's context storage")
+            raise ValueError(
+                "Input context does not exist in current interface's context storage"
+            )
         self.rtsdll.rtCtxSetCurrent.restype = ctypes.c_uint64
         rt_error = self.rtsdll.rtCtxSetCurrent(c_context)
         self.parse_error(rt_error, "rtCtxSetCurrent")
@@ -347,7 +402,9 @@ class AscendRTSApi:
         rt_error = self.rtsdll.rtStreamDestroy(stream)
         self.parse_error(rt_error, "rtStreamDestroy")
 
-    def register_device_binary_kernel(self, kernel_path: str, magic="RT_DEV_BINARY_MAGIC_ELF"):
+    def register_device_binary_kernel(
+        self, kernel_path: str, magic="RT_DEV_BINARY_MAGIC_ELF"
+    ):
         """
         Register device kernel on current thread
 
@@ -366,14 +423,18 @@ class AscendRTSApi:
             magic = "RT_DEV_BINARY_MAGIC_ELF"
         kernel = file_util.read_file(kernel_path)
         c_kernel_p = ctypes.c_char_p(kernel)
-        rts_device_binary = rtDevBinary_t(data=c_kernel_p,
-                                          length=ctypes.c_uint64(len(kernel)),
-                                          version=ctypes.c_uint32(0),
-                                          magic=ctypes.c_uint32(rts_info.MAGIC_MAP[magic]))
+        rts_device_binary = rtDevBinary_t(
+            data=c_kernel_p,
+            length=ctypes.c_uint64(len(kernel)),
+            version=ctypes.c_uint32(0),
+            magic=ctypes.c_uint32(rts_info.MAGIC_MAP[magic]),
+        )
         rts_binary_handle = ctypes.c_void_p()
         self.rtsdll.rtDevBinaryRegister.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtDevBinaryRegister(ctypes.c_void_p(ctypes.addressof(rts_device_binary)),
-                                                   ctypes.c_void_p(ctypes.addressof(rts_binary_handle)))
+        rt_error = self.rtsdll.rtDevBinaryRegister(
+            ctypes.c_void_p(ctypes.addressof(rts_device_binary)),
+            ctypes.c_void_p(ctypes.addressof(rts_binary_handle)),
+        )
         self.parse_error(rt_error, "rtDevBinaryRegister")
         self.kernel_binary_storage[rts_binary_handle.value] = kernel
         return rts_binary_handle
@@ -399,8 +460,9 @@ class AscendRTSApi:
             self.kernel_name_storage[rts_binary_handle.value].clear()
             del self.kernel_name_storage[rts_binary_handle.value]
 
-    def register_function(self, rts_binary_handle: ctypes.c_void_p, kernel_name: str,
-                          func_mode: int) -> ctypes.c_char_p:
+    def register_function(
+        self, rts_binary_handle: ctypes.c_void_p, kernel_name: str, func_mode: int
+    ) -> ctypes.c_char_p:
         """
         Register function
 
@@ -424,12 +486,16 @@ class AscendRTSApi:
         c_func_mode = ctypes.c_uint32(func_mode)
         self.rtsdll.rtFunctionRegister.restype = ctypes.c_uint64
         kernel_name_cache.append(c_kernel_name_p)
-        rt_error = self.rtsdll.rtFunctionRegister(rts_binary_handle,
-                                                  c_kernel_name_p,
-                                                  c_kernel_name_p,
-                                                  c_kernel_name_p,
-                                                  c_func_mode)
-        self.parse_error(rt_error, "rtFunctionRegister", ", kernel_name is: %s" % kernel_name)
+        rt_error = self.rtsdll.rtFunctionRegister(
+            rts_binary_handle,
+            c_kernel_name_p,
+            c_kernel_name_p,
+            c_kernel_name_p,
+            c_func_mode,
+        )
+        self.parse_error(
+            rt_error, "rtFunctionRegister", ", kernel_name is: %s" % kernel_name
+        )
         self.kernel_name_storage[rts_binary_handle.value].append(kernel_name_bytes)
         return c_kernel_name_p
 
@@ -464,7 +530,9 @@ class AscendRTSApi:
 
         """
         if not isinstance(data, bytes):
-            raise TypeError("Copy binary to hbm supports bytes only, receive %s" % str(type(data)))
+            raise TypeError(
+                "Copy binary to hbm supports bytes only, receive %s" % str(type(data))
+            )
 
         real_mem_len = int(math.ceil(len(data) / 32) * 32 + 32)
         pad_len = real_mem_len - len(data)
@@ -474,15 +542,17 @@ class AscendRTSApi:
         try:
             c_memory_p = self.malloc(real_mem_len, "RT_MEMORY_HBM")
         except BaseException:
-            utils.print_error_log("rtMalloc on HBM failed, HBM memory info:  %s" %
-                                  str(self.get_memory_info_ex("RT_MEMORYINFO_HBM")))
+            utils.print_error_log(
+                "rtMalloc on HBM failed, HBM memory info:  %s"
+                % str(self.get_memory_info_ex("RT_MEMORYINFO_HBM"))
+            )
             raise
-        self.memcpy(c_memory_p, real_mem_len, data, len(data), "RT_MEMCPY_HOST_TO_DEVICE")
+        self.memcpy(
+            c_memory_p, real_mem_len, data, len(data), "RT_MEMCPY_HOST_TO_DEVICE"
+        )
         return c_memory_p
 
-    def get_data_from_hbm(self,
-                          c_memory_p: ctypes.c_void_p,
-                          data_size: int):
+    def get_data_from_hbm(self, c_memory_p: ctypes.c_void_p, data_size: int):
         """
         Get data from hbm
 
@@ -503,9 +573,9 @@ class AscendRTSApi:
         if not isinstance(c_memory_p, ctypes.c_void_p):
             c_memory_p = ctypes.c_void_p(c_memory_p)
         c_buffer_p = self.host_malloc(data_size)
-        self.memcpy(c_buffer_p,
-                    data_size, c_memory_p, data_size,
-                    "RT_MEMCPY_DEVICE_TO_HOST")
+        self.memcpy(
+            c_buffer_p, data_size, c_memory_p, data_size, "RT_MEMCPY_DEVICE_TO_HOST"
+        )
         if data_size > 8192:
             c_buffer = (ctypes.c_char * data_size).from_address(c_buffer_p.value)
         else:
@@ -513,9 +583,15 @@ class AscendRTSApi:
         return c_buffer, c_buffer_p
 
     # 'pylint: disable=unused-argument
-    def memcpy(self, c_memory_p: ctypes.c_void_p, memory_size: int,
-               data: Union[bytes, ctypes.c_void_p], data_size: int,
-               memcpy_kind: str = "RT_MEMCPY_HOST_TO_HOST", retry_count: int = 0) -> None:
+    def memcpy(
+        self,
+        c_memory_p: ctypes.c_void_p,
+        memory_size: int,
+        data: Union[bytes, ctypes.c_void_p],
+        data_size: int,
+        memcpy_kind: str = "RT_MEMCPY_HOST_TO_HOST",
+        retry_count: int = 0,
+    ) -> None:
         """
         Do memory copy on Ascend
 
@@ -546,22 +622,28 @@ class AscendRTSApi:
         c_data_size = ctypes.c_uint64(data_size)
         c_memory_size = ctypes.c_uint64(memory_size)
         self.rtsdll.rtMemcpy.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtMemcpy(c_memory_p, c_memory_size,
-                                        c_data_p, c_data_size,
-                                        rts_info.RT_MEMCPY_KIND[memcpy_kind])
+        rt_error = self.rtsdll.rtMemcpy(
+            c_memory_p,
+            c_memory_size,
+            c_data_p,
+            c_data_size,
+            rts_info.RT_MEMCPY_KIND[memcpy_kind],
+        )
         try:
             self.parse_error(rt_error, "rtMemcpy")
         except RuntimeError as err:
             if retry_count < 3:
                 retry_count += 1
                 time.sleep(1)
-                self.memcpy(c_memory_p, memory_size, data, data_size, memcpy_kind, retry_count)
+                self.memcpy(
+                    c_memory_p, memory_size, data, data_size, memcpy_kind, retry_count
+                )
             else:
                 raise RuntimeError("After three retries, memcpy still fails") from err
 
-    def memset(self,
-               c_memory_p: ctypes.c_void_p, memory_size: int,
-               data: int, count: int):
+    def memset(
+        self, c_memory_p: ctypes.c_void_p, memory_size: int, data: int, count: int
+    ):
         """
         Set memory value with uint32_t value
 
@@ -586,8 +668,7 @@ class AscendRTSApi:
         c_data = ctypes.c_uint32(data)
         c_memory_size = ctypes.c_uint64(memory_size)
         self.rtsdll.rtMemset.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtMemset(c_memory_p, c_memory_size,
-                                        c_data, c_data_size)
+        rt_error = self.rtsdll.rtMemset(c_memory_p, c_memory_size, c_data, c_data_size)
         self.parse_error(rt_error, "rtMemset")
 
     def api_call(self, rt_api_name: str, extra_log: Optional[str], *api_args):
@@ -595,7 +676,9 @@ class AscendRTSApi:
         start_time = time.time()
         api.restype = ctypes.c_uint64
         rt_error = api(*api_args)
-        self.parse_error(rt_error, rt_api_name, f"costs {round(time.time() - start_time, 3)} seconds")
+        self.parse_error(
+            rt_error, rt_api_name, f"costs {round(time.time() - start_time, 3)} seconds"
+        )
 
     def get_c2c_ctrl_addr(self):
         """
@@ -606,10 +689,12 @@ class AscendRTSApi:
         self.api_call("rtGetC2cCtrlAddr", None, ret_addr, ret_len)
         return ctypes.c_void_p(ret_addr[0])
 
-    def malloc(self,
-               memory_size: int,
-               memory_type: str = "RT_MEMORY_DEFAULT",
-               memory_policy: str = "RT_MEMORY_POLICY_NONE") -> ctypes.c_void_p:
+    def malloc(
+        self,
+        memory_size: int,
+        memory_type: str = "RT_MEMORY_DEFAULT",
+        memory_policy: str = "RT_MEMORY_POLICY_NONE",
+    ) -> ctypes.c_void_p:
         """
         Malloc a buffer on device
 
@@ -629,13 +714,23 @@ class AscendRTSApi:
         c_memory_p = ctypes.c_void_p()
         c_memory_size = ctypes.c_uint64(memory_size)
         self.rtsdll.rtMalloc.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtMalloc(ctypes.c_void_p(ctypes.addressof(c_memory_p)),
-                                        c_memory_size,
-                                        rts_info.RT_MEMORY_TYPE[memory_type]
-                                        | rts_info.RT_MEMORY_POLICY[memory_policy])
-        self.parse_error(rt_error, "rtMalloc", ", trying to allocate %d bytes" % memory_size)
+        rt_error = self.rtsdll.rtMalloc(
+            ctypes.c_void_p(ctypes.addressof(c_memory_p)),
+            c_memory_size,
+            rts_info.RT_MEMORY_TYPE[memory_type]
+            | rts_info.RT_MEMORY_POLICY[memory_policy],
+        )
+        self.parse_error(
+            rt_error, "rtMalloc", ", trying to allocate %d bytes" % memory_size
+        )
         # dirty data
-        self.memcpy(c_memory_p, memory_size, secrets.token_bytes(memory_size), memory_size, "RT_MEMCPY_HOST_TO_DEVICE")
+        self.memcpy(
+            c_memory_p,
+            memory_size,
+            secrets.token_bytes(memory_size),
+            memory_size,
+            "RT_MEMCPY_HOST_TO_DEVICE",
+        )
         return c_memory_p
 
     def host_malloc(self, memory_size: int) -> ctypes.c_void_p:
@@ -655,9 +750,12 @@ class AscendRTSApi:
         c_memory_p = ctypes.c_void_p()
         c_memory_size = ctypes.c_uint64(memory_size)
         self.rtsdll.rtMallocHost.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtMallocHost(ctypes.c_void_p(ctypes.addressof(c_memory_p)),
-                                            c_memory_size)
-        self.parse_error(rt_error, "rtMallocHost", ", try to  allocate %d bytes" % memory_size)
+        rt_error = self.rtsdll.rtMallocHost(
+            ctypes.c_void_p(ctypes.addressof(c_memory_p)), c_memory_size
+        )
+        self.parse_error(
+            rt_error, "rtMallocHost", ", try to  allocate %d bytes" % memory_size
+        )
         return c_memory_p
 
     def free(self, c_memory_p: ctypes.c_void_p):
@@ -676,11 +774,15 @@ class AscendRTSApi:
         rt_error = self.rtsdll.rtFreeHost(c_memory_p)
         self.parse_error(rt_error, "rtFreeHost")
 
-    def launch_kernel(self,
-                      stub_func: ctypes.c_void_p,
-                      block_dim: int,
-                      args: tuple, s_args: int,
-                      sm_desc: ctypes.c_uint64, stream: ctypes.c_uint64) -> int:
+    def launch_kernel(
+        self,
+        stub_func: ctypes.c_void_p,
+        block_dim: int,
+        args: tuple,
+        s_args: int,
+        sm_desc: ctypes.c_uint64,
+        stream: ctypes.c_uint64,
+    ) -> int:
         """
         launch kernel
         """
@@ -690,12 +792,14 @@ class AscendRTSApi:
         c_s_args = ctypes.c_uint32(s_args * 8)
         c_sm_dec = ctypes.c_void_p(sm_desc)
         self.rtsdll.rtKernelLaunch.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtKernelLaunch(stub_func,
-                                              c_block_dim,
-                                              ctypes.c_void_p(ctypes.addressof(c_args_p)),
-                                              c_s_args,
-                                              c_sm_dec,
-                                              stream)
+        rt_error = self.rtsdll.rtKernelLaunch(
+            stub_func,
+            c_block_dim,
+            ctypes.c_void_p(ctypes.addressof(c_args_p)),
+            c_s_args,
+            c_sm_dec,
+            stream,
+        )
         self.parse_error(rt_error, "rtKernelLaunch")
         if isinstance(rt_error, ctypes.c_uint64):
             rt_error = rt_error.value
@@ -728,7 +832,9 @@ class AscendRTSApi:
         start online profiling
         """
         self.rtsdll.rtStartOnlineProf.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtStartOnlineProf(stream, ctypes.c_uint32(profiling_count))
+        rt_error = self.rtsdll.rtStartOnlineProf(
+            stream, ctypes.c_uint32(profiling_count)
+        )
         self.parse_error(rt_error, "rtStartOnlineProf")
 
     def stop_online_profiling(self, stream: ctypes.c_uint64):
@@ -758,11 +864,16 @@ class AscendRTSApi:
             else:
                 return INVALID_VALUE
         if error_code >= len(rts_info.RT_ERROR_CODE_DICT[error_type]):
-            utils.print_error_log("Received invalid runtime error code: " + hex(0x07000000 + error_type + error_code))
+            utils.print_error_log(
+                "Received invalid runtime error code: "
+                + hex(0x07000000 + error_type + error_code)
+            )
             return INVALID_VALUE
         return rts_info.RT_ERROR_CODE_DICT[error_type][error_code]
 
-    def parse_error(self, rt_error: ctypes.c_uint64, rt_api_name: str, extra_info: str = "") -> None:
+    def parse_error(
+        self, rt_error: ctypes.c_uint64, rt_api_name: str, extra_info: str = ""
+    ) -> None:
         """
         parse error
         """
@@ -778,15 +889,24 @@ class AscendRTSApi:
 
         rt_error_magic = rt_error & 0xFF000000
         if rt_error_magic != 0x07000000 and not self.camodel:
-            utils.print_error_log("Received invalid runtime error code:" + hex(rt_error) + extra_info)
+            utils.print_error_log(
+                "Received invalid runtime error code:" + hex(rt_error) + extra_info
+            )
             return
         rt_error_type = rt_error & 0x00FF0000
         if rt_error_type not in rts_info.RT_ERROR_CODE_DICT and not self.camodel:
-            utils.print_error_log("Received invalid runtime error type: " + hex(rt_error) + extra_info)
+            utils.print_error_log(
+                "Received invalid runtime error type: " + hex(rt_error) + extra_info
+            )
             return
         rt_error_code = rt_error & 0x0000FFFF
-        utils.print_error_log("Runtime API call " + rt_api_name + "() failed:"
-                              + self._parse_error_code(rt_error_type, rt_error_code) + extra_info)
+        utils.print_error_log(
+            "Runtime API call "
+            + rt_api_name
+            + "() failed:"
+            + self._parse_error_code(rt_error_type, rt_error_code)
+            + extra_info
+        )
         return
 
     def get_memory_info_ex(self, memory_info_type: str):
@@ -798,24 +918,29 @@ class AscendRTSApi:
         _free = (ctypes.c_size_t * 1)()
         _total = (ctypes.c_size_t * 1)()
         self.rtsdll.rtMemGetInfoEx.restype = ctypes.c_uint64
-        rt_error = self.rtsdll.rtMemGetInfoEx(rts_info.MEMORY_INFO_TYPE[memory_info_type],
-                                              _free,
-                                              _total)
+        rt_error = self.rtsdll.rtMemGetInfoEx(
+            rts_info.MEMORY_INFO_TYPE[memory_info_type], _free, _total
+        )
         self.parse_error(rt_error, "rtMemGetInfoEx")
         return _free[0], _total[0]
 
     def register_kernel_launch_fill_func(self):
-        def update_op_system_run_cfg(cfg_addr_ptr: ctypes.c_void_p, cfg_len: ctypes.c_uint32):
-            utils.print_info_log('start to execute UpdateOpSystemRunCfg')
+        def update_op_system_run_cfg(
+            cfg_addr_ptr: ctypes.c_void_p, cfg_len: ctypes.c_uint32
+        ):
+            utils.print_info_log("start to execute UpdateOpSystemRunCfg")
             if cfg_addr_ptr is None or cfg_len < ctypes.sizeof(ctypes.c_size_t):
                 utils.print_error_log(
-                    f'UpdateOpSystemRunCfg failed, invalid config address(null) or invalid length {cfg_len}')
+                    f"UpdateOpSystemRunCfg failed, invalid config address(null) or invalid length {cfg_len}"
+                )
                 return rts_info.ACL_ERROR_RT_PARAM_INVALID
             dev_id = ctypes.c_int32(0)
             self.rtsdll.rtGetDevice.restype = ctypes.c_int32
             rt_err = self.rtsdll.rtGetDevice(ctypes.byref(dev_id))
             if rt_err != rts_info.RT_ERROR_NONE:
-                utils.print_error_log(f'Can not get device id, runtime errorCode is {rt_err}')
+                utils.print_error_log(
+                    f"Can not get device id, runtime errorCode is {rt_err}"
+                )
                 return rt_err
             offset = ctypes.c_uint64(0)
             self.rtsdll.rtGetL2CacheOffset.restype = ctypes.c_int32
@@ -823,33 +948,42 @@ class AscendRTSApi:
             if rt_err != rts_info.RT_ERROR_NONE:
                 if rt_err == rts_info.ACL_ERROR_RT_FEATURE_NOT_SUPPORT:
                     utils.print_warn_log(
-                        f'Can not get L2 cache offset, feature not support, device id = {dev_id.value}')
+                        f"Can not get L2 cache offset, feature not support, device id = {dev_id.value}"
+                    )
                 else:
                     utils.print_error_log(
-                        f'Can not get l2 cache offset, runtime errorCode is {rt_err}, device id = {dev_id.value}')
+                        f"Can not get l2 cache offset, runtime errorCode is {rt_err}, device id = {dev_id.value}"
+                    )
                 return rt_err
             addr_ptr = ctypes.cast(cfg_addr_ptr, ctypes.POINTER(ctypes.c_uint64))
             addr_ptr[0] = offset
             utils.print_info_log(
-                f'Execute UpdateOpSystemRunCfg successfully, l2 cache offset is {offset.value}, '
-                f'device id = {dev_id.value}')
+                f"Execute UpdateOpSystemRunCfg successfully, l2 cache offset is {offset.value}, "
+                f"device id = {dev_id.value}"
+            )
             return rts_info.ACL_RT_SUCCESS
 
-        callback_type = ctypes.CFUNCTYPE(ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint32)
+        callback_type = ctypes.CFUNCTYPE(
+            ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint32
+        )
         self.update_op_system_run_cfg_callback = callback_type(update_op_system_run_cfg)
         auto_uc_memory = os.getenv("AUTO_USE_UC_MEMORY")
-        auto_uc_memory_value_one = '1'
+        auto_uc_memory_value_one = "1"
         if not auto_uc_memory or auto_uc_memory == auto_uc_memory_value_one:
             self.rtsdll.rtRegKernelLaunchFillFunc.restype = ctypes.c_uint64
-            g_op_system_run_cfg = "g_opSystemRunCfg".encode('UTF-8')
+            g_op_system_run_cfg = "g_opSystemRunCfg".encode("UTF-8")
             g_op_system_run_cfg_p = ctypes.c_char_p(g_op_system_run_cfg)
             rt_error = self.rtsdll.rtRegKernelLaunchFillFunc(
                 g_op_system_run_cfg_p, self.update_op_system_run_cfg_callback
             )
             if rt_error != rts_info.RT_ERROR_NONE:
                 if rt_error == rts_info.ACL_ERROR_RT_FEATURE_NOT_SUPPORT:
-                    utils.print_warn_log('Can not register kernel launch fill function, feature not support')
+                    utils.print_warn_log(
+                        "Can not register kernel launch fill function, feature not support"
+                    )
                 else:
-                    utils.print_error_log(f'rtRegKernelLaunchFillFunc register failed,ret = {rt_error}')
+                    utils.print_error_log(
+                        f"rtRegKernelLaunchFillFunc register failed,ret = {rt_error}"
+                    )
             else:
-                utils.print_debug_log('rtRegKernelLaunchFillFunc register succeeded')
+                utils.print_debug_log("rtRegKernelLaunchFillFunc register succeeded")

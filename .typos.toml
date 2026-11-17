@@ -48,3 +48,5 @@ bandwith = "bandwith"     # legacy ctypes ABI field bandwith_util_rate
 ue = "ue"                 # device report field UEIdx
 dbe = "dbe"               # hexadecimal device sample identifiers
 destory = "destory"       # legacy function name destory_alloc_buf/destory_hcclComm
+TRNSFER = "TRNSFER"       # runtime 错误码名 RT_ERROR_TSFW_SYS_DMA_TRNSFER_FAILED 的忠实转录
+complie = "complie"       # legacy res 样本目录名 ori_data/complie_path(_train)

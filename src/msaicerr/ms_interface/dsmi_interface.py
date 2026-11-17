@@ -18,6 +18,7 @@
 """
 DRV Interface
 """
+
 # Standard Packages
 import ctypes
 import logging
@@ -50,9 +51,11 @@ class DsmiErrorCode(Enum):
 
 
 class DsmiChipInfoStru(ctypes.Structure):
-    _fields_ = [('chip_type', ctypes.c_char * 32),
-                ('chip_name', ctypes.c_char * 32),
-                ('chip_ver', ctypes.c_char * 32)]
+    _fields_ = [
+        ("chip_type", ctypes.c_char * 32),
+        ("chip_name", ctypes.c_char * 32),
+        ("chip_ver", ctypes.c_char * 32),
+    ]
 
     def get_complete_platform(self) -> str:
         res = self.chip_type + self.chip_name
@@ -66,6 +69,7 @@ class DSMIInterface:
     """
     DRV Function Wrappers
     """
+
     prof_online: dict = {}
 
     def __init__(self):
@@ -84,7 +88,9 @@ class DSMIInterface:
         device_id = ctypes.c_int(device_id)
         result_struct = DsmiChipInfoStru()
         self.dsmidll.dsmi_get_chip_info.restype = ctypes.c_int
-        error_code = self.dsmidll.dsmi_get_chip_info(device_id, ctypes.c_void_p(ctypes.addressof(result_struct)))
+        error_code = self.dsmidll.dsmi_get_chip_info(
+            device_id, ctypes.c_void_p(ctypes.addressof(result_struct))
+        )
         if self._parse_error(error_code, "dsmi_get_chip_info"):
             return None
         return result_struct
@@ -94,7 +100,9 @@ class DSMIInterface:
         type_core_num = ctypes.c_int(INFO_TYPE_CORE_NUM)
         p_veccore_count = ctypes.pointer(ctypes.c_int())
         try:
-            ret = self.drvhal.halGetDeviceInfo(device_id, type_vector_core, type_core_num, p_veccore_count)
+            ret = self.drvhal.halGetDeviceInfo(
+                device_id, type_vector_core, type_core_num, p_veccore_count
+            )
         except AttributeError:
             logging.error("Failed to obtain core information.")
             return 0
@@ -107,7 +115,9 @@ class DSMIInterface:
         type_core_num = ctypes.c_int(INFO_TYPE_CORE_NUM)
         p_aicore_count = ctypes.pointer(ctypes.c_int())
         try:
-            ret = self.drvhal.halGetDeviceInfo(device_id, module_type_aicore, type_core_num, p_aicore_count)
+            ret = self.drvhal.halGetDeviceInfo(
+                device_id, module_type_aicore, type_core_num, p_aicore_count
+            )
         except AttributeError:
             logging.error("Failed to obtain core information.")
             return 0
@@ -115,19 +125,30 @@ class DSMIInterface:
             return 0
         return p_aicore_count.contents.value
 
-
     @staticmethod
     def _parse_error(error_code: int, function_name: str, allow_positive=False) -> bool:
         if error_code != 0:
             if allow_positive and error_code > 0:
-                logging.debug("DRV API Call %s() Success with return code %d", function_name, error_code)
+                logging.debug(
+                    "DRV API Call %s() Success with return code %d",
+                    function_name,
+                    error_code,
+                )
             else:
                 try:
-                    logging.error("DSMI API Call %s failed: %s", function_name, DsmiErrorCode(error_code).name)
+                    logging.error(
+                        "DSMI API Call %s failed: %s",
+                        function_name,
+                        DsmiErrorCode(error_code).name,
+                    )
                     return True
                 except ValueError:
                     pass
-                logging.error("DSMI API Call %s failed with unknown code: %s", function_name, error_code)
+                logging.error(
+                    "DSMI API Call %s failed with unknown code: %s",
+                    function_name,
+                    error_code,
+                )
                 return True
         else:
             logging.debug("DSMI API Call %s() Success", function_name)

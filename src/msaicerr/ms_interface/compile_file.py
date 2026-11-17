@@ -26,9 +26,13 @@ def get_compile_from_tik(soc_version, compile_temp_dir):
         from tbe.common.platform import set_current_compile_soc_info as te_set_version
         from tbe import tik
     except (ImportError, AttributeError) as e:
-        utils.print_warn_log(f"failed to import te or tbe to compile op golden op, skipped it. error: {e}")
+        utils.print_warn_log(
+            f"failed to import te or tbe to compile op golden op, skipped it. error: {e}"
+        )
         return []
-    build_dir = Path(compile_temp_dir).joinpath(ModeCustom.ADD_CUSTOM.value, 'build_out', 'op_kernel')
+    build_dir = Path(compile_temp_dir).joinpath(
+        ModeCustom.ADD_CUSTOM.value, "build_out", "op_kernel"
+    )
     utils.check_path_valid(str(build_dir), isdir=True, output=True)
     te_set_version(soc_version)
     m = 256
@@ -39,10 +43,18 @@ def get_compile_from_tik(soc_version, compile_temp_dir):
     input_a = tik_instance.Tensor("float16", (m, n), name="a", scope=tik.scope_gm)
     input_b = tik_instance.Tensor("float16", (n, k), name="b", scope=tik.scope_gm)
 
-    input_a_ub = tik_instance.Tensor("float16", (m, n), name="a_ub", scope=tik.scope_ubuf)
-    input_b_ub = tik_instance.Tensor("float16", (m, n), name="b_ub", scope=tik.scope_ubuf)
-    output_ub = tik_instance.Tensor("float16", (m, k), name="out_ub", scope=tik.scope_ubuf)
-    output_gm = tik_instance.Tensor("float16", (m, k), name="out_ub", scope=tik.scope_gm)
+    input_a_ub = tik_instance.Tensor(
+        "float16", (m, n), name="a_ub", scope=tik.scope_ubuf
+    )
+    input_b_ub = tik_instance.Tensor(
+        "float16", (m, n), name="b_ub", scope=tik.scope_ubuf
+    )
+    output_ub = tik_instance.Tensor(
+        "float16", (m, k), name="out_ub", scope=tik.scope_ubuf
+    )
+    output_gm = tik_instance.Tensor(
+        "float16", (m, k), name="out_ub", scope=tik.scope_gm
+    )
 
     index_scalar = tik_instance.Scalar("int32", init_value=0)
     tik_instance.data_move(input_a_ub, input_a[index_scalar], 0, 1, 32, 0, 0)
@@ -51,11 +63,16 @@ def get_compile_from_tik(soc_version, compile_temp_dir):
     tik_instance.data_move(output_gm, output_ub, 0, 1, 1, 0, 0)
 
     kernel_name = ModeCustom.ADD_CUSTOM.value
-    tik_instance.BuildCCE(kernel_name, inputs=[input_a, input_b],
-                            outputs=[output_gm],
-                            output_files_path=str(build_dir))
-    build_bins, build_jsons = list(build_dir.rglob(f"{kernel_name}*.o")), list(
-        build_dir.rglob(f"{kernel_name}*.json"))
+    tik_instance.BuildCCE(
+        kernel_name,
+        inputs=[input_a, input_b],
+        outputs=[output_gm],
+        output_files_path=str(build_dir),
+    )
+    build_bins, build_jsons = (
+        list(build_dir.rglob(f"{kernel_name}*.o")),
+        list(build_dir.rglob(f"{kernel_name}*.json")),
+    )
     if not (build_bins and build_jsons):
         utils.print_warn_log("The file generated after compilation does not exist.")
         return []

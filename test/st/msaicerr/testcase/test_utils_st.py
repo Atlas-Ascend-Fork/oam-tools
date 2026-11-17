@@ -23,21 +23,18 @@ from unittest.mock import Mock
 
 te = Mock(name="te")
 te.__name__ = "te"
-sys.modules['te'] = te
-sys.path.append('../../../../../../../asl/devtools/msaicerr/ms_interface')
+sys.modules["te"] = te
+sys.path.append("../../../../../../../asl/devtools/msaicerr/ms_interface")
 
 cur_abspath = os.path.dirname(__file__)
 
 
 class TestUtilsMethods:
-
     def test_get_inquire_result_failed(self, mocker):
-        mocker.patch('ms_interface.utils.execute_command',
-                     return_value=(1, ''))
-        res = utils.get_inquire_result(['xxx'], '', match_dict=True)
+        mocker.patch("ms_interface.utils.execute_command", return_value=(1, ""))
+        res = utils.get_inquire_result(["xxx"], "", match_dict=True)
         assert res == []
 
-        mocker.patch('ms_interface.utils.execute_command',
-                     return_value=(0, ''))
-        res = utils.get_inquire_result(['xxx'], 'asfdd', match_dict=True)
+        mocker.patch("ms_interface.utils.execute_command", return_value=(0, ""))
+        res = utils.get_inquire_result(["xxx"], "asfdd", match_dict=True)
         assert res == []

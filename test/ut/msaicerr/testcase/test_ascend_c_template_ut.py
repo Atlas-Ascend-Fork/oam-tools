@@ -19,9 +19,13 @@
 import sys
 
 from conftest import MSAICERR_PATH, CommonAssert
+
 sys.path.append(MSAICERR_PATH)
 
-from ms_interface.ascend950.ascend_c_template import ADD_OP_KERNEL_TEMPLATE, DIRTY_OP_KERNEL_TEMPLATE
+from ms_interface.ascend950.ascend_c_template import (
+    ADD_OP_KERNEL_TEMPLATE,
+    DIRTY_OP_KERNEL_TEMPLATE,
+)
 
 
 class TestAscendCTemplateMethods(CommonAssert):

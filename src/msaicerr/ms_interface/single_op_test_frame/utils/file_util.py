@@ -18,6 +18,7 @@
 """
 file util module
 """
+
 import os
 import stat
 
@@ -27,7 +28,10 @@ class Constant:
     """
     This class for Constant.
     """
-    DATA_DIR_MODES = stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
+
+    DATA_DIR_MODES = (
+        stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
+    )
 
 
 # 'pylint: disable=unused-argument,invalid-name,unused-variable
@@ -78,13 +82,18 @@ def read_file(file_path: str, size_limit: int = 134217728) -> bytes:
         The data content
     """
     if not isinstance(size_limit, int):
-        raise TypeError("size_limit needs to be an integer, not %s" % str(type(size_limit)))
+        raise TypeError(
+            "size_limit needs to be an integer, not %s" % str(type(size_limit))
+        )
     file_path = os.path.realpath(file_path)
     if not os.path.exists(file_path):
         raise IOError("file_path is not exist.")
     file_size = os.stat(file_path, follow_symlinks=True).st_size
     if file_size > size_limit:
-        raise IOError("File is too large! Size of %s exceeds the limit: %d" % (file_path, size_limit))
+        raise IOError(
+            "File is too large! Size of %s exceeds the limit: %d"
+            % (file_path, size_limit)
+        )
     with open(file_path, "rb") as ff:
         file_content = ff.read(-1)
     return file_content

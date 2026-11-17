@@ -19,6 +19,7 @@
 import sys
 
 from conftest import MSAICERR_PATH, CommonAssert
+
 sys.path.append(MSAICERR_PATH)
 
 from ms_interface.single_op_test_frame.utils.op_param_util import (
@@ -112,9 +113,15 @@ class TestOpParamUtilMethods(CommonAssert):
         self.assertEqual(result, [1, 3, 224, 224])
 
     def test_change_cur_format_single(self):
-        op_params = [{"ori_shape": [1, 3, 224, 224], "ori_format": "NCHW",
-                       "format": "NCHW", "shape": [1, 3, 224, 224],
-                       "dtype": "float16"}]
+        op_params = [
+            {
+                "ori_shape": [1, 3, 224, 224],
+                "ori_format": "NCHW",
+                "format": "NCHW",
+                "shape": [1, 3, 224, 224],
+                "dtype": "float16",
+            }
+        ]
         result = change_cur_format(op_params, ["NC1HWC0"])
         self.assertEqual(result[0]["format"], "NC1HWC0")
         self.assertEqual(result[0]["shape"], [1, 1, 224, 224, 16])
@@ -166,10 +173,20 @@ class TestOpParamUtilMethods(CommonAssert):
 
     def test_gen_all_format_params(self):
         op_params = [
-            {"dtype": "float16", "shape": [1, 3, 224, 224], "format": "NCHW",
-             "ori_shape": [1, 3, 224, 224], "ori_format": "NCHW"},
-            {"dtype": "float16", "shape": [1, 3, 224, 224], "format": "NCHW",
-             "ori_shape": [1, 3, 224, 224], "ori_format": "NCHW"},
+            {
+                "dtype": "float16",
+                "shape": [1, 3, 224, 224],
+                "format": "NCHW",
+                "ori_shape": [1, 3, 224, 224],
+                "ori_format": "NCHW",
+            },
+            {
+                "dtype": "float16",
+                "shape": [1, 3, 224, 224],
+                "format": "NCHW",
+                "ori_shape": [1, 3, 224, 224],
+                "ori_format": "NCHW",
+            },
         ]
         format_res = '{"input0": {"name": "a", "dtype": "float16", "format": "NC1HWC0"}, "output0": {"name": "b", "dtype": "float16", "format": "NC1HWC0"}}'
         result = gen_all_format_params(format_res, op_params)

@@ -62,7 +62,8 @@ def test_get_device_count_success(dsmi):
 def test_get_device_count_known_error_code_returns_zero(dsmi):
     # 错误码经 _parse_error 判定为失败，公有方法应兜底返回 0
     dsmi.dsmidll.dsmi_get_device_count = Mock(
-        return_value=DsmiErrorCode.DSMI_ERROR_NO_DEVICE.value)
+        return_value=DsmiErrorCode.DSMI_ERROR_NO_DEVICE.value
+    )
     assert dsmi.get_device_count() == 0
 
 
@@ -79,7 +80,8 @@ def test_get_chip_info_success_returns_struct(dsmi):
 
 def test_get_chip_info_error_returns_none(dsmi):
     dsmi.dsmidll.dsmi_get_chip_info = Mock(
-        return_value=DsmiErrorCode.DSMI_ERROR_INVALID_DEVICE.value)
+        return_value=DsmiErrorCode.DSMI_ERROR_INVALID_DEVICE.value
+    )
     assert dsmi.get_chip_info(0) is None
 
 

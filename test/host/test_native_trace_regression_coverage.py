@@ -19,8 +19,13 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills/cann-perf-breakdown/1-perf-breakdown/scripts/regression_check.py"
-FIXTURE = ROOT / "skills/cann-perf-breakdown/2-adapt-breakdown-to-ui-json/tests/fixtures/synthetic/analysis_config_v2.json"
+SCRIPT = (
+    ROOT / "skills/cann-perf-breakdown/1-perf-breakdown/scripts/regression_check.py"
+)
+FIXTURE = (
+    ROOT
+    / "skills/cann-perf-breakdown/2-adapt-breakdown-to-ui-json/tests/fixtures/synthetic/analysis_config_v2.json"
+)
 
 
 def _fixture():
@@ -31,9 +36,22 @@ def _run(tmp_path, baseline, new, *arguments):
     baseline_path, new_path = tmp_path / "baseline.json", tmp_path / "new.json"
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
     new_path.write_text(json.dumps(new), encoding="utf-8")
-    result = subprocess.run([sys.executable, str(SCRIPT), "--baseline", str(baseline_path),
-                             "--new", str(new_path), "--json", *arguments],
-                            capture_output=True, text=True, encoding="utf-8", check=False)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--baseline",
+            str(baseline_path),
+            "--new",
+            str(new_path),
+            "--json",
+            *arguments,
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
     assert result.returncode in (0, 1), result.stdout + result.stderr
     report = json.loads(result.stdout)
     return result, report
@@ -140,8 +158,13 @@ def test_changed_instance_partition_with_same_union_is_not_a_coverage_loss(tmp_p
 def test_excluded_profiler_ops_are_part_of_total_accounting(tmp_path):
     baseline = _fixture()
     new = deepcopy(baseline)
-    new["excluded_profiler_ops"].append({"op_indices": [32], "reason_code": "profiler_marker",
-                                         "evidence": "synthetic extra profiler marker index"})
+    new["excluded_profiler_ops"].append(
+        {
+            "op_indices": [32],
+            "reason_code": "profiler_marker",
+            "evidence": "synthetic extra profiler marker index",
+        }
+    )
     _expect_loss(tmp_path, baseline, new, [], [32])
 
 
@@ -156,7 +179,9 @@ def test_category_change_preserves_total_union(tmp_path):
     baseline = _fixture()
     new = deepcopy(baseline)
     new["trace_instances"][-1]["op_range"][1] = 27
-    new["unmapped_ops"].append({"op_indices": [28], "reason": "ownership remains unresolved"})
+    new["unmapped_ops"].append(
+        {"op_indices": [28], "reason": "ownership remains unresolved"}
+    )
     _expect_same(tmp_path, baseline, new)
 
 
@@ -178,18 +203,25 @@ def test_mode_b_continues_to_skip_op_coverage(tmp_path):
 
 
 def test_legacy_layer_structure_coverage_is_unchanged(tmp_path):
-    baseline = {"schema_version": 1, "layer_types": {"Dense": {"layer_indices": [0]}},
-                "layer_structure": {"Dense": {"name": "Dense", "op_indices": [1, 2]}},
-                "stages": {"input": {"name": "input", "op_indices": [0]}},
-                "runtime_auxiliary": [{"name": "sampling", "op_indices": [3]}]}
+    baseline = {
+        "schema_version": 1,
+        "layer_types": {"Dense": {"layer_indices": [0]}},
+        "layer_structure": {"Dense": {"name": "Dense", "op_indices": [1, 2]}},
+        "stages": {"input": {"name": "input", "op_indices": [0]}},
+        "runtime_auxiliary": [{"name": "sampling", "op_indices": [3]}],
+    }
     new = deepcopy(baseline)
     new["layer_structure"]["Dense"]["op_indices"] = [1]
     result, report = _run(tmp_path, baseline, new)
     assert result.returncode == 1
     check = _coverage(report)
     assert not check["pass"]
-    assert check["detail"] == {"baseline_count": 4, "new_count": 3,
-                               "missing_in_new": [2], "extra_in_new": []}
+    assert check["detail"] == {
+        "baseline_count": 4,
+        "new_count": 3,
+        "missing_in_new": [2],
+        "extra_in_new": [],
+    }
 
 
 @pytest.mark.parametrize("lose_observed_op", (False, True))
@@ -214,11 +246,17 @@ print(json.dumps(module.check_regression(baseline, new)))
 """
     result = subprocess.run(
         [sys.executable, "-c", code, str(SCRIPT), str(FIXTURE), str(lose_observed_op)],
-        cwd=tmp_path, capture_output=True, text=True, encoding="utf-8", check=False,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     findings = json.loads(result.stdout)
-    assert [finding["id"] for finding in findings] == [f"L{index}" for index in range(1, 9)]
+    assert [finding["id"] for finding in findings] == [
+        f"L{index}" for index in range(1, 9)
+    ]
     assert all(finding["pass"] for finding in findings if finding["id"] != "L7")
     coverage = next(finding for finding in findings if finding["id"] == "L7")
     assert coverage["pass"] is not lose_observed_op

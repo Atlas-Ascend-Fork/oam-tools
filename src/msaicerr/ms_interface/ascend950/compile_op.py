@@ -22,12 +22,14 @@ from pathlib import Path
 import shutil
 
 from ms_interface import utils
-from ms_interface.ascend950.ascend_c_template import ADD_OP_KERNEL_TEMPLATE, DIRTY_OP_KERNEL_TEMPLATE
+from ms_interface.ascend950.ascend_c_template import (
+    ADD_OP_KERNEL_TEMPLATE,
+    DIRTY_OP_KERNEL_TEMPLATE,
+)
 from ms_interface.dsmi_interface import DSMIInterface
 
 
 class CompileOP:
-
     # 记录某个算子编译产物所对应芯片的标记文件名，用于跨芯片复用时的校验
     COMPILE_CHIP_MARKER = ".compile_chip"
 
@@ -56,12 +58,7 @@ class CompileOP:
 
     def make_json_file(self, compile_temp_dir):
         template = [
-            {
-                "op": self.op_name,
-                "language": "cpp",
-                "input_desc": [],
-                "output_desc": []
-            }
+            {"op": self.op_name, "language": "cpp", "input_desc": [], "output_desc": []}
         ]
         template[0]["input_desc"] = self.inputs
         template[0]["output_desc"] = self.outputs
@@ -73,9 +70,11 @@ class CompileOP:
 
     def get_compile_file_from_temp(self, compile_temp_dir):
         utils.print_debug_log("Searching for Compiled Files")
-        build_dir = compile_temp_dir.joinpath(self.op_name, 'build_out', 'op_kernel')
-        build_bins, build_jsons = list(build_dir.rglob(f"{self.op_name}*.o")), list(
-            build_dir.rglob(f"{self.op_name}*.json"))
+        build_dir = compile_temp_dir.joinpath(self.op_name, "build_out", "op_kernel")
+        build_bins, build_jsons = (
+            list(build_dir.rglob(f"{self.op_name}*.o")),
+            list(build_dir.rglob(f"{self.op_name}*.json")),
+        )
         if not (build_bins and build_jsons):
             utils.print_warn_log("The file generated after compilation does not exist.")
             return []
@@ -85,7 +84,9 @@ class CompileOP:
         new_env = os.environ.copy()
         if not new_env.get("ASCEND_HOME_PATH"):
             # 如果环境变量中没有ASCEND_HOME_PATH，通过TOOLCHAIN_HOME推导
-            new_env["ASCEND_HOME_PATH"] = os.path.join(new_env.get("TOOLCHAIN_HOME", ""), '../')
+            new_env["ASCEND_HOME_PATH"] = os.path.join(
+                new_env.get("TOOLCHAIN_HOME", ""), "../"
+            )
         # 将python_path/bin路径添加到环境变量中,用于查找msopgen工具
         new_env["PATH"] = new_env["PATH"] + ":" + python_bin_path
         # 1、生成自定义算子模板
@@ -95,8 +96,18 @@ class CompileOP:
         if not msopgen_bin:
             utils.print_error_log("Cannot find msopgen in PATH!")
             return False
-        cmd = [msopgen_bin, "gen", "-i", str(json_file), "-c", f"ai_core-{self.chip}",
-               "-lan", "cpp", "-out", self.op_name]
+        cmd = [
+            msopgen_bin,
+            "gen",
+            "-i",
+            str(json_file),
+            "-c",
+            f"ai_core-{self.chip}",
+            "-lan",
+            "cpp",
+            "-out",
+            self.op_name,
+        ]
         res = utils.run_cmd_output(cmd, cwd=compile_temp_dir, env=new_env)
         utils.print_debug_log("Generating a custom operator Template")
         if not res:
@@ -104,18 +115,25 @@ class CompileOP:
             return False
         # 2、更新op_kernel 算子文件
         utils.print_debug_log("Update the kernel file.")
-        op_kernel_file = compile_temp_dir.joinpath(self.op_name, 'op_kernel',
-                                                   kernel_info[self.op_name]["op_kernel_file"])
+        op_kernel_file = compile_temp_dir.joinpath(
+            self.op_name, "op_kernel", kernel_info[self.op_name]["op_kernel_file"]
+        )
         op_kernel_file.write_text(kernel_info[self.op_name]["file_content"])
         #  3、编译自定义算子
         bash_bin = shutil.which("bash")
         if not bash_bin:
             utils.print_error_log("Cannot find bash in PATH!")
             return False
-        res = utils.run_cmd_output([bash_bin, "build.sh"], cwd=compile_temp_dir.joinpath(self.op_name), env=new_env)
+        res = utils.run_cmd_output(
+            [bash_bin, "build.sh"],
+            cwd=compile_temp_dir.joinpath(self.op_name),
+            env=new_env,
+        )
         utils.print_debug_log("Compiling the custom operator")
         if not res:
-            utils.print_error_log("Compiling the operator failed. Check the environment.")
+            utils.print_error_log(
+                "Compiling the operator failed. Check the environment."
+            )
             return False
         return True
 
@@ -123,11 +141,15 @@ class CompileOP:
         kernel_info = {
             "AddCustom": {
                 "op_kernel_file": "add_custom.cpp",
-                "file_content": ADD_OP_KERNEL_TEMPLATE},
+                "file_content": ADD_OP_KERNEL_TEMPLATE,
+            },
             "DirtyCustom": {
                 "op_kernel_file": "dirty_custom.cpp",
-                "file_content": DIRTY_OP_KERNEL_TEMPLATE.replace("uint32_t total_length = 256;",
-                                                                 f"uint32_t total_length = {self.get_ub_size()};")}
+                "file_content": DIRTY_OP_KERNEL_TEMPLATE.replace(
+                    "uint32_t total_length = 256;",
+                    f"uint32_t total_length = {self.get_ub_size()};",
+                ),
+            },
         }
         compile_temp_dir = Path(compile_temp_dir)
         # 判断temp是否存在之前编译过，如果能查询到且芯片一致则直接复用，否则重新编译
@@ -137,7 +159,9 @@ class CompileOP:
                 return find_res
         # 检查msopgen 工具是否存在
         python_bin_path = os.path.join(sys.base_prefix, "bin")
-        if not (shutil.which("msopgen") or shutil.which("msopgen", path=python_bin_path)):
+        if not (
+            shutil.which("msopgen") or shutil.which("msopgen", path=python_bin_path)
+        ):
             utils.print_error_log("The msopgen tool does not exist.")
             return []
         # 清理可能残留的旧芯片编译目录，避免 msopgen 生成失败或复用到旧产物
@@ -148,13 +172,17 @@ class CompileOP:
         if not json_file:
             return []
         # 2、编译
-        compile_res = self.compile(python_bin_path, compile_temp_dir, json_file, kernel_info)
+        compile_res = self.compile(
+            python_bin_path, compile_temp_dir, json_file, kernel_info
+        )
         if not compile_res:
             return []
         # 3、查找.o 和 .json 文件
         find_res = self.get_compile_file_from_temp(compile_temp_dir)
         if not find_res:
-            utils.print_error_log("Compiling the operator failed. Check the environment.")
+            utils.print_error_log(
+                "Compiling the operator failed. Check the environment."
+            )
             return []
         # 4、记录本次编译产物所属芯片，供后续复用校验
         self._write_chip_marker(compile_temp_dir)
@@ -181,24 +209,30 @@ class CompileOP:
             marker_file.parent.mkdir(parents=True, exist_ok=True)
             marker_file.write_text(self.chip)
         except OSError as ex:
-            utils.print_warn_log(f"Failed to write compile chip marker {marker_file}: {ex}")
+            utils.print_warn_log(
+                f"Failed to write compile chip marker {marker_file}: {ex}"
+            )
 
     def _is_cache_chip_matched(self, compile_temp_dir):
         # 仅当标记文件存在且与当前芯片一致时，才允许复用已有编译产物
         marker_file = self._get_chip_marker_file(compile_temp_dir)
         if not marker_file.exists():
             utils.print_debug_log(
-                "The compile chip marker does not exist, recompile to avoid reusing artifacts of another chip.")
+                "The compile chip marker does not exist, recompile to avoid reusing artifacts of another chip."
+            )
             return False
         try:
             cached_chip = marker_file.read_text().strip()
         except OSError as ex:
-            utils.print_warn_log(f"Failed to read compile chip marker {marker_file}: {ex}")
+            utils.print_warn_log(
+                f"Failed to read compile chip marker {marker_file}: {ex}"
+            )
             return False
         if cached_chip != self.chip:
             utils.print_debug_log(
                 f"The cached compile artifacts belong to chip {cached_chip}, "
-                f"but current chip is {self.chip}, recompile is required.")
+                f"but current chip is {self.chip}, recompile is required."
+            )
             return False
         return True
 
@@ -209,6 +243,8 @@ class CompileOP:
             try:
                 shutil.rmtree(op_dir)
             except OSError as ex:
-                utils.print_error_log(f"Failed to clean old compile dir {op_dir}: {ex}, clean it manually please")
+                utils.print_error_log(
+                    f"Failed to clean old compile dir {op_dir}: {ex}, clean it manually please"
+                )
                 return False
         return True

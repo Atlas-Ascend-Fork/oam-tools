@@ -51,8 +51,14 @@ def _make_info(**kwargs):
 
 def _mocked_parser(mocker, info=None, collect_succ=True):
     parser = AicoreErrorParser("/collect", collect_succ=collect_succ)
-    for name in ("add_objdump_to_path", "check_plog_info", "_write_errorinfo_file",
-                 "_write_summary_file", "run_single_operator", "write_tiling_data_to_file"):
+    for name in (
+        "add_objdump_to_path",
+        "check_plog_info",
+        "_write_errorinfo_file",
+        "_write_summary_file",
+        "run_single_operator",
+        "write_tiling_data_to_file",
+    ):
         mocker.patch.object(parser, name)
     mocker.patch.object(parser, "get_op_info", return_value=info)
     mocker.patch.object(parser, "_get_graph_file", return_value="graph")
@@ -74,7 +80,9 @@ def _mocked_parser(mocker, info=None, collect_succ=True):
     dump_parser.get_output_data.return_value = []
     dump_parser.get_workspace_data.return_value = []
     dump_parser.get_bin_data.return_value = []
-    mocker.patch("ms_interface.aicore_error_parser.DumpDataParser", return_value=dump_parser)
+    mocker.patch(
+        "ms_interface.aicore_error_parser.DumpDataParser", return_value=dump_parser
+    )
     return parser
 
 
@@ -106,8 +114,10 @@ def test_get_workspace_info_level0():
 
 
 def test_get_workspace_info_level1(mocker):
-    mocker.patch("ms_interface.aicore_error_parser.np.load",
-                 return_value=np.ones(4, dtype=np.float16))
+    mocker.patch(
+        "ms_interface.aicore_error_parser.np.load",
+        return_value=np.ones(4, dtype=np.float16),
+    )
     assert AicoreErrorParser.get_workspace_info(1, ["w.npy"]) == 8
 
 
@@ -144,27 +154,42 @@ def test_get_ffts_addrs_num_value(mocker):
 
 def test_return_code_memset_missing():
     info = _make_info(atomic_clean_check=False)
-    assert AicoreErrorParser.get_return_code(info) == Constant.MS_AICERR_FRAMEWORK_MEMSET_MISSING
+    assert (
+        AicoreErrorParser.get_return_code(info)
+        == Constant.MS_AICERR_FRAMEWORK_MEMSET_MISSING
+    )
 
 
 def test_return_code_atomic_overflow():
     info = _make_info(atomic_add_err=True)
-    assert AicoreErrorParser.get_return_code(info) == Constant.MS_AICERR_ATOMIC_OPERATOR_OVERFLOW
+    assert (
+        AicoreErrorParser.get_return_code(info)
+        == Constant.MS_AICERR_ATOMIC_OPERATOR_OVERFLOW
+    )
 
 
 def test_return_code_data_invalid():
     info = _make_info(dump_info="data invalid here")
-    assert AicoreErrorParser.get_return_code(info) == Constant.MS_AICERR_OPERATOR_INPUT_DATA_ERR
+    assert (
+        AicoreErrorParser.get_return_code(info)
+        == Constant.MS_AICERR_OPERATOR_INPUT_DATA_ERR
+    )
 
 
 def test_return_code_args_overwritten():
     info = _make_info(check_args_result=False)
-    assert AicoreErrorParser.get_return_code(info) == Constant.MS_AICERR_OPERATOR_ARGS_OVERWRITTEN
+    assert (
+        AicoreErrorParser.get_return_code(info)
+        == Constant.MS_AICERR_OPERATOR_ARGS_OVERWRITTEN
+    )
 
 
 def test_return_code_mem_alloc():
     info = _make_info(data_dump_result=False)
-    assert AicoreErrorParser.get_return_code(info) == Constant.MS_AICERR_MEMORY_ALLOCATION_ERR
+    assert (
+        AicoreErrorParser.get_return_code(info)
+        == Constant.MS_AICERR_MEMORY_ALLOCATION_ERR
+    )
 
 
 def test_return_code_single_op_err():
@@ -239,8 +264,10 @@ def test_concurrentexe_no_match(mocker):
 
 def test_concurrentexe_match_two_tasks(mocker):
     mocker.patch("os.path.exists", return_value=True)
-    log = ("[file.cc:10]5 first taskid: 1 first streamid: 2 "
-           "second taskid: 3 second streamid: 4 isconcurrentexe: 1")
+    log = (
+        "[file.cc:10]5 first taskid: 1 first streamid: 2 "
+        "second taskid: 3 second streamid: 4 isconcurrentexe: 1"
+    )
     mocker.patch("ms_interface.utils.execute_command", return_value=(0, log))
     result = AicoreErrorParser.get_is_concurrentexe_value("/p")
     assert "5" in result
@@ -249,10 +276,12 @@ def test_concurrentexe_match_two_tasks(mocker):
 
 def test_concurrentexe_match_too_many_tasks(mocker):
     mocker.patch("os.path.exists", return_value=True)
-    log = ("[file.cc:10]5 first taskid: 1 first streamid: 2 "
-           "second taskid: 3 second streamid: 4 isconcurrentexe: 1\n"
-           "[file.cc:11]6 first taskid: 7 first streamid: 8 "
-           "second taskid: 9 second streamid: 10 isconcurrentexe: 1")
+    log = (
+        "[file.cc:10]5 first taskid: 1 first streamid: 2 "
+        "second taskid: 3 second streamid: 4 isconcurrentexe: 1\n"
+        "[file.cc:11]6 first taskid: 7 first streamid: 8 "
+        "second taskid: 9 second streamid: 10 isconcurrentexe: 1"
+    )
     mocker.patch("ms_interface.utils.execute_command", return_value=(0, log))
     assert AicoreErrorParser.get_is_concurrentexe_value("/p") == {}
 
@@ -271,7 +300,9 @@ def test_check_args_no_match():
 
 def test_kernel_info_default():
     ret = [("2", "6", "GatherV2", "123")]
-    stream_id, task_id, kernel, h = AicoreErrorParser.parser_kernel_info(ret, None, None)
+    stream_id, task_id, kernel, h = AicoreErrorParser.parser_kernel_info(
+        ret, None, None
+    )
     assert (stream_id, task_id, kernel, h) == ("2", "6", "GatherV2", "123")
 
 
@@ -319,12 +350,18 @@ def test_parse_collect_fail(mocker):
 
 def test_parse_full_flow(mocker):
     info = AicErrorInfo()
-    info.aic_error_info = {"err_time": "2024-09-12-16:40:08.360.397",
-                           "error_code": "0x0", "dev_id": "0", "core_id": "0"}
+    info.aic_error_info = {
+        "err_time": "2024-09-12-16:40:08.360.397",
+        "error_code": "0x0",
+        "dev_id": "0",
+        "core_id": "0",
+    }
     info.single_op_test_result = RetCode.SUCCESS
     parser = _mocked_parser(mocker, info=info)
     parser.parse_level = 1
-    mocker.patch("ms_interface.aicore_error_parser.utils.strplogtime",
-                 return_value=datetime.datetime(2024, 9, 12, 16, 40, 8))
+    mocker.patch(
+        "ms_interface.aicore_error_parser.utils.strplogtime",
+        return_value=datetime.datetime(2024, 9, 12, 16, 40, 8),
+    )
     mocker.patch.object(info, "analyse", return_value="result")
     assert parser.parse() == Constant.MS_AICERR_NONE_ERROR

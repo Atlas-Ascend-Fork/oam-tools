@@ -117,5 +117,7 @@ def test_get_soc_version(mocker):
     chip = mocker.Mock()
     chip.get_complete_platform.return_value = "Ascend910B"
     mocker.patch.object(dsmi_interface.DSMIInterface, "__init__", return_value=None)
-    mocker.patch.object(dsmi_interface.DSMIInterface, "get_chip_info", return_value=chip)
+    mocker.patch.object(
+        dsmi_interface.DSMIInterface, "get_chip_info", return_value=chip
+    )
     assert dsmi_interface.get_soc_version() == "Ascend910B"

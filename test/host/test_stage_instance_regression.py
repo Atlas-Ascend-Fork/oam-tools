@@ -19,8 +19,13 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills/cann-perf-breakdown/1-perf-breakdown/scripts/regression_check.py"
-FIXTURE = ROOT / "skills/cann-perf-breakdown/2-adapt-breakdown-to-ui-json/tests/fixtures/synthetic/analysis_config_v2.json"
+SCRIPT = (
+    ROOT / "skills/cann-perf-breakdown/1-perf-breakdown/scripts/regression_check.py"
+)
+FIXTURE = (
+    ROOT
+    / "skills/cann-perf-breakdown/2-adapt-breakdown-to-ui-json/tests/fixtures/synthetic/analysis_config_v2.json"
+)
 
 
 def _run_check(tmp_path, baseline, updated, mode="A", report=False):
@@ -28,11 +33,22 @@ def _run_check(tmp_path, baseline, updated, mode="A", report=False):
     updated_path = tmp_path / "updated.json"
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
     updated_path.write_text(json.dumps(updated), encoding="utf-8")
-    args = [sys.executable, str(SCRIPT), "--baseline", str(baseline_path),
-            "--new", str(updated_path), "--mode", mode, "--json"]
+    args = [
+        sys.executable,
+        str(SCRIPT),
+        "--baseline",
+        str(baseline_path),
+        "--new",
+        str(updated_path),
+        "--mode",
+        mode,
+        "--json",
+    ]
     if report:
         args += ["--report", str(tmp_path / "report.md")]
-    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", check=False)
+    result = subprocess.run(
+        args, capture_output=True, text=True, encoding="utf-8", check=False
+    )
     assert not result.stderr, result.stderr
     # Without a report, stdout is the public JSON contract.
     data = json.loads(result.stdout) if not report else None
@@ -69,9 +85,9 @@ def test_stage_indices_compared_per_stage_not_as_global_union(tmp_path, config):
     assert result.returncode == 1
     assert data["hard_fails"] == 1
     finding = next(item for item in data["findings"] if item["id"] == "L3")
-    assert [item["stage"] for item in finding["detail"]["stage_indices_mismatches"]] == [
-        "mtp_output", "mtp_scaffold"
-    ]
+    assert [
+        item["stage"] for item in finding["detail"]["stage_indices_mismatches"]
+    ] == ["mtp_output", "mtp_scaffold"]
 
 
 @pytest.mark.parametrize("variant", ("unchanged", "reordered", "explicit_singleton"))
@@ -97,7 +113,9 @@ def test_changed_stage_names_still_fail_l3(tmp_path, config, operation):
         updated["stages"].pop("embedding")
     result, data = _run_check(tmp_path, config, updated)
     assert result.returncode == 1
-    assert next(item for item in data["findings"] if item["id"] == "L3")["pass"] is False
+    assert (
+        next(item for item in data["findings"] if item["id"] == "L3")["pass"] is False
+    )
 
 
 def test_changed_stage_instances_report_explains_difference(tmp_path, config):

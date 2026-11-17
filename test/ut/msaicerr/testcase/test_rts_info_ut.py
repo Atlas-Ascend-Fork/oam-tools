@@ -19,6 +19,7 @@
 import sys
 
 from conftest import MSAICERR_PATH, CommonAssert
+
 sys.path.append(MSAICERR_PATH)
 
 from ms_interface.single_op_test_frame.runtime.rts_info import (
@@ -51,13 +52,13 @@ from ms_interface.single_op_test_frame.runtime.rts_info import (
 
 class TestRtsInfoMethods(CommonAssert):
     def test_rt_dev_binary_magic_plain_value(self):
-        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN, 0xabceed50)
+        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN, 0xABCEED50)
 
     def test_rt_dev_binary_magic_plain_aicpu_value(self):
-        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN_AICPU, 0xabceed51)
+        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN_AICPU, 0xABCEED51)
 
     def test_rt_dev_binary_magic_plain_aivec_value(self):
-        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN_AIVEC, 0xabceed52)
+        self.assertEqual(RT_DEV_BINARY_MAGIC_PLAIN_AIVEC, 0xABCEED52)
 
     def test_rt_dev_binary_magic_elf_value(self):
         self.assertEqual(RT_DEV_BINARY_MAGIC_ELF, 0x43554245)
@@ -86,11 +87,19 @@ class TestRtsInfoMethods(CommonAssert):
             self.assertIn(MAGIC_MAP, key)
 
     def test_magic_map_maps_correctly(self):
-        self.assertEqual(MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AIVEC"], RT_DEV_BINARY_MAGIC_ELF_AIVEC)
-        self.assertEqual(MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AIVECTOR"], RT_DEV_BINARY_MAGIC_ELF_AIVEC)
+        self.assertEqual(
+            MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AIVEC"], RT_DEV_BINARY_MAGIC_ELF_AIVEC
+        )
+        self.assertEqual(
+            MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AIVECTOR"], RT_DEV_BINARY_MAGIC_ELF_AIVEC
+        )
         self.assertEqual(MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF"], RT_DEV_BINARY_MAGIC_ELF)
-        self.assertEqual(MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AICPU"], RT_DEV_BINARY_MAGIC_ELF_AICPU)
-        self.assertEqual(MAGIC_MAP["RT_DEV_BINARY_MAGIC_PLAIN"], RT_DEV_BINARY_MAGIC_PLAIN)
+        self.assertEqual(
+            MAGIC_MAP["RT_DEV_BINARY_MAGIC_ELF_AICPU"], RT_DEV_BINARY_MAGIC_ELF_AICPU
+        )
+        self.assertEqual(
+            MAGIC_MAP["RT_DEV_BINARY_MAGIC_PLAIN"], RT_DEV_BINARY_MAGIC_PLAIN
+        )
 
     def test_rt_memory_type_contains_expected_keys(self):
         self.assertIn(RT_MEMORY_TYPE, "RT_MEMORY_DEFAULT")
@@ -165,8 +174,15 @@ class TestRtsInfoMethods(CommonAssert):
         self.assertEqual(RT_ERROR_TYPE_DICT[0x00FF0000], "RESERVED")
 
     def test_rt_error_code_dict_contains_major_types(self):
-        major_types = [0x00000000, 0x00010000, 0x00020000, 0x00080000,
-                        0x000e0000, 0x00150000, 0x00FF0000]
+        major_types = [
+            0x00000000,
+            0x00010000,
+            0x00020000,
+            0x00080000,
+            0x000E0000,
+            0x00150000,
+            0x00FF0000,
+        ]
         for mt in major_types:
             self.assertIn(RT_ERROR_CODE_DICT, mt)
 

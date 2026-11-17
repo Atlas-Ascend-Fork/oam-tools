@@ -47,6 +47,7 @@ def _resolve(error_code, extra_info=""):
 # chip type detection
 # --------------------------------------------------------------------------
 
+
 def test_detect_chip_type_stars_hex():
     assert detect_chip_type("0x12345678") == ChipType.ASCEND_910B
     assert detect_chip_type("0Xabcdef") == ChipType.ASCEND_910B
@@ -75,6 +76,7 @@ def test_detect_chip_type_empty_is_stars():
 # David bit-list parsing
 # --------------------------------------------------------------------------
 
+
 def test_parse_david_error_codes_preserves_order():
     assert parse_david_error_codes("192, 256, 64") == [192, 256, 64]
 
@@ -87,6 +89,7 @@ def test_parse_david_error_codes_skips_garbage():
 # AIC_ERROR_INFO_DICT (910B / Stars)
 # --------------------------------------------------------------------------
 
+
 def test_stars_dict_is_contiguous():
     assert len(Constant.AIC_ERROR_INFO_DICT) == 176
     assert sorted(Constant.AIC_ERROR_INFO_DICT) == list(range(176))
@@ -98,7 +101,9 @@ def test_stars_dict_values_keep_name_prefix():
     for bit, value in Constant.AIC_ERROR_INFO_DICT.items():
         assert ", " in value, f"bit {bit} has no description separator"
         name = value.split(",")[0]
-        assert re.fullmatch(r"[a-z0-9_]+", name), f"bit {bit} name {name!r} not snake_case"
+        assert re.fullmatch(r"[a-z0-9_]+", name), (
+            f"bit {bit} name {name!r} not snake_case"
+        )
 
 
 def test_stars_dict_dispatch_prefixes_present():
@@ -133,7 +138,7 @@ def test_stars_biu_read_write_symmetry():
     assert "biu_l2_write_oob" in _resolve("0x2")
 
 
-def test_stars_unparseable_code_is_not_bit0():
+def test_stars_unparsable_code_is_not_bit0():
     # get_hexstr_value returns -1 for these, whose binary form would otherwise
     # scan as bit 0 and be misreported as a bus read error.
     for code in ("", "   ", "garbage"):
@@ -159,6 +164,7 @@ def test_stars_dict_is_english():
 # AIC_ERROR_INFO_DICT_DAVID (950 / David)
 # --------------------------------------------------------------------------
 
+
 def test_david_dict_entry_count():
     assert len(Constant.AIC_ERROR_INFO_DICT_DAVID) == 187
 
@@ -167,7 +173,9 @@ def test_david_dict_entry_shape():
     for bit, entry in Constant.AIC_ERROR_INFO_DICT_DAVID.items():
         assert set(entry) == {"name", "desc"}, f"bit {bit} has unexpected keys"
         assert entry["name"] and entry["desc"], f"bit {bit} incomplete"
-        assert re.fullmatch(r"[A-Z0-9_]+", entry["name"]), f"bit {bit} name not an enum name"
+        assert re.fullmatch(r"[A-Z0-9_]+", entry["name"]), (
+            f"bit {bit} name not an enum name"
+        )
 
 
 def test_david_dict_covers_every_offset_segment():
@@ -183,7 +191,9 @@ def test_david_dict_covers_every_offset_segment():
     ]
     keys = Constant.AIC_ERROR_INFO_DICT_DAVID
     for offset in offsets:
-        assert any(offset <= bit < offset + 32 for bit in keys), f"segment {offset} empty"
+        assert any(offset <= bit < offset + 32 for bit in keys), (
+            f"segment {offset} empty"
+        )
 
 
 def test_david_offsets_match_runtime_header():
@@ -201,6 +211,7 @@ def test_david_offsets_match_runtime_header():
 # --------------------------------------------------------------------------
 # end-to-end resolution
 # --------------------------------------------------------------------------
+
 
 def test_stars_single_bit_is_bit_scanned():
     # 0x4 sets bit 2, so it must resolve to bit 2 rather than key 4.
@@ -253,6 +264,7 @@ def test_david_find_extra_pc_returns_empty():
 # --------------------------------------------------------------------------
 # log regex
 # --------------------------------------------------------------------------
+
 
 def _david_log(error_code):
     return (

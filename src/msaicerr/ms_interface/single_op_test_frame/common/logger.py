@@ -18,6 +18,7 @@
 """
 logger
 """
+
 import sys
 import inspect
 import traceback
@@ -29,6 +30,7 @@ class Constant:
     """
     This class for Constant.
     """
+
     LOG_LEVEL = "ERROR"
 
 
@@ -55,7 +57,10 @@ def log(level, file_name, line, msg):
     def _get_time_str():
         return datetime.utcnow()
 
-    print("[%s] %s [File \"%s\", line %d] %s" % (level, _get_time_str(), file_name, line, msg))
+    print(
+        '[%s] %s [File "%s", line %d] %s'
+        % (level, _get_time_str(), file_name, line, msg)
+    )
 
 
 def log_warn(msg):

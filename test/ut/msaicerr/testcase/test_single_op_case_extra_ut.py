@@ -31,11 +31,20 @@ SOC_MODULE = "ms_interface.single_op_test_frame.single_op_case"
 
 def _kernel_data(**kwargs):
     data = {
-        "kernel_name": "k", "cce_file": "", "bin_path": "b.o",
-        "json_path": "j.json", "tiling_data": "0102", "tiling_key": 0,
-        "block_dim": 8, "device_id": 0, "input_file_list": [],
-        "output_file_list": [], "bin_file_list": [], "sub_ptr_addrs": {},
-        "ffts_addrs_num": 0, "workspace": 0,
+        "kernel_name": "k",
+        "cce_file": "",
+        "bin_path": "b.o",
+        "json_path": "j.json",
+        "tiling_data": "0102",
+        "tiling_key": 0,
+        "block_dim": 8,
+        "device_id": 0,
+        "input_file_list": [],
+        "output_file_list": [],
+        "bin_file_list": [],
+        "sub_ptr_addrs": {},
+        "ffts_addrs_num": 0,
+        "workspace": 0,
     }
     data.update(kwargs)
     return data
