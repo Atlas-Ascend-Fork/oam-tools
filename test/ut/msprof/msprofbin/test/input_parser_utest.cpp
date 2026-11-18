@@ -1067,12 +1067,16 @@ TEST_F(INPUT_PARSER_UTEST, CheckBaseInfo)
     // check analyze rule valid range
     cmdInfo.args[ARGS_RULE] = nullptr;
     EXPECT_EQ(PROFILING_FAILED, parser.CheckAnalyzeRuleSwitch(cmdInfo));
+    cmdInfo.args[ARGS_RULE] = "";
+    EXPECT_EQ(PROFILING_FAILED, parser.CheckAnalyzeRuleSwitch(cmdInfo));
     cmdInfo.args[ARGS_RULE] = "on";
     EXPECT_EQ(PROFILING_FAILED, parser.CheckAnalyzeRuleSwitch(cmdInfo));
     cmdInfo.args[ARGS_RULE] = "communication";
     EXPECT_EQ(PROFILING_SUCCESS, parser.CheckAnalyzeRuleSwitch(cmdInfo));
+    EXPECT_EQ("communication", parser.params_->analyzeRuleSwitch);
     cmdInfo.args[ARGS_RULE] = "communication,communication_matrix";
     EXPECT_EQ(PROFILING_SUCCESS, parser.CheckAnalyzeRuleSwitch(cmdInfo));
+    EXPECT_EQ("communication,communication_matrix", parser.params_->analyzeRuleSwitch);
 
     // params switch valid
     cmdInfo.args[ARGS_IO_PROFILING] = "1";

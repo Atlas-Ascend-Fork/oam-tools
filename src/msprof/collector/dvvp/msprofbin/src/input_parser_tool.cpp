@@ -1937,7 +1937,7 @@ int32_t InputParser::CheckReports(const struct MsprofCmdInfo& cmdInfo) const
 
 int32_t InputParser::CheckAnalyzeRuleSwitch(const struct MsprofCmdInfo& cmdInfo) const
 {
-    if (cmdInfo.args[ARGS_RULE] == nullptr) {
+    if (cmdInfo.args[ARGS_RULE] == nullptr || cmdInfo.args[ARGS_RULE][0] == '\0') {
         CmdLog::CmdErrorLog("Argument --rule: expected one argument");
         return MSPROF_DAEMON_ERROR;
     }
@@ -1952,6 +1952,7 @@ int32_t InputParser::CheckAnalyzeRuleSwitch(const struct MsprofCmdInfo& cmdInfo)
             return MSPROF_DAEMON_ERROR;
         }
     }
+    params_->analyzeRuleSwitch = cmdInfo.args[ARGS_RULE];
 
     return MSPROF_DAEMON_OK;
 }
