@@ -93,7 +93,7 @@ aclprofFinalize();
 
 ## 使用msproftx扩展接口采集并落盘性能数据
 
-为了获取用户和上层框架程序的性能数据，Profiling开启msproftx功能之前，需要在程序内调用msproftx相关接口来对用户程序进行打点以输出对应的性能数据。
+为了获取用户和上层框架程序的性能数据，在Profiling开启msproftx功能之前，需要在程序内调用msproftx相关接口来对用户程序进行打点以输出对应的性能数据。
 
 **API简介**
 

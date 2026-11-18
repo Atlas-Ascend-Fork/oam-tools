@@ -383,4 +383,4 @@ Host侧性能数据采集开关，取值包括：
 ### msproftx
 
 控制msproftx用户和上层框架程序输出性能数据的开关，可选on或off，默认值为off。
-<br>Profiling开启msproftx功能之前，需要在程序内调用msproftx相关接口来开启程序的Profiling数据流的输出，并开启记录应用程序执行期间特定事件发生的时间跨度。
+<br>在Profiling开启msproftx功能之前，需要在程序内调用msproftx相关接口来开启程序的Profiling数据流的输出，并开启记录应用程序执行期间特定事件发生的时间跨度。

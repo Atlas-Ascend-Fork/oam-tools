@@ -39,7 +39,7 @@ msprof命令行工具提供了**AI任务运行性能数据**、**AI处理器系�
     msprof --output=/home/projects/output /home/projects/main parameter1 parameter2
     ```
 
-  - msprof传入执行脚本和脚本参数：
+  - 在msprof传入执行脚本和脚本参数：
 
     ```sh
     msprof --output=/home/projects/output /home/projects/run.sh parameter1 parameter2
