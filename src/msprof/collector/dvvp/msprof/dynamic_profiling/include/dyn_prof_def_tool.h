@@ -16,6 +16,7 @@
 #ifndef COLLECTOR_DVVP_MSPROF_DYNAMIC_PROFILING_DYN_PROF_DEF_H
 #define COLLECTOR_DVVP_MSPROF_DYNAMIC_PROFILING_DYN_PROF_DEF_H
 
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -29,8 +30,6 @@ constexpr uint32_t DYN_PROF_IDLE_LINK_HOLD_TIME = 1800; // 30 mins
 constexpr uint32_t DYN_PROF_SERVER_PROC_MSG_MAX_NUM = 100;
 const uint32_t DYN_PROF_READ_INPUT_CMD_WAIT_TIME = 1;
 constexpr long DYN_PROF_PROC_TIME_OUT = 60;
-
-using ProcFunc = std::function<void(int)>;
 
 enum class DynProfMsgType {
     DYN_PROF_PARAMS_RSQ = 0,
@@ -52,6 +51,10 @@ enum class DynProfMsgRsqCode {
     // stop
     DYN_PROF_RSQ_NOT_START,
 };
+
+// 命令处理函数：请求由 DynProfClient 统一批量下发，处理函数只负责解释回执。
+// 入参为客户端套接字 fd 和该 fd 上收到的回执码。
+using ProcFunc = std::function<void(int32_t, DynProfMsgRsqCode)>;
 
 struct DynProfMsg {
     DynProfMsgType msgType;

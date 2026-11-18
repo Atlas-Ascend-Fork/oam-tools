@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 #include "dyn_prof_client_tool.h"
+#include <poll.h>
+#include <sys/socket.h>
 #include <algorithm>
+#include <cerrno>
 #include "cmd_log/cmd_log_tool.h"
 #include "config/config.h"
 #include "errno/error_code_tool.h"
@@ -26,6 +29,8 @@
 namespace Collector {
 namespace Dvvp {
 namespace DynProf {
+constexpr long DYN_PROF_MS_PER_SEC = 1000;
+constexpr int32_t DYN_PROF_NS_PER_MS = 1000000;
 const std::map<std::string, DynProfCliCmd> DYN_PROF_CLI_CMD_MAP = {
     {"start", DynProfCliCmd::DYN_PROF_CLI_CMD_START},
     {"stop", DynProfCliCmd::DYN_PROF_CLI_CMD_STOP},
@@ -39,6 +44,11 @@ using namespace analysis::dvvp::common::socket;
 using namespace analysis::dvvp::common::thread;
 using namespace analysis::dvvp::common::utils;
 using namespace Analysis::Dvvp::MsprofErrMgr;
+
+namespace {
+// 单调时钟毫秒值，用于计算 poll 的剩余超时预算，避免受系统时间跳变影响。
+int64_t GetMonotonicMs() { return static_cast<int64_t>(Utils::GetClockMonotonicRaw()) / DYN_PROF_NS_PER_MS; }
+} // namespace
 
 void DynProfClient::SetParams(const std::string& params)
 {
@@ -95,9 +105,11 @@ int32_t DynProfClient::Stop()
 void DynProfClient::DynProfCliStopSocket(int32_t cliSockFd)
 {
     MSPROF_LOGI("dynamic profiling close client socket: %d", cliSockFd);
-    LocalSocket::Close(cliSockFd);
+    // LocalSocket::Close 的入参是引用，会把 fd 改写成 -1；必须先按原 fd 摘除，否则 erase(-1) 是空操作，
+    // 已关闭的 fd 会残留在两个容器里，后续命令反复在失效 fd 上失败。
     cliSockFds_.erase(cliSockFd);
     cliSockFdMap_.erase(cliSockFd);
+    LocalSocket::Close(cliSockFd);
 }
 
 bool DynProfClient::IsCliStarted() const { return cliStarted_; }
@@ -126,15 +138,19 @@ void DynProfClient::CheckServerPidsIfValid()
             continue;
         }
         CmdLog::CmdLogNoLevel("server process %d did not create socket, or process has already exited", pid);
-        LocalSocket::Close(cliSockFd);
+        // 先按原 fd 从两个容器摘除再关闭：LocalSocket::Close 的入参是引用，会把 fd 改写成 -1，
+        // 先 Close 会让下面的 map erase 变成 erase(-1)，cliSockFdMap_ 里留下永不释放的条目。
         iter = cliSockFds_.erase(iter);
         cliSockFdMap_.erase(cliSockFd);
+        LocalSocket::Close(cliSockFd);
     }
 }
 
 void DynProfClient::SetSocketTimeout()
 {
-    for (auto cliSockFd : cliSockFds_) {
+    // 快照：下面失败时会关闭 socket 并修改 cliSockFds_，不能边遍历边删
+    const std::vector<int32_t> fds(cliSockFds_.begin(), cliSockFds_.end());
+    for (auto cliSockFd : fds) {
         if (LocalSocket::SetRecvTimeOut(cliSockFd, DYN_PROF_PROC_TIME_OUT, 0) == PROFILING_FAILED ||
             LocalSocket::SetSendTimeOut(cliSockFd, DYN_PROF_PROC_TIME_OUT, 0) == PROFILING_FAILED) {
             MSPROF_LOGE("set client recv time out for pid %d failed.", cliSockFdMap_.at(cliSockFd));
@@ -150,6 +166,9 @@ void DynProfClient::Run(const error_message::ErrorManagerContext& errorContext)
     SetSocketTimeout();
     if (cliSockFds_.empty()) {
         MSPROF_LOGE("set client recv time out for all pids failed.");
+        // 提前返回也必须复位启动标志，否则 Stop() 会对已退出的线程再调一次 Thread::Stop，
+        // IsCliStarted() 也会一直返回 true。
+        cliStarted_ = false;
         return;
     }
 
@@ -179,16 +198,16 @@ void DynProfClient::Run(const error_message::ErrorManagerContext& errorContext)
             std::cout << "> " << std::flush;
             continue;
         }
-        for (auto cliSockFd : cliSockFds_) {
-            procFuncMap_[it->second](cliSockFd);
-        }
+        DynProfCliDispatch(it->second);
         if (inputCmd == "quit" || inputCmd == "q") {
             MSPROF_LOGI("receive quit signal, stop dynamic profiler");
             break;
         }
         std::cout << "> " << std::flush;
     }
-    for (auto cliSockFd : cliSockFds_) {
+    // 快照：DynProfCliStopSocket 会修改 cliSockFds_
+    const std::vector<int32_t> restFds(cliSockFds_.begin(), cliSockFds_.end());
+    for (auto cliSockFd : restFds) {
         DynProfCliStopSocket(cliSockFd);
     }
     cliStarted_ = false;
@@ -198,11 +217,15 @@ void DynProfClient::Run(const error_message::ErrorManagerContext& errorContext)
 void DynProfClient::DynProfCliInitProcFunc()
 {
     procFuncMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_START] =
-        std::bind(&DynProfClient::DynProfCliProcStart, this, std::placeholders::_1);
+        std::bind(&DynProfClient::DynProfCliProcStart, this, std::placeholders::_1, std::placeholders::_2);
     procFuncMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_STOP] =
-        std::bind(&DynProfClient::DynProfCliProcStop, this, std::placeholders::_1);
+        std::bind(&DynProfClient::DynProfCliProcStop, this, std::placeholders::_1, std::placeholders::_2);
     procFuncMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_QUIT] =
-        std::bind(&DynProfClient::DynProfCliProcQuit, this, std::placeholders::_1);
+        std::bind(&DynProfClient::DynProfCliProcQuit, this, std::placeholders::_1, std::placeholders::_2);
+
+    cmdReqMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_START] = DynProfMsgType::DYN_PROF_START_REQ;
+    cmdReqMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_STOP] = DynProfMsgType::DYN_PROF_STOP_REQ;
+    cmdReqMap_[DynProfCliCmd::DYN_PROF_CLI_CMD_QUIT] = DynProfMsgType::DYN_PROF_QUIT_REQ;
 }
 
 int32_t DynProfClient::DynProfCliConnectSocket(const int32_t cliSockFd, const std::string& srvSockDomain) const
@@ -281,22 +304,42 @@ int32_t DynProfClient::DynProfCliSendParams()
     params.dataLen = dynProfParams_.size();
     (void)memcpy_s(params.data, sizeof(params.data), dynProfParams_.c_str(), dynProfParams_.size());
 
-    for (auto cliSockFd : cliSockFds_) {
-        int32_t pid = cliSockFdMap_.at(cliSockFd);
-        if (LocalSocket::Send(cliSockFd, &params, sizeof(params), 0) == PROFILING_FAILED) {
-            MSPROF_LOGE("send params failed for pid %d", pid);
+    // 快照：失败时会关闭 socket 并修改 cliSockFds_
+    const std::vector<int32_t> fds(cliSockFds_.begin(), cliSockFds_.end());
+
+    // 阶段一：先向所有已连接的目标进程连续下发参数，不等待回执
+    std::vector<int32_t> waiting;
+    waiting.reserve(fds.size());
+    for (auto cliSockFd : fds) {
+        // 同上：参数下发阶段目标进程也可能刚退出，避免 SIGPIPE
+        if (LocalSocket::Send(cliSockFd, &params, sizeof(params), MSG_NOSIGNAL) == PROFILING_FAILED) {
+            MSPROF_LOGE("send params failed for pid %d", cliSockFdMap_.at(cliSockFd));
+            DynProfCliStopSocket(cliSockFd);
+            continue;
+        }
+        waiting.push_back(cliSockFd);
+    }
+
+    // 阶段二：所有回执共用一个超时预算，而不是每个 pid 各等一次
+    const std::set<int32_t> ready = DynProfCliWaitReadable(waiting);
+    for (auto cliSockFd : waiting) {
+        const int32_t pid = cliSockFdMap_.at(cliSockFd);
+        if (ready.count(cliSockFd) == 0) {
+            CmdLog::CmdErrorLog("recv params timeout, server for pid %d has been connected to another client.", pid);
+            MSPROF_LOGE("recv params timeout, server for pid %d has been connected to another client.", pid);
             DynProfCliStopSocket(cliSockFd);
             continue;
         }
         // 接收回执
         DynProfMsg rsqMsg;
-        auto ret = LocalSocket::Recv(cliSockFd, &rsqMsg, sizeof(rsqMsg), 0);
+        const int32_t ret = RecvFull(cliSockFd, &rsqMsg, sizeof(rsqMsg));
         if (ret == SOCKET_ERR_EAGAIN) {
             CmdLog::CmdErrorLog("recv params timeout, server for pid %d has been connected to another client.", pid);
             MSPROF_LOGE("recv params timeout, server for pid %d has been connected to another client.", pid);
             DynProfCliStopSocket(cliSockFd);
             continue;
-        } else if (ret != sizeof(rsqMsg)) {
+        }
+        if (ret != static_cast<int32_t>(sizeof(rsqMsg))) {
             MSPROF_LOGE("recv params rsq failed for pid %d", pid);
             DynProfCliStopSocket(cliSockFd);
             continue;
@@ -312,35 +355,149 @@ int32_t DynProfClient::DynProfCliSendParams()
     return PROFILING_SUCCESS;
 }
 
-DynProfMsgRsqCode DynProfClient::DynProfCliSendCmd(const int32_t cliSockFd, DynProfMsgType req) const
+int32_t DynProfClient::DynProfCliSendReq(const int32_t cliSockFd, DynProfMsgType req) const
 {
     DynProfMsg reqMsg;
     reqMsg.msgType = req;
-    if (LocalSocket::Send(cliSockFd, &reqMsg, sizeof(reqMsg), 0) == PROFILING_FAILED) {
-        MSPROF_LOGE("send req: %d failed", req);
-        return DynProfMsgRsqCode::DYN_PROF_RSQ_FAIL;
+    reqMsg.statusCode = DynProfMsgRsqCode::DYN_PROF_RSQ_FAIL; // 请求中该字段无意义，显式初始化避免发送未初始化数据
+    // MSG_NOSIGNAL：目标进程可能在 CheckServerPidsIfValid 之后、本次发送之前退出，
+    // 向已断开的连接写数据会触发 SIGPIPE 直接终止 msprofbin 进程（msprofbin 未忽略 SIGPIPE）。
+    if (LocalSocket::Send(cliSockFd, &reqMsg, sizeof(reqMsg), MSG_NOSIGNAL) != PROFILING_SUCCESS) {
+        MSPROF_LOGE("send req: %d failed", static_cast<int32_t>(req));
+        return PROFILING_FAILED;
     }
-    MSPROF_LOGI("client send req: %d", req);
+    MSPROF_LOGI("client send req: %d", static_cast<int32_t>(req));
+    return PROFILING_SUCCESS;
+}
+
+int32_t DynProfClient::RecvFull(const int32_t cliSockFd, void* buff, int32_t len) const
+{
+    // 字节游标用 uint8_t 而不是 char：这里收发的是二进制消息缓冲区（DynProfMsg），不是字符串，
+    // 用 char* 表示会被检视工具判定为“用 char* 表示字符串”。
+    uint8_t* cursor = static_cast<uint8_t*>(buff);
+    int32_t received = 0;
+    while (received < len) {
+        const int32_t ret = LocalSocket::Recv(cliSockFd, cursor + received, len - received, 0);
+        if (ret <= 0) {
+            // 保留 SOCKET_ERR_EAGAIN 与错误码语义，交给调用方区分超时和其他失败
+            return ret;
+        }
+        received += ret;
+    }
+    return received;
+}
+
+DynProfMsgRsqCode DynProfClient::DynProfCliRecvRsq(const int32_t cliSockFd, DynProfMsgType req) const
+{
     // 接收回执
     DynProfMsg rsqMsg;
-    if (LocalSocket::Recv(cliSockFd, &(rsqMsg), sizeof(rsqMsg), 0) != sizeof(rsqMsg)) {
+    if (RecvFull(cliSockFd, &rsqMsg, sizeof(rsqMsg)) != static_cast<int32_t>(sizeof(rsqMsg))) {
         MSPROF_LOGE("recv server rsq failed");
         return DynProfMsgRsqCode::DYN_PROF_RSQ_FAIL;
     }
     MSPROF_LOGI("client recv rsq: %d(%d)", rsqMsg.msgType, rsqMsg.statusCode);
     // rsq在req后
     if (static_cast<int32_t>(rsqMsg.msgType) != static_cast<int32_t>(req) + 1) {
-        MSPROF_LOGE("req type:%d and rsq type:%d is not matched", req, rsqMsg.msgType);
+        MSPROF_LOGE(
+            "req type:%d and rsq type:%d is not matched", static_cast<int32_t>(req),
+            static_cast<int32_t>(rsqMsg.msgType));
         return DynProfMsgRsqCode::DYN_PROF_RSQ_FAIL;
     }
     return rsqMsg.statusCode;
 }
 
-void DynProfClient::DynProfCliProcStart(const int32_t cliSockFd)
+std::set<int32_t> DynProfClient::DynProfCliWaitReadable(const std::vector<int32_t>& waiting) const
+{
+    std::set<int32_t> ready;
+    if (waiting.empty()) {
+        return ready;
+    }
+
+    // 所有 pid 共用一份超时预算：批量下发后总等待时间不再随 pid 数量线性增长
+    const int64_t deadlineMs = GetMonotonicMs() + static_cast<int64_t>(DYN_PROF_PROC_TIME_OUT) * DYN_PROF_MS_PER_SEC;
+    std::vector<int32_t> pending = waiting;
+    while (!pending.empty()) {
+        const int64_t leftMs = deadlineMs - GetMonotonicMs();
+        if (leftMs <= 0) {
+            break;
+        }
+        std::vector<struct pollfd> pfds;
+        pfds.reserve(pending.size());
+        for (auto cliSockFd : pending) {
+            struct pollfd pfd {};
+            pfd.fd = cliSockFd;
+            pfd.events = POLLIN;
+            pfds.push_back(pfd);
+        }
+        const int32_t ret = poll(pfds.data(), static_cast<nfds_t>(pfds.size()), static_cast<int32_t>(leftMs));
+        if (ret < 0) {
+            if (errno == EINTR) {
+                // 被信号打断不是超时：剩余预算内继续等，否则一次 EINTR 会让所有 pid 都判失败
+                continue;
+            }
+            break;
+        }
+        if (ret == 0) {
+            // 预算耗尽
+            break;
+        }
+        std::vector<int32_t> next;
+        next.reserve(pending.size());
+        for (size_t i = 0; i < pfds.size(); ++i) {
+            // POLLERR/POLLHUP/POLLNVAL 也一并收掉，否则这些 fd 会让 poll 反复就绪导致空转
+            if ((pfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) == 0) {
+                next.push_back(pending[i]);
+                continue;
+            }
+            ready.insert(pending[i]);
+        }
+        pending.swap(next);
+    }
+    return ready;
+}
+
+void DynProfClient::DynProfCliDispatch(DynProfCliCmd cmd)
+{
+    const auto funcIt = procFuncMap_.find(cmd);
+    const auto reqIt = cmdReqMap_.find(cmd);
+    if (funcIt == procFuncMap_.cend() || reqIt == cmdReqMap_.cend()) {
+        return;
+    }
+    const DynProfMsgType req = reqIt->second;
+
+    // 快照：收执与处理阶段可能关闭 socket 并修改 cliSockFds_ / cliSockFdMap_
+    const std::vector<int32_t> fds(cliSockFds_.begin(), cliSockFds_.end());
+
+    // 阶段一：先向所有 pid 连续下发请求，不等待任何回执，使各目标进程尽可能同时收到命令
+    std::vector<int32_t> waiting;
+    waiting.reserve(fds.size());
+    for (auto cliSockFd : fds) {
+        if (DynProfCliSendReq(cliSockFd, req) != PROFILING_SUCCESS) {
+            MSPROF_LOGE("send req for pid %d failed", cliSockFdMap_.at(cliSockFd));
+            DynProfCliStopSocket(cliSockFd);
+            continue;
+        }
+        waiting.push_back(cliSockFd);
+    }
+
+    // 阶段二：所有回执共用一个超时预算
+    const std::set<int32_t> ready = DynProfCliWaitReadable(waiting);
+
+    // 阶段三：逐个解释回执；处理函数内部可能关闭 socket，此处遍历的是快照
+    for (auto cliSockFd : waiting) {
+        if (ready.count(cliSockFd) == 0) {
+            MSPROF_LOGE("recv rsq for pid %d timeout", cliSockFdMap_.at(cliSockFd));
+            funcIt->second(cliSockFd, DynProfMsgRsqCode::DYN_PROF_RSQ_FAIL);
+            continue;
+        }
+        funcIt->second(cliSockFd, DynProfCliRecvRsq(cliSockFd, req));
+    }
+}
+
+void DynProfClient::DynProfCliProcStart(const int32_t cliSockFd, const DynProfMsgRsqCode rsq)
 {
     MSPROF_LOGI("dynamic profiling start message proc.");
-    auto rsq = DynProfCliSendCmd(cliSockFd, DynProfMsgType::DYN_PROF_START_REQ);
-    int32_t pid = cliSockFdMap_.at(cliSockFd);
+    const int32_t pid = cliSockFdMap_.at(cliSockFd);
     switch (rsq) {
         case DynProfMsgRsqCode::DYN_PROF_RSQ_SUCCESS:
             CmdLog::CmdLogNoLevel("dynamic profiling for pid %d start success", pid);
@@ -363,11 +520,10 @@ void DynProfClient::DynProfCliProcStart(const int32_t cliSockFd)
     }
 }
 
-void DynProfClient::DynProfCliProcStop(const int32_t cliSockFd)
+void DynProfClient::DynProfCliProcStop(const int32_t cliSockFd, const DynProfMsgRsqCode rsq)
 {
     MSPROF_LOGI("dynamic profiling stop message proc.");
-    auto rsq = DynProfCliSendCmd(cliSockFd, DynProfMsgType::DYN_PROF_STOP_REQ);
-    int32_t pid = cliSockFdMap_.at(cliSockFd);
+    const int32_t pid = cliSockFdMap_.at(cliSockFd);
     switch (rsq) {
         case DynProfMsgRsqCode::DYN_PROF_RSQ_SUCCESS:
             CmdLog::CmdLogNoLevel("dynamic profiling for pid %d stop success", pid);
@@ -386,11 +542,10 @@ void DynProfClient::DynProfCliProcStop(const int32_t cliSockFd)
     }
 }
 
-void DynProfClient::DynProfCliProcQuit(const int32_t cliSockFd) const
+void DynProfClient::DynProfCliProcQuit(const int32_t cliSockFd, const DynProfMsgRsqCode rsq) const
 {
     MSPROF_LOGI("dynamic profiling quit message proc.");
-    auto rsq = DynProfCliSendCmd(cliSockFd, DynProfMsgType::DYN_PROF_QUIT_REQ);
-    int32_t pid = cliSockFdMap_.at(cliSockFd);
+    const int32_t pid = cliSockFdMap_.at(cliSockFd);
     switch (rsq) {
         case DynProfMsgRsqCode::DYN_PROF_RSQ_SUCCESS:
             CmdLog::CmdLogNoLevel("dynamic profiling for pid %d quit success", pid);

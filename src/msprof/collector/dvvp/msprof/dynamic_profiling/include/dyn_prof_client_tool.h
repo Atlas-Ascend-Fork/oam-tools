@@ -21,6 +21,8 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <string>
+#include <vector>
 #include "dyn_prof_def_tool.h"
 #include "thread/thread_tool.h"
 
@@ -53,10 +55,14 @@ private:
     int32_t DynProfCliCreate();
     int32_t DynProfCliSendParams();
 
-    DynProfMsgRsqCode DynProfCliSendCmd(const int32_t cliSockFd, DynProfMsgType req) const;
-    void DynProfCliProcStart(const int32_t cliSockFd);
-    void DynProfCliProcStop(const int32_t cliSockFd);
-    void DynProfCliProcQuit(const int32_t cliSockFd) const;
+    int32_t DynProfCliSendReq(const int32_t cliSockFd, DynProfMsgType req) const;
+    DynProfMsgRsqCode DynProfCliRecvRsq(const int32_t cliSockFd, DynProfMsgType req) const;
+    int32_t RecvFull(const int32_t cliSockFd, void* buff, int32_t len) const;
+    std::set<int32_t> DynProfCliWaitReadable(const std::vector<int32_t>& waiting) const;
+    void DynProfCliDispatch(DynProfCliCmd cmd);
+    void DynProfCliProcStart(const int32_t cliSockFd, const DynProfMsgRsqCode rsq);
+    void DynProfCliProcStop(const int32_t cliSockFd, const DynProfMsgRsqCode rsq);
+    void DynProfCliProcQuit(const int32_t cliSockFd, const DynProfMsgRsqCode rsq) const;
     void DynProfCliHelpInfo() const;
     int32_t DynProfCliConnectSocket(const int32_t cliSockFd, const std::string& srvSockDomain) const;
     void DynProfCliStopSocket(int32_t cliSockFd);
@@ -68,6 +74,7 @@ private:
     std::atomic<bool> cliStarted_{false};
     std::string dynProfParams_;
     std::map<DynProfCliCmd, ProcFunc> procFuncMap_;
+    std::map<DynProfCliCmd, DynProfMsgType> cmdReqMap_;
     std::map<int32_t, int32_t> cliSockFdMap_;
 };
 
