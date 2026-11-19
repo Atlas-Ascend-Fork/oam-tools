@@ -23,6 +23,7 @@ import re
 from common import FileOperate as f
 from common import log_warning, log_error
 from common.file_operate import MOVE_MODE
+from collect.msnpureport_type_collect import merge_dir
 
 
 __all__ = ["collect_device_logs"]
@@ -104,6 +105,18 @@ def collect_stackcore(source_root_dir, output_root_dir):
     return f.collect_dir(stackcore_source, stackcore_target, MOVE_MODE)
 
 
+def collect_system_info(source_root_dir, output_root_dir):
+    # The full export (-f) also writes system_info (event_sched, tee, ...),
+    # while the typed export (report -t 5) merges into the same dfx directory.
+    # Both sources must coexist: merge recursively by name instead of letting
+    # either side drop the other's sub-directories.
+    system_info_source = os.path.join(source_root_dir, "system_info")
+    if not f.check_valid_dir(system_info_source):
+        return False
+    system_info_target = os.path.join(output_root_dir, "dfx", "system_info")
+    return merge_dir(system_info_source, system_info_target, "full_export")
+
+
 def collect_bbox(source_root_dir, output_root_dir):
     bbox_source = os.path.join(source_root_dir, "hisi_logs")
     bbox_target = os.path.join(output_root_dir, "dfx", "bbox")
@@ -182,6 +195,10 @@ def collect_device_logs(source_root_dir, output_root_dir):
     stackcore_ret = collect_stackcore(source_root_dir, output_root_dir)
     if not stackcore_ret:
         log_warning("Collect device stackcore failed.")
+        err += 1
+    system_info_ret = collect_system_info(source_root_dir, output_root_dir)
+    if not system_info_ret:
+        log_warning("Collect device system info failed.")
         err += 1
     bbox_ret = collect_bbox(source_root_dir, output_root_dir)
     if not bbox_ret:

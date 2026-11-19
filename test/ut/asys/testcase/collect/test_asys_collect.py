@@ -118,30 +118,81 @@ class TestAsysCollect(AssertTest):
         )
         delete_dirs.assert_called_once_with([full_export_path, typed_export_path])
 
-    def test_device_file_export_falls_back_to_legacy_cmd(self, mocker):
-        # A driver package predating the "report" subcommand must keep the
-        # full device export working: the legacy "msnpureport -f" form is
-        # retried once the recommended form fails.
+    def test_collect_msnpureport_double_failure_logs_single_error(self, mocker, caplog):
+        # The full export fails: collect() must emit exactly one ERROR record
+        # for the whole fault (no sys.stderr fragment - msnpureport often
+        # fails with an empty stderr). Assert on the record list by level
+        # instead of text substrings so unrelated loggers cannot skew it.
+        import logging
+
+        caplog.set_level(logging.DEBUG)
         commands = []
 
         def fake_run_cmd_output(command, timeout=None, **_kwargs):  # noqa: ARG001
             commands.append(command)
-            if "msnpureport report -f" in command:
-                return False, "msnpureport: invalid option -- report"
-            return True, ""
+            return False, ""
 
         mocker.patch(
             "collect.asys_collect.run_cmd_output", side_effect=fake_run_cmd_output
         )
         mocker.patch("common.FileOperate.create_dir", return_value=True)
-        mocker.patch("common.FileOperate.list_dir", return_value=["20261110000000"])
+        mocker.patch("common.FileOperate.remove_dir")
+        mocker.patch("common.FileOperate.write_file")
+        mocker.patch("collect.ops.ops_collect.collect_ops", return_value=True)
+        ParamDict().set_env_type("EP")
+
+        asys_collect = AsysCollect()
+        self.assertTrue(asys_collect.collect())
+        self.assertTrue(len(commands) == 1)
+        # Filter to the messages this fault produces: unrelated ERROR noise
+        # from the environment-type probe (unsupported platform code) must
+        # not make the assertion brittle.
+        fault_records = [
+            r
+            for r in caplog.records
+            if r.levelno == logging.ERROR and "msnpureport" in r.getMessage()
+        ]
+        self.assertTrue(len(fault_records) == 1)
+        self.assertTrue(
+            "msnpureport tool export device files failed"
+            in fault_records[0].getMessage()
+        )
+        self.assertTrue(all("sys.stderr" not in r.getMessage() for r in caplog.records))
+
+    def test_device_file_export_failure_logs_nothing(self, mocker, caplog):
+        # A failed export does not log an error inside _device_file_export
+        # (not even a debug with the "failed" wording: the command, ret_code
+        # and stderr are already recorded at debug level by run_cmd_output).
+        # The single summary error is left to collect().
+        import logging
+
+        caplog.set_level(logging.DEBUG)
+
+        def fake_run_cmd_output(command, timeout=None, **_kwargs):  # noqa: ARG001
+            return False, ""
+
+        mocker.patch(
+            "collect.asys_collect.run_cmd_output", side_effect=fake_run_cmd_output
+        )
+        mocker.patch("common.FileOperate.create_dir", return_value=True)
         mocker.patch("common.FileOperate.remove_dir")
 
         asys_collect = AsysCollect()
-        self.assertTrue(asys_collect._device_file_export())
-        self.assertTrue(len(commands) == 2)
-        self.assertTrue("msnpureport report -f" in commands[0])
-        self.assertTrue("msnpureport -f" in commands[1])
+        self.assertTrue(not asys_collect._device_file_export())
+        # _device_file_export itself stays silent about the failure: no ERROR
+        # and no debug line carrying "failed" (both wording rules).
+        self.assertTrue(
+            not any(
+                r.levelno == logging.ERROR and "msnpureport" in r.getMessage()
+                for r in caplog.records
+            )
+        )
+        self.assertTrue(
+            not any(
+                r.levelno == logging.DEBUG and "failed" in r.getMessage().lower()
+                for r in caplog.records
+            )
+        )
 
     @pytest.mark.parametrize(["msnpureport_ok"], [(True,), (False,)])
     def test_collect_msnpureport_failed(self, msnpureport_ok, mocker, caplog):

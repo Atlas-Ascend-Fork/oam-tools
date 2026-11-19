@@ -79,7 +79,7 @@ class TestMsnpureportTypeCollect(AssertTest):
         mocker.patch.object(DeviceInfo, "get_device_count", return_value=1)
         mocker.patch.object(DeviceInfo, "get_chip_info", return_value=chip_info)
 
-    def test_typed_collect_950_full_flow(self, mocker):
+    def test_typed_collect_950_full_flow(self, mocker, caplog):
         """
         @描述: 950环境走真实collect流程, 校验类型化采集与归档
         @类型: FUNCTION
@@ -108,6 +108,19 @@ class TestMsnpureportTypeCollect(AssertTest):
             "network_info",
         ):
             self.assertTrue(os.path.isdir(os.path.join(dfx_dir, dir_name)))
+        # The -f export archives system_info/tee first, then the typed -t 5
+        # export merges system_info/event_sched into the same directory:
+        # both sub-directories must coexist (merged by name, not overwritten).
+        # The two exports also produce the identical tee.log twice; the
+        # idempotent merge must not misreport the typed collect as failed.
+        system_info_dir = os.path.join(dfx_dir, "system_info", "dev-os-0")
+        self.assertTrue(os.path.isdir(os.path.join(system_info_dir, "tee")))
+        self.assertTrue(os.path.isdir(os.path.join(system_info_dir, "event_sched")))
+        self.assertTrue(
+            "execute failed, which may be caused by a low driver package version"
+            not in caplog.text
+        )
+        self.assertTrue("Collect msnpureport typed info failed." not in caplog.text)
         ao_dir = os.path.join(dfx_dir, "ao_info", "dev-os-0")
         for leaf in ("ao_self", "ao_cnt", "ao_uart"):
             self.assertTrue(os.path.isdir(os.path.join(ao_dir, leaf)))
@@ -208,11 +221,13 @@ class TestMsnpureportTypeCollect(AssertTest):
 
     def test_merge_dir_merges_without_overwrite(self):
         """
-        @描述: merge_dir 合并目录不覆盖已有文件, 冲突保留目标
+        @描述: merge_dir 合并目录不覆盖已有文件, 冲突时两份都保留
         @类型: FUNCTION
         @输入: source与target各含不同/同名文件
         @步骤: 调用 merge_dir; 检查双方文件与source清理
-        @预期结果: 新文件合入; 同名冲突保留target原内容且返回False
+        @预期结果: 新文件合入; 同名不同内容时目标文件保留原名不覆盖,
+                  源文件改名为 <名称>__<来源标签>.<扩展名>(如 old__conflict.log)
+                  一并保留在目标目录, 两份数据都不丢失
         """
         source = os.path.join(test_case_tmp, "merge_src")
         target = os.path.join(test_case_tmp, "merge_tgt")
@@ -226,14 +241,16 @@ class TestMsnpureportTypeCollect(AssertTest):
         self.assertTrue(os.path.isfile(os.path.join(target, "dev-os-0", "new.log")))
         self.assertTrue(os.path.isfile(os.path.join(target, "dev-os-0", "old.log")))
 
-        # 同名冲突: 保留 target 内容, 不覆盖
+        # 同名不同内容: target 不被覆盖, 源文件改名为 <名称>__<来源标签>.<扩展名> 保留 (数据不丢失)
         source2 = os.path.join(test_case_tmp, "merge_src2")
         os.makedirs(os.path.join(source2, "dev-os-0"))
         with open(os.path.join(source2, "dev-os-0", "old.log"), "w") as fw:
             fw.write("clobber")
-        self.assertTrue(not merge_dir(source2, target))
+        self.assertTrue(merge_dir(source2, target))
         with open(os.path.join(target, "dev-os-0", "old.log")) as fr:
             self.assertTrue(fr.read() == "old")
+        with open(os.path.join(target, "dev-os-0", "old__conflict.log")) as fr:
+            self.assertTrue(fr.read() == "clobber")
 
     def test_convert_ub_files_cli_shape(self):
         """

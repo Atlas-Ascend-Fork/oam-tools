@@ -48,6 +48,9 @@ class TestDeviceLogCollect(AssertTest):
             "collect.log.device_log_collect.collect_host_driver", return_value=True
         )
         mocker.patch(
+            "collect.log.device_log_collect.collect_system_info", return_value=True
+        )
+        mocker.patch(
             "common.FileOperate.list_dir", return_value=["dev-os-3", "dev-os-7"]
         )
         mocker.patch("common.FileOperate.collect_dir", return_value=True)
@@ -110,6 +113,9 @@ class TestDeviceLogCollect(AssertTest):
         self.assertTrue(not collect_device_logs("./", "./output"))
 
         mocker.patch("common.FileOperate.collect_file_to_dir", return_value=True)
+        mocker.patch(
+            "collect.log.device_log_collect.collect_system_info", return_value=True
+        )
         self.assertTrue(collect_device_logs("./", "./output"))
 
     def test_collect_slogd_failed(self, mocker, caplog):
@@ -124,8 +130,38 @@ class TestDeviceLogCollect(AssertTest):
             "collect.log.device_log_collect.collect_host_driver", return_value=True
         )
         mocker.patch(
+            "collect.log.device_log_collect.collect_system_info", return_value=True
+        )
+        mocker.patch(
             "common.FileOperate.list_dir", return_value=["dev-os-0", "device-os"]
         )
         mocker.patch("common.FileOperate.check_dir", return_value=True)
         mocker.patch("common.FileOperate.collect_dir", return_value=False)
         self.assertTrue(not collect_device_logs("./", "./output"))
+
+    def test_collect_system_info_merges_with_existing_typed_output(self, tmp_path):
+        # One export archives system_info first (event/); the other one
+        # later merges its own system_info (tee/) into the same dfx directory.
+        # Both sub-directories must coexist after both archivals, regardless
+        # of which export produced which sub-directory.
+        from collect.log.device_log_collect import collect_system_info
+
+        source = tmp_path / "full_export" / "system_info" / "dev-os-0" / "event"
+        source.mkdir(parents=True)
+        (source / "event.log").write_text("event", encoding="utf-8")
+        output_root = tmp_path / "asys_output"
+        typed = output_root / "dfx" / "system_info" / "dev-os-0" / "tee"
+        typed.mkdir(parents=True)
+        (typed / "tee.log").write_text("tee", encoding="utf-8")
+
+        self.assertTrue(
+            collect_system_info(str(tmp_path / "full_export"), str(output_root))
+        )
+        merged = output_root / "dfx" / "system_info" / "dev-os-0"
+        self.assertTrue((merged / "event" / "event.log").is_file())
+        self.assertTrue((merged / "tee" / "tee.log").is_file())
+
+    def test_collect_system_info_missing_dir(self, tmp_path):
+        from collect.log.device_log_collect import collect_system_info
+
+        self.assertTrue(not collect_system_info(str(tmp_path), str(tmp_path / "out")))

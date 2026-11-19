@@ -40,11 +40,11 @@ After the command is executed, the fault information files in  **\{output\}/asys
        ├── ops                      // Operator compilation information, including the *.o and *.json files of operator compilation and custom operator configuration.
        ├── stackcore                // Information about the core file generated when a core dump is triggered by an error.
        ├── atrace                  // Trace flush information, including the plaintext file parsed from the trace binary file.
-       ├── system_info              // Other module maintenance and test information (-t 5), such as event scheduling module information, driver proc logs, and TEE logs. Collected only in some chip model environments.
-       ├── ub_info                  // UB (Unified Bus) maintenance and test information (-t 6). Collected only on 950/960 series environments. Binary files in the mami directory are converted to .txt files with the same names and the .bin files are removed when parsing succeeds; the original .bin files are retained for on-site analysis when parsing fails.
-       ├── ao_info                  // AO (Always Online) maintenance and test information (-t 7/-t 8/-t 9): ao_self (AO logs), ao_cnt (AO counters), and ao_uart (UART recordings). Collected only on 950/960 series environments.
-       ├── ccu_info                 // CCU maintenance and test information (-t 10). Collected only on 950/960 series environments.
-       ├── network_info             // network maintenance and test information (-t 11). Collected only on 950/960 series environments.
+       ├── system_info              // Other module maintenance and test information, such as event scheduling module information, driver proc logs, and TEE logs. Collected only in some chip model environments.
+       ├── ub_info                  // UB (Unified Bus) maintenance and test information. Collected only on 350/950/960 series environments. Binary files in the mami directory are converted to .txt files with the same names and the .bin files are removed when parsing succeeds; the original .bin files are retained for on-site analysis when parsing fails.
+       ├── ao_info                  // AO (Always Online) maintenance and test information: ao_self (AO logs), ao_cnt (AO counters), and ao_uart (UART recordings). Collected only on 350/950/960 series environments.
+       ├── ccu_info                 // CCU maintenance and test information. Collected only on 350/950/960 series environments.
+       ├── network_info             // network maintenance and test information. Collected only on 350/950/960 series environments.
        └── log
            ├── device
            │     ├──dev-os-{id}

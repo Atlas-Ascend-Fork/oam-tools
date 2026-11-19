@@ -40,11 +40,11 @@ asys collect --task_dir=$HOME/cache_path --tar="True" --output=$HOME/dfx_info
        ├── ops                      // 算子编译信息，包括算子编译*.o和*.json文件、自定义算子配置信息等
        ├── stackcore                // 报错触发coredump时的core文件信息
        ├── atrace                   // trace落盘信息，包括trace二进制文件解析的明文文件
-       ├── system_info              // 其他模块维测信息（-t 5），如事件调度模块维测信息、驱动proc日志、TEE日志等；仅部分芯片型号环境收集
-       ├── ub_info                  // UB（Unified Bus）维测信息（-t 6）；仅950/960系列环境收集，mami目录下二进制文件解析成功时转换为同名txt并删除bin，解析失败时保留原始bin供现场分析
-       ├── ao_info                  // AO（Always Online）维测信息（-t 7/-t 8/-t 9）：ao_self（AO区日志）、ao_cnt（AO计数）、ao_uart（串口录音）；仅950/960系列环境收集
-       ├── ccu_info                 // CCU维测信息（-t 10）；仅950/960系列环境收集
-       ├── network_info             // network维测信息（-t 11）；仅950/960系列环境收集
+       ├── system_info              // 其他模块维测信息，如事件调度模块维测信息、驱动proc日志、TEE日志等；仅部分芯片型号环境收集
+       ├── ub_info                  // UB（Unified Bus）维测信息；仅350/950/960系列环境收集，mami目录下二进制文件解析成功时转换为同名txt并删除bin，解析失败时保留原始bin供现场分析
+       ├── ao_info                  // AO（Always Online）维测信息：ao_self（AO区日志）、ao_cnt（AO计数）、ao_uart（串口录音）；仅350/950/960系列环境收集
+       ├── ccu_info                 // CCU维测信息；仅350/950/960系列环境收集
+       ├── network_info             // network维测信息；仅350/950/960系列环境收集
        └── log
            ├── device
            │     ├──dev-os-{id}

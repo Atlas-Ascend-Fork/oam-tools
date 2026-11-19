@@ -302,6 +302,14 @@ def collect_file(output_root_path):
         )
         if f.check_dir(ops_source_dir):
             ret = f.collect_dir(ops_source_dir, ops_target_dir, MOVE_MODE)
+        else:
+            # The replayed task generated no operator files (e.g. no AI Core
+            # involved). Keep the same normal-empty-state wording as the
+            # collect path instead of reporting a collect failure.
+            log_info(
+                "No fault operator file to collect, this is normal when no fault occurred."
+            )
+            ret = True
     # SK场景下只生成host.o，没有device .o/.json，按算子名搜索必然失败，跳过兜底搜索
     elif is_sk_scenario(output_root_path):
         log_info(

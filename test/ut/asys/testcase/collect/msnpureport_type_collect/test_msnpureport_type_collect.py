@@ -146,6 +146,56 @@ class TestMsnpureportTypeCollect:
             )
         )
 
+    def test_350_environment_runs_all_type_commands(self, mocker):
+        # Ascend350 supports every typed export (-t 5 through -t 11) just
+        # like 950/960: the chip gate must not skip the typed collection.
+        commands = []
+
+        def fake_run_cmd_output(command, timeout=None, **_kwargs):  # noqa: ARG001
+            commands.append(command)
+            type_id = int(command.rsplit("-t ", 1)[1].split()[0])
+            type_dir = os.path.join(self.output, "export_type_tmp", f"type_{type_id}")
+            output_dir = os.path.join(type_dir, "20261118000000")
+            dir_name = {
+                5: "system_info",
+                6: "ub_info",
+                7: "ao_info",
+                8: "ao_info",
+                9: "ao_info",
+                10: "ccu_info",
+                11: "network_info",
+            }[type_id]
+            output_tree = os.path.join(output_dir, dir_name)
+            os.makedirs(output_tree, exist_ok=True)
+            with open(
+                os.path.join(output_tree, "data.log"), "w", encoding="utf-8"
+            ) as fw:
+                fw.write(f"type {type_id}")
+            return True, ""
+
+        mocker.patch(
+            "collect.msnpureport_type_collect.run_cmd_output",
+            side_effect=fake_run_cmd_output,
+        )
+        mocker.patch(
+            "common.DeviceInfo.get_chip_info", return_value="Ascend Ascend350 v1"
+        )
+        mocker.patch("common.DeviceInfo.get_device_count", return_value=1)
+        mocker.patch(
+            "collect.msnpureport_type_collect.parse_ub_in_place", return_value=True
+        )
+
+        assert collect_msnpureport_type_info(self.output) is True
+        assert [command.rsplit("-t ", 1)[1].split()[0] for command in commands] == [
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+        ]
+
     def test_960_environment_runs_all_type_commands(self, mocker):
         commands = []
 
@@ -305,9 +355,210 @@ class TestMsnpureportTypeCollect:
         )
         assert "No expected msnpureport output directories" in caplog.text
 
+    def test_merge_dir_identical_file_is_idempotent(self, tmp_path):
+        # -f and -t 5 both export system_info; the same relative file is
+        # merged twice per collect run. Identical content must be a no-op
+        # success (so the typed export is not misreported as failed), while
+        # the duplicate source copy is removed.
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        (source / "dev-os-0" / "tee").mkdir(parents=True)
+        (target / "dev-os-0" / "tee").mkdir(parents=True)
+        (source / "dev-os-0" / "tee" / "tee.log").write_text("same", encoding="utf-8")
+        (target / "dev-os-0" / "tee" / "tee.log").write_text("same", encoding="utf-8")
+
+        assert merge_dir(str(source), str(target)) is True
+        assert (target / "dev-os-0" / "tee" / "tee.log").read_text(
+            encoding="utf-8"
+        ) == "same"
+        assert not (source / "dev-os-0" / "tee" / "tee.log").exists()
+
+    def test_merge_dir_conflicting_content_keeps_both_copies(self, tmp_path):
+        # Genuinely different content under the same relative path stays a
+        # conflict: the target copy keeps its name, the source copy is kept
+        # under a suffixed name tagged with its origin (the temporary export
+        # directory is deleted afterwards, so dropping the source would lose
+        # the data). No data is lost, so the merge succeeds with a warning.
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        (source / "dev-os-0" / "tee").mkdir(parents=True)
+        (target / "dev-os-0" / "tee").mkdir(parents=True)
+        (source / "dev-os-0" / "tee" / "tee.log").write_text("new", encoding="utf-8")
+        (target / "dev-os-0" / "tee" / "tee.log").write_text("old", encoding="utf-8")
+
+        assert merge_dir(str(source), str(target), "typed_export") is True
+        assert (target / "dev-os-0" / "tee" / "tee.log").read_text(
+            encoding="utf-8"
+        ) == "old"
+        assert (target / "dev-os-0" / "tee" / "tee__typed_export.log").read_text(
+            encoding="utf-8"
+        ) == "new"
+        assert not (source / "dev-os-0" / "tee" / "tee.log").exists()
+
+    def test_merge_dir_conflict_without_tag_uses_default_suffix(self, tmp_path):
+        # Without an explicit tag the suffixed copy still lands next to the
+        # target, so the data survives regardless of the caller.
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        source.mkdir()
+        target.mkdir()
+        (source / "a.log").write_text("new", encoding="utf-8")
+        (target / "a.log").write_text("old", encoding="utf-8")
+
+        assert merge_dir(str(source), str(target)) is True
+        assert (target / "a.log").read_text(encoding="utf-8") == "old"
+        assert (target / "a__conflict.log").read_text(encoding="utf-8") == "new"
+
+    def test_merge_dir_repeated_conflicts_keep_every_copy(self, tmp_path):
+        # fujun19 复现：同一目标目录连续多次同名不同内容冲突（-t 7/-t 8/-t 9
+        # 都归档到 ao_info 时可能发生），后缀名不能重复，否则 os.replace 覆盖
+        # 上一次保留的副本。已占用的后缀名追加 __2、__3 序号，每份都保留。
+        target = tmp_path / "target"
+        target.mkdir()
+        (target / "a.log").write_text("full", encoding="utf-8")
+
+        for round_no, content in enumerate(["typed-1st", "typed-2nd", "typed-3rd"], 1):
+            source = tmp_path / f"round_{round_no}"
+            source.mkdir()
+            (source / "a.log").write_text(content, encoding="utf-8")
+            assert merge_dir(str(source), str(target), "typed_export") is True
+            assert not source.exists()
+
+        contents = {
+            path.name: path.read_text(encoding="utf-8") for path in target.iterdir()
+        }
+        assert contents == {
+            "a.log": "full",
+            "a__typed_export.log": "typed-1st",
+            "a__typed_export__2.log": "typed-2nd",
+            "a__typed_export__3.log": "typed-3rd",
+        }
+
+    def test_merge_dir_long_name_conflict_truncates_to_name_max(self, tmp_path):
+        # fujun19 复现：主名接近 NAME_MAX 的同名冲突文件，加 __typed_export
+        # 后缀会超出文件系统单名上限（ext4/xfs 255 字节），os.replace 报
+        # Errno 36，源副本滞留临时目录随后被清理删除。基名必须截断到后缀名
+        # 仍合法，数据才能保住；截断后的后缀名也绝不能塌回目标名本身。
+        from collect.msnpureport_type_collect import _CONFLICT_NAME_MAX
+
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        source.mkdir()
+        target.mkdir()
+        # base + ext 刚好顶满 NAME_MAX，再加 __typed_export 必然超限
+        long_name = "x" * (_CONFLICT_NAME_MAX - len(".log")) + ".log"
+        (source / long_name).write_text("typed", encoding="utf-8")
+        (target / long_name).write_text("full", encoding="utf-8")
+
+        assert merge_dir(str(source), str(target), "typed_export") is True
+        assert not source.exists()
+        target_names = os.listdir(target)
+        assert len(target_names) == 2
+        assert long_name in target_names
+        for name in target_names:
+            content = (target / name).read_text(encoding="utf-8")
+            if name == long_name:
+                assert content == "full"
+            else:
+                assert name.endswith("__typed_export.log")
+                assert len(name.encode("utf-8")) <= _CONFLICT_NAME_MAX
+                assert content == "typed"
+
+    def test_merge_dir_long_name_repeated_conflict_stays_within_name_max(
+        self, tmp_path
+    ):
+        # 组合场景：接近 NAME_MAX 的文件名连续冲突两次——既要每份都保留
+        # （序号后缀），又要每个后缀名都截断到 NAME_MAX 以内。
+        from collect.msnpureport_type_collect import _CONFLICT_NAME_MAX
+
+        target = tmp_path / "target"
+        target.mkdir()
+        long_name = "x" * (_CONFLICT_NAME_MAX - len(".log")) + ".log"
+        (target / long_name).write_text("full", encoding="utf-8")
+
+        for round_no, content in enumerate(["typed-1st", "typed-2nd"], 1):
+            source = tmp_path / f"round_{round_no}"
+            source.mkdir()
+            (source / long_name).write_text(content, encoding="utf-8")
+            assert merge_dir(str(source), str(target), "typed_export") is True
+            assert not source.exists()
+
+        target_names = os.listdir(target)
+        assert len(target_names) == 3
+        contents = {
+            name: (target / name).read_text(encoding="utf-8") for name in target_names
+        }
+        assert contents[long_name] == "full"
+        for name in target_names:
+            assert len(name.encode("utf-8")) <= _CONFLICT_NAME_MAX
+        assert sorted(contents[name] for name in target_names if name != long_name) == [
+            "typed-1st",
+            "typed-2nd",
+        ]
+
+    def test_merge_dir_overlong_extension_conflict_keeps_both(self, tmp_path):
+        # fujun19 复现：主名 a + 250 字符扩展名（原名 251 字节，磁盘合法），
+        # 加 __typed_export 后缀后超 NAME_MAX。基名截空仍超限时，截扩展名会让
+        # 同一冲突序列的候选名互相撞名（区分字符被切掉）甚至死循环，因此超长
+        # 扩展名整体替换为 .conf，再按预算截基名：两份数据都保留、名字合法
+        # 且可区分。
+        from collect.msnpureport_type_collect import _CONFLICT_NAME_MAX
+
+        source = tmp_path / "source"
+        target = tmp_path / "target"
+        source.mkdir()
+        target.mkdir()
+        overlong_ext = "." + "e" * 249
+        name = "a" + overlong_ext
+        (source / name).write_text("typed", encoding="utf-8")
+        (target / name).write_text("full", encoding="utf-8")
+
+        assert merge_dir(str(source), str(target), "typed_export") is True
+        assert not source.exists()
+        target_names = os.listdir(target)
+        assert len(target_names) == 2
+        assert name in target_names
+        assert (target / name).read_text(encoding="utf-8") == "full"
+        for kept in target_names:
+            assert len(kept.encode("utf-8")) <= _CONFLICT_NAME_MAX
+        suffixed = [n for n in target_names if n != name][0]
+        assert suffixed == "a__typed_export.conf"
+        assert (target / suffixed).read_text(encoding="utf-8") == "typed"
+
+    def test_merge_dir_overlong_extension_repeated_conflict_keeps_all(self, tmp_path):
+        # 超长扩展名 + 连续两次冲突：序号候选必须仍可区分，不能撞名死循环。
+        from collect.msnpureport_type_collect import _CONFLICT_NAME_MAX
+
+        target = tmp_path / "target"
+        target.mkdir()
+        overlong_ext = "." + "e" * 249
+        name = "a" + overlong_ext
+        (target / name).write_text("full", encoding="utf-8")
+
+        for round_no, content in enumerate(["typed-1st", "typed-2nd"], 1):
+            source = tmp_path / f"round_{round_no}"
+            source.mkdir()
+            (source / name).write_text(content, encoding="utf-8")
+            assert merge_dir(str(source), str(target), "typed_export") is True
+            assert not source.exists()
+
+        target_names = os.listdir(target)
+        assert len(target_names) == 3
+        contents = {n: (target / n).read_text(encoding="utf-8") for n in target_names}
+        assert contents[name] == "full"
+        for n in target_names:
+            assert len(n.encode("utf-8")) <= _CONFLICT_NAME_MAX
+        assert sorted(c for n, c in contents.items() if n != name) == [
+            "typed-1st",
+            "typed-2nd",
+        ]
+        assert len({n for n in target_names if n != name}) == 2
+
     def test_merge_dir_reports_target_file_conflict_without_overwrite(
         self, tmp_path, caplog
     ):
+        # Different content under the same name: the target is never
+        # overwritten, both copies survive, and the divergence is a warning.
         source = tmp_path / "source"
         target = tmp_path / "target"
         (source / "dev-os-0").mkdir(parents=True)
@@ -315,11 +566,60 @@ class TestMsnpureportTypeCollect:
         (source / "dev-os-0" / "ao_self.log").write_text("new", encoding="utf-8")
         (target / "dev-os-0" / "ao_self.log").write_text("old", encoding="utf-8")
 
-        assert merge_dir(str(source), str(target)) is False
+        assert merge_dir(str(source), str(target)) is True
         assert (target / "dev-os-0" / "ao_self.log").read_text(
             encoding="utf-8"
         ) == "old"
-        assert "The merge target file already exists" in caplog.text
+        assert (target / "dev-os-0" / "ao_self__conflict.log").read_text(
+            encoding="utf-8"
+        ) == "new"
+        assert (
+            "The merge target file already exists with different content" in caplog.text
+        )
+
+    def test_full_chain_conflicting_system_info_keeps_both(self, mocker, tmp_path):
+        # fujun19 复现的整链场景：-f 与 -t 5 都导出 system_info/dev-os-0/tee/tee.log
+        # 且内容不同。collect_msnpureport_type_info 必须返回 True（不再把冲突
+        # 误报为类型化采集失败），且 dfx/system_info 下两份数据都在：
+        # 先归档的 full_export 版本保留原名，typed_export 版本改名为
+        # <名称>__typed_export.<扩展名> 保留。
+        from collect.msnpureport_type_collect import collect_msnpureport_type_info
+
+        mocker.patch("params.ParamDict.get_env_type", return_value="EP")
+        mocker.patch("common.DeviceInfo.get_device_count", return_value=1)
+        mocker.patch("common.DeviceInfo.get_chip_info", return_value="Ascend950")
+        mocker.patch(
+            "collect.msnpureport_type_collect.parse_ub_in_place", return_value=True
+        )
+
+        # -f 先归档的 system_info（collect_device_logs 阶段已进入 dfx）
+        dfx_system_info = tmp_path / "dfx" / "system_info" / "dev-os-0" / "tee"
+        dfx_system_info.mkdir(parents=True)
+        (dfx_system_info / "tee.log").write_text("full-export", encoding="utf-8")
+
+        # typed -t 5 导出目录里的同名不同内容文件
+        def fake_run_cmd_output(command, timeout=None, **_kwargs):  # noqa: ARG001
+            if "report -t 5" in command:
+                type_dir = command.split(";")[0].split("cd ")[-1].strip("'")
+                out = os.path.join(type_dir, "20261117000000")
+                tee = os.path.join(out, "system_info", "dev-os-0", "tee")
+                os.makedirs(tee, exist_ok=True)
+                with open(os.path.join(tee, "tee.log"), "w", encoding="utf-8") as fw:
+                    fw.write("typed-export")
+            return True, ""
+
+        mocker.patch(
+            "collect.msnpureport_type_collect.run_cmd_output",
+            side_effect=fake_run_cmd_output,
+        )
+
+        assert collect_msnpureport_type_info(str(tmp_path)) is True
+        merged = tmp_path / "dfx" / "system_info" / "dev-os-0" / "tee"
+        assert (merged / "tee.log").read_text(encoding="utf-8") == "full-export"
+        assert (merged / "tee__typed_export.log").read_text(
+            encoding="utf-8"
+        ) == "typed-export"
+        assert not os.path.exists(tmp_path / "export_type_tmp")
 
     def test_merge_dir_moves_empty_source_dir(self, tmp_path):
         source = tmp_path / "source"

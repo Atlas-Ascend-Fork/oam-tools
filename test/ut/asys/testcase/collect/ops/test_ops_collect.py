@@ -499,6 +499,36 @@ class TestOpsCollect(AssertTest):
             collect_file("./output")
         self.assertTrue("WARNING" not in caplog.text)
 
+    def test_collect_file_launch_no_ops_dir_is_info_not_warning(self, mocker, caplog):
+        # launch 复跑的命令不涉及 AI Core 时，extra-info/ops 目录不会生成；
+        # 该空态与 collect 场景同口径：INFO 正常空态提示、无 WARNING
+        # "Ops collect failed."（统一口径）
+        import logging
+
+        from collect.ops.ops_collect import collect_file
+
+        mocker.patch("params.ParamDict.get_command", return_value=consts.launch_cmd)
+        mocker.patch("common.FileOperate.check_dir", return_value=False)
+        with caplog.at_level(logging.INFO):
+            collect_file("./output")
+        self.assertTrue("WARNING" not in caplog.text)
+        self.assertTrue(
+            "No fault operator file to collect, this is normal when no fault occurred."
+            in caplog.text
+        )
+
+    def test_collect_file_launch_with_ops_dir_still_collects(self, mocker):
+        # launch 下 extra-info/ops 存在时照常归档；目录缺失才走空态提示
+        from collect.ops.ops_collect import collect_file
+
+        mocker.patch("params.ParamDict.get_command", return_value=consts.launch_cmd)
+        mocker.patch("common.FileOperate.check_dir", return_value=True)
+        collect_mock = mocker.patch("common.FileOperate.collect_dir", return_value=True)
+        warn_mock = mocker.patch("collect.ops.ops_collect.log_warning")
+        collect_file("./output")
+        collect_mock.assert_called_once()
+        warn_mock.assert_not_called()
+
     def test_collect_file_sk_scenario_skip_env_search(self, mocker):
         from collect.ops.ops_collect import collect_file
 

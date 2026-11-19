@@ -62,6 +62,9 @@ mkdir -p ${time_stamp}/stackcore/dev-os-0/
 touch ${time_stamp}/stackcore/dev-os-0/stackcore.slogd.11233.6.583572
 touch ${time_stamp}/stackcore/dev-os-0/stackcore.slogd.11546.6.583572
 
+mkdir -p ${time_stamp}/system_info/dev-os-0/tee
+echo "llt tee log" > ${time_stamp}/system_info/dev-os-0/tee/tee.log
+
 echo "llt msnpureport execute finish."
 # Typed export for ST: "msnpureport report -t <id>" (also tolerates the legacy
 # "-t <id>" form). Produces the timestamp dir plus the per-type info dirs so

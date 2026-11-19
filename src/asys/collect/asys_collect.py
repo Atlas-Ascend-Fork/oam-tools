@@ -73,32 +73,27 @@ class AsysCollect:
             AsysHealth().run()
 
     def _device_file_export(self):
-        def run_msnpureport(export_dir_path, export_tool):
+        def run_msnpureport(export_dir_path):
             f.create_dir(export_dir_path)
             export_dir_cmd = "cd " + shlex.quote(export_dir_path)
-            export_cmd = "{0};{1}".format(export_dir_cmd, export_tool)
+            export_cmd = "{0};{1}".format(export_dir_cmd, "msnpureport report -f")
             # #399 拍板规格：msnpureport 全量导出(-f)超时 60s，挂死时按
             # 既有失败路径降级（清理临时目录、返回失败）
             cmd_res = run_cmd_output(
                 export_cmd, timeout=MSNPUREPORT_TYPE_TIMEOUTS["-f"]
             )
             if not cmd_res[0]:
-                log_error(
-                    'Call msnpureport tool failed, sys.stderr: "{}"'.format(
-                        cmd_res[1].strip()
-                    )
-                )
+                # msnpureport 失败时 stderr 常为空（错误信息走 stdout 或仅退出码），
+                # 不打印 sys.stderr 内容。失败细节（命令、ret_code、stderr）由
+                # run_cmd_output 在 debug 级记录，此处不再重复。
+                # No error here: collect() logs the single summary error, so
+                # the same fault does not produce two error lines.
                 f.remove_dir(export_dir_path)
                 return False
             return True
 
         export_dir_path = os.path.join(self.output_root_path, "export_tmp")
-        # Prefer the documented "msnpureport report -f" form; fall back to the
-        # legacy "msnpureport -f" for driver packages predating the report
-        # subcommand, so the full device export keeps working on old drivers.
-        if not run_msnpureport(
-            export_dir_path, "msnpureport report -f"
-        ) and not run_msnpureport(export_dir_path, "msnpureport -f"):
+        if not run_msnpureport(export_dir_path):
             return False
         # export success
         in_export_dir = f.list_dir(export_dir_path)
