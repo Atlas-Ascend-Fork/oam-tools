@@ -16,11 +16,10 @@
 # limitations under the License.
 # ----------------------------------------------------------------------------
 
-import time
 import struct
 import os.path
 from threading import Thread
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 
 from common import FileOperate as f
@@ -113,28 +112,6 @@ class ParseTrace:
             fw.write(msg_txt.replace("\x00", ""))
 
     @staticmethod
-    def time_zone_calculation(tz_offset):
-        date_now = time.localtime()
-        date_utc = time.gmtime()
-        date_utc = datetime(
-            date_utc.tm_year,
-            date_utc.tm_mon,
-            date_utc.tm_mday,
-            date_utc.tm_hour,
-            date_utc.tm_min,
-        )
-        date_now = datetime(
-            date_now.tm_year,
-            date_now.tm_mon,
-            date_now.tm_mday,
-            date_now.tm_hour,
-            date_now.tm_min,
-        )
-        return (
-            (date_now.timestamp() - date_utc.timestamp()) // 60 - tz_offset
-        ) * NS_TO_S
-
-    @staticmethod
     def get_struct_data(fp, num, num_type):
         try:
             unpack_list = UNPACK.get(num_type)
@@ -186,8 +163,8 @@ class ParseTrace:
             fp, 2, TRACE_STRUCT_FIELD_TYPE_UINT32
         )
 
-        # Obtains the realTime and minutestWest information.
-        tz_offset = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT32)
+        # Obtains realTime and the signed local UTC offset in minutes.
+        tz_offset = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_INT32)
         real_time = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
         if str(version) == "3":
             cpu_freq = self.get_struct_data(fp, 1, TRACE_STRUCT_FIELD_TYPE_UINT64)
@@ -285,7 +262,7 @@ class ParseTrace:
             raise ValueError(
                 "Failed to parse the data, check whether the file is complete."
             )
-        offset_time_ns = self.time_zone_calculation(tz_offset)
+        trace_timezone = timezone(timedelta(minutes=tz_offset))
         _, msg_txt_size, msg_num, _ = self.get_struct_data(
             fp, 4, TRACE_STRUCT_FIELD_TYPE_UINT32
         )
@@ -301,14 +278,10 @@ class ParseTrace:
                 self.get_res_data(fp, msg_txt_size)
                 continue
             if cpu_freq != 0:
-                time_str = datetime.fromtimestamp(
-                    (real_time + (cycle / cpu_freq) * FREQ_GHZ_TO_KHZ + offset_time_ns)
-                    / NS_TO_S
-                )
+                timestamp_ns = real_time + (cycle / cpu_freq) * FREQ_GHZ_TO_KHZ
             else:
-                time_str = datetime.fromtimestamp(
-                    (real_time + cycle + offset_time_ns) / NS_TO_S
-                )
+                timestamp_ns = real_time + cycle
+            time_str = datetime.fromtimestamp(timestamp_ns / NS_TO_S, tz=trace_timezone)
             time_str = time_str.strftime("%Y-%m-%d %H:%M:%S.%f")
             # data
             struct_info = struct_dict.get(struct_type)

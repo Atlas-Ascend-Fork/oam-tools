@@ -20,10 +20,21 @@
 
 # pylint: disable=protected-access,redefined-outer-name,attribute-defined-outside-init,unused-argument,broad-exception-caught,unused-import,unused-variable,redefined-builtin,reimported,no-member,function-redefined,possibly-used-before-assignment,no-self-argument,too-many-function-args,unexpected-keyword-arg,no-value-for-parameter  # pytest fixture/mock/cleanup patterns
 
+import json
 import os
+from pathlib import Path
+import struct
+import subprocess
+import sys
 
 import pytest
-from testcase.conftest import ut_root_path, great_bin, create_dir, check_atrace_file
+from testcase.conftest import (
+    ASYS_SRC_PATH,
+    ut_root_path,
+    great_bin,
+    create_dir,
+    check_atrace_file,
+)
 
 from collect.trace import collect_trace, ParseTrace
 from testcase.conftest import AssertTest
@@ -184,3 +195,129 @@ class TestAtraceCollect(AssertTest):
         parse_trace = ParseTrace(is_file=True)
         parse_trace.parse("test.log")
         self.assertTrue("The test.log cannot be read or cannot be found" in caplog.text)
+
+
+def _timezone_trace_bytes(version, offset):
+    # Field layout is the same as write_ctrl_head/write_struct_segment in
+    # the native trace fixture generator. These are controlled Host inputs.
+    control = struct.pack(
+        "<5IiQ", 0xD928, version, 0, 120, 36, offset, 1715252892000000000
+    )
+    control += struct.pack("<QQ", 1000000 if version == 3 else 0, 0)
+    structures = struct.pack("<I36x", 1)
+    structures += struct.pack("<32sIB3x", b"counter_record", 1, 0)
+    structures += struct.pack("<32sBBH4x", b"counter", 6, 0, 4)
+    data = struct.pack("<4I", 20, 4, 1, 0)
+    data += struct.pack("<QI?B2xI", 1000000000, 4, False, 0, 42)
+    return control + structures + data
+
+
+def _trace_timezone_environment(analyzer_zone):
+    environment = os.environ.copy()
+    environment.pop("PYTHONHOME", None)
+    environment["PYTHONPATH"] = str(Path(ASYS_SRC_PATH).resolve())
+    environment["TZ"] = analyzer_zone
+    return environment
+
+
+@pytest.mark.parametrize("version", [2, 3])
+@pytest.mark.parametrize("analyzer_zone", ["UTC0", "SGT-8", "EST5"])
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (0, "2024-05-09 11:08:13.000"),
+        (480, "2024-05-09 19:08:13.000"),
+        (-300, "2024-05-09 06:08:13.000"),
+        (330, "2024-05-09 16:38:13.000"),
+    ],
+)
+def test_native_trace_timestamp_uses_recorded_zone(
+    version, analyzer_zone, offset, expected, tmp_path
+):
+    trace_file = tmp_path / "controlled_trace.bin"
+    original = _timezone_trace_bytes(version, offset)
+    trace_file.write_bytes(original)
+    # A fresh interpreter imports the complete native package without pytest's
+    # device/conftest mocks; the environment supplies the analyzer's real TZ.
+    code = (
+        "import json,sys; from collect.trace import ParseTrace; "
+        "print(json.dumps(ParseTrace(is_file=True).parse(sys.argv[1])))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(trace_file)],
+        env=_trace_timezone_environment(analyzer_zone),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (
+        json.loads(result.stdout.splitlines()[-1])
+        == expected + " counter_record: counter[42]\n"
+    )
+    assert trace_file.read_bytes() == original
+
+
+@pytest.mark.parametrize("version", [2, 3])
+@pytest.mark.parametrize(
+    ("offset", "expected"),
+    [
+        (480, "2024-05-09 19:08:13.000"),
+        (-300, "2024-05-09 06:08:13.000"),
+    ],
+)
+def test_native_trace_analyze_keeps_recorded_zone(version, offset, expected, tmp_path):
+    trace_file = tmp_path / "controlled_trace.bin"
+    original = _timezone_trace_bytes(version, offset)
+    trace_file.write_bytes(original)
+    output = tmp_path / "output"
+    output.mkdir()
+    # Configure the native analysis command as existing analyze UTs do.
+    # Device auto-detection belongs to asys.main(), whose RC guard rejects
+    # analyze; this file-analysis regression must run on either CI host type.
+    code = (
+        "import sys; from argparse import Namespace; "
+        "from analyze import AsysAnalyze; from params import ParamDict; "
+        "from common.task_common import create_out_timestamp_dir; "
+        "ParamDict().set_env_type('EP'); "
+        "ParamDict().set_args(Namespace(subparser_name='analyze', r='trace', "
+        "path=None, file=sys.argv[1], output=sys.argv[2], exe_file=None, "
+        "core_file=None, symbol=None, symbol_path=None, reg=0, d=0)); "
+        "create_out_timestamp_dir(); assert AsysAnalyze().run()"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(trace_file), str(output)],
+        env=_trace_timezone_environment("UTC0"),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    texts = list(output.rglob("controlled_trace.txt"))
+    assert len(texts) == 1
+    assert texts[0].read_text() == expected + " counter_record: counter[42]\n"
+    assert trace_file.read_bytes() == original
+
+
+@pytest.mark.parametrize("offset", [-1440, 1440, -(2**31), 2**31 - 1])
+def test_native_trace_rejects_invalid_recorded_offset(offset, tmp_path):
+    trace_file = tmp_path / "invalid_offset.bin"
+    original = _timezone_trace_bytes(3, offset)
+    trace_file.write_bytes(original)
+    code = (
+        "import json,sys; from collect.trace import ParseTrace; "
+        "print(json.dumps(ParseTrace(is_file=True).parse(sys.argv[1])))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(trace_file)],
+        env=_trace_timezone_environment("UTC0"),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout.splitlines()[-1]) == ""
+    assert trace_file.read_bytes() == original

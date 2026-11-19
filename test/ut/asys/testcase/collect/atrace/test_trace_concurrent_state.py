@@ -122,9 +122,9 @@ def test_run_isolates_v3_header_state_across_concurrent_files(
 ):
     # v3 头部三个字段同时具备区分力：tz_offset 不同（60/120）、cpu_freq 非 0 且
     # 不同（2e9/1e9）、cycle 非 0，时间戳走 cycle/cpu_freq 分支（贡献 1s/3s）。
-    # 期望值按公式 real_time + cycle/cpu_freq*1e6 - tz_offset*1e9（ns，TZ=UTC）实测：
-    # third: 86400s + 1s - 60s = 86341s -> 1970-01-01 23:59:01
-    # fourth: 172800s + 3s - 120s = 172683s -> 1970-01-02 23:58:03
+    # 头部偏移为采集端相对 UTC 的分钟数，按各文件自己的时区显示。
+    # third: 86400s + 1s，UTC+01:00 -> 1970-01-02 01:00:01
+    # fourth: 172800s + 3s，UTC+02:00 -> 1970-01-03 02:00:03
     _write_trace_with_real_time(
         tmp_path / "third.bin",
         86_400_000_000_000,
@@ -159,9 +159,9 @@ def test_run_isolates_v3_header_state_across_concurrent_files(
 
     third = (tmp_path / "third.txt").read_text(encoding="utf-8")
     fourth = (tmp_path / "fourth.txt").read_text(encoding="utf-8")
-    assert third.startswith("1970-01-01 23:59:01"), (
+    assert third.startswith("1970-01-02 01:00:01.000"), (
         f"third.txt 应使用自身 tz_offset/cpu_freq 时间基准: {third!r}"
     )
-    assert fourth.startswith("1970-01-02 23:58:03"), (
+    assert fourth.startswith("1970-01-03 02:00:03.000"), (
         f"fourth.txt 应使用自身 tz_offset/cpu_freq 时间基准: {fourth!r}"
     )
