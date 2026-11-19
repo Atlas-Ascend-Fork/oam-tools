@@ -1403,3 +1403,50 @@ class TestUtilsMethods(CommonAssert):
             "after convert:\n"
             "BB\n",
         )
+
+
+@pytest.mark.parametrize(
+    "shape,count,expected",
+    [
+        ([], 1, ()),
+        ([1], 1, (1,)),
+        ([0], 0, (0,)),
+        ([2, 3], 6, (2, 3)),
+        (None, 1, (1,)),
+        ([2], 1, (1,)),
+    ],
+)
+def test_dump_typed_array_preserves_explicit_scalar_shape(shape, count, expected):
+    raw = np.arange(count, dtype=np.float32).tobytes()
+    array, dtype = DumpDataParser._build_typed_array(raw, "float32", shape)
+    assert dtype == np.dtype("float32")
+    assert array.shape == expected
+    np.testing.assert_array_equal(array.reshape(-1), np.arange(count, dtype=np.float32))
+
+
+@pytest.mark.parametrize(
+    "shape,count",
+    [
+        ([], 1),
+        ([1], 1),
+        ([0], 0),
+        ([2, 3], 6),
+        (None, 1),
+        (None, 3),
+    ],
+)
+def test_dump_shape_metadata_matches_saved_npy(tmp_path, shape, count):
+    info = AicErrorInfo()
+    info.kernel_name = "shape_roundtrip"
+    parser = DumpDataParser(str(tmp_path), info)
+    data = np.arange(count, dtype=np.float32)
+    item = {"data_type": 1, "data": data.tobytes(), "size": data.nbytes}
+    if shape is not None:
+        item["shape"] = {"dim": shape}
+    parser._parse_one_item(item, "input", {}, 0, str(tmp_path))
+    result = np.load(info.dump_tensor_meta[-1]["file"], allow_pickle=False)
+    assert result.shape == ((count,) if shape is None else tuple(shape))
+    # 元数据与落盘 .npy 的 shape 必须一致：显式 shape 记声明值，
+    # 未声明 shape 的条目记实际落盘形状（而非 []）。
+    assert info.dump_tensor_meta[-1]["shape"] == list(result.shape)
+    np.testing.assert_array_equal(result.reshape(-1), data)

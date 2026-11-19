@@ -348,7 +348,7 @@ class DumpDataParser:
         if np_dtype is None or array.nbytes % np_dtype.itemsize != 0:
             return array, None
         array = array.view(np_dtype)
-        if shape and array.size == int(np.prod(shape)):
+        if shape is not None and array.size == int(np.prod(shape)):
             array = array.reshape(shape)
         return array, np_dtype
 
@@ -455,6 +455,9 @@ class DumpDataParser:
             arg_index = int(arg_index)
         except (TypeError, ValueError):
             arg_index = index
+        has_declared_shape = item.get("shape") is not None
+        array_shape = shape if has_declared_shape else None
+        array, np_dtype = self._build_typed_array(item.get("data"), dtype, array_shape)
         if not self._custom_dump_mode:
             try:
                 size_value = int(item.get("size", 0))
@@ -465,13 +468,13 @@ class DumpDataParser:
                     "parse_type": parse_type,
                     "index": arg_index,
                     "dtype": dtype,
-                    "shape": shape,
+                    # 未声明 shape 的条目落盘为一维数组，元数据记录实际落盘形状，
+                    # 保证与 .npy 一致（此前固定记 []，与落盘 (n,) 口径不符）。
+                    "shape": shape if has_declared_shape else list(array.shape),
                     "size": size_value,
                     "file": None,  # 落盘后由 _save_array 回填
                 }
             )
-
-        array, np_dtype = self._build_typed_array(item.get("data"), dtype, shape)
         dst_file_name = self._build_dst_file_name(
             dump_file_path, parse_type, index, dtype, np_dtype
         )
