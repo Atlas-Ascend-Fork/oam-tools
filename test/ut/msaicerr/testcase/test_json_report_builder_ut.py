@@ -84,6 +84,23 @@ def test_missing_file_to_not_collected(tmp_path):
     assert report["basic_info"]["json_file"] == "not_collected"
 
 
+def test_cause_info_empty_list(tmp_path):
+    info = _make_info()
+    report = jrb.build_report(info, str(tmp_path))
+    assert report["aic_error"]["cause_info"] == []
+
+
+def test_cause_info_kept(tmp_path):
+    hint = (
+        "GatherV2 failed to access the host memory through PCIe. You can enable "
+        "the environment variable OP_PCIE_THROUGH_ACCESS_HOST_MEM_CHECK_ENABLE "
+        "to enable the address check for the PCIe through feature."
+    )
+    info = _make_info(cause_info=[hint])
+    report = jrb.build_report(info, str(tmp_path))
+    assert report["aic_error"]["cause_info"] == [hint]
+
+
 def test_scene_not_applicable_null(tmp_path):
     info = _make_info()  # corrected_pc 为空 dict、graph_file 未命中
     report = jrb.build_report(info, str(tmp_path))

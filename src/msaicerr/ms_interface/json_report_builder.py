@@ -286,7 +286,11 @@ def _build_aic_error(info):
                 "registers": registers,
             }
         )
-    return {"groups": out_groups, "extend_info": info.extra_info}
+    return {
+        "groups": out_groups,
+        "extend_info": info.extra_info,
+        "cause_info": list(info.cause_info),
+    }
 
 
 def _build_basic_info(info, collection_dir):

@@ -222,6 +222,8 @@ class AicErrorInfo:
         # PC 修正结果，见 pc_corrector.get_corrected_pc；拿不到时为空 dict。
         self.corrected_pc = {}
         self.corrected_instr = ""
+        # plog命中的根因提示语，按检测类别逐条追加；空列表表示未命中。
+        self.cause_info = []
 
     def analyse(self: any) -> str:
         """
@@ -233,6 +235,14 @@ class AicErrorInfo:
         addr_check_str = self._get_addr_check_str()
 
         single_op_mem_monitor = self.single_op_mem_monitor
+
+        dfx_section = self._get_group_dfx(aicerror_info)
+        if self.cause_info:
+            # cause info 标签 18 位填充，与 AIC_ERROR / core id 等同列对齐。
+            hint_lines = "\n".join(
+                f"{'cause info'.ljust(18)}: {hint}" for hint in self.cause_info
+            )
+            dfx_section += "\n\n" + hint_lines
 
         msg = f"""{self.root_cause_conclusion}
 
@@ -251,7 +261,7 @@ rts_block_dim     : {self.rts_block_dim}
 driver_aicore_num : {self.driver_aicore_num}
 
 ***********************2. AI Core DFX Register***********************
-{self._get_group_dfx(aicerror_info)}
+{dfx_section}
 
 ***********************3. Operator Error Line Number************************
 {self._get_group_pc()}

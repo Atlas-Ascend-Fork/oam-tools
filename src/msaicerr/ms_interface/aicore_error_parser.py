@@ -581,6 +581,40 @@ class AicoreErrorParser:
             custom_dump_files=self._get_custom_dump_files(collect_dump_data),
         )
 
+    def _get_pcie_through_hint(self: any, plog_path: str, thread_id: str) -> str:
+        """识别adump输出的pcie through根因提示语，未命中返回空串。
+
+        仅取与主记录同线程的提示：多进程混写、多卡或多次dump时，plog中可能
+        存在其他进程/其他错误的提示语，全局取首条会错配（与 get_op_info 按
+        thread_id 锁定主记录、pc_corrector 按核身份过滤的既有口径一致）。
+        同线程多条命中取首条；全部失配返回空串不追加（宁漏勿错配）。
+        """
+        cmd = ["grep", r"\[Dump\]\[Exception\]", "-inrE", plog_path]
+        rets = utils.get_inquire_result(
+            cmd, RegexPattern.ADUMP_PCIE_THROUGH, match_dict=True
+        )
+        for ret in rets or []:
+            if ret.get("thread_id") == str(thread_id):
+                return ret["hint"].strip()
+        if rets:
+            utils.print_warn_log(
+                f"{len(rets)} pcie through hint(s) found in plog but none "
+                f"matches main thread id {thread_id}, skip appending cause info."
+            )
+        return ""
+
+    def _collect_cause_info(self: any, plog_path: str, thread_id: str) -> list:
+        """收集plog中命中的根因信息原文，未命中返回空列表。
+
+        各检测类别独立grep，命中一条即收集；新增adump提示日志时在此追加
+        对应关键字/正则的检测项，报告字段与渲染无需再改。
+        """
+        cause_info = []
+        hint = self._get_pcie_through_hint(plog_path, thread_id)
+        if hint:
+            cause_info.append(hint)
+        return cause_info
+
     def set_info(self, aic_err_ret, plog_path, data_name, rts_block_dim, records=None):
         info = AicErrorInfo()
         if records is None:
@@ -623,6 +657,10 @@ class AicoreErrorParser:
         info.aic_error_groups = list(groups.items())
 
         info.data_name = data_name
+        # 主记录 thread_id 为本次分析的身份标识，根因信息仅收集同线程的提示语
+        info.cause_info = self._collect_cause_info(
+            plog_path, aic_err_ret.get("thread_id", "")
+        )
 
         # 此处附加判断是L0还是L1
         error_info = self._get_node_and_kernel_name(data_name)
