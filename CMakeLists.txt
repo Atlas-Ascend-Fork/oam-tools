@@ -169,7 +169,8 @@ set(BUNDLE_PKG ${CMAKE_CURRENT_SOURCE_DIR}/bundle)
 if(EXISTS "${BUNDLE_PKG}/aml")
     # AICore STL 形态目录列表。目录名须与入口 so 里 SOC_PLATFORM_TABLE 的
     # formSubDir 逐字符一致(oam-tools-diag: aml_aicore_stl_platform.cpp)，
-    # 形态 so / kernel so / 算子 .o / 算子输入数据(mx.bin)都放这里。
+    # 形态 so / kernel so / 算子输入数据(mx.bin)都放这里（算子 .o 已链接进
+    # kernel so，不打包）。
     # 新增形态时在此追加子目录名（与 oam-tools-diag 的 STL_PLATFORM_DIRS 对应）。
     set(_aml_stl_form_subdirs "ascend950_aicore_stl" "ascend960dt_aicore_stl")
     # 已稳定发布的形态：产物不齐（形态目录 / 形态 so / kernel so 缺失）视为打包异常，
@@ -309,7 +310,7 @@ if(EXISTS "${BUNDLE_PKG}/aml")
     #   入口 libaml_aicore_stl.so → host libaml_stl_<形态>.so → kernel libaml_stl_kernel_<形态>.so
     # 分级放置以便后续按 SoC 形态扩展:
     #   aicore_stl/                        入口层，平台无关
-    #   aicore_stl/<形态>_aicore_stl/      形态相关(host so + kernel so + 算子 .o)
+    #   aicore_stl/<形态>_aicore_stl/      形态相关(host so + kernel so)
     # 形态子目录名须与入口 so 里 SOC_PLATFORM_TABLE 的 formSubDir 逐字符一致
     # (oam-tools-diag: aml_aicore_stl_platform.cpp)：入口 so 用 dladdr 定位自身目录后
     # 拼 <自身目录>/<formSubDir>/ 加载形态 so，名字不一致会在运行期 dlopen 失败。
@@ -342,23 +343,14 @@ if(EXISTS "${BUNDLE_PKG}/aml")
         endif()
         unset(_form_required_idx)
         unset(_aml_stl_form_complete)
-        # 形态层:host so + kernel so，放 aicore_stl/<形态>/
+        # 形态层:host so + kernel so，放 aicore_stl/<形态>/。
+        # 算子 .o 不打包：device 代码已链接进 kernel so（.aicore_binary 段）。
         install(FILES
             "${_aml_stl_bundle_form_dir}/libaml_stl_${_soc}.so"
             "${_aml_stl_bundle_form_dir}/libaml_stl_kernel_${_soc}.so"
             DESTINATION ${_aml_stl_form_rel}
             COMPONENT oam-tools
         )
-        # 算子 .o(算子目录名生成，随形态增删会变)，用 GLOB 全量纳入。
-        # 按形态子目录取，避免把别的形态的 .o 一并捞进本形态目录。
-        file(GLOB _stl_kernel_objs CONFIGURE_DEPENDS
-            "${_aml_stl_bundle_form_dir}/*.o"
-        )
-        install(FILES ${_stl_kernel_objs}
-            DESTINATION ${_aml_stl_form_rel}
-            COMPONENT oam-tools
-        )
-        unset(_stl_kernel_objs)
         unset(_soc)
         unset(_aml_stl_form_rel)
         unset(_aml_stl_bundle_form_dir)
