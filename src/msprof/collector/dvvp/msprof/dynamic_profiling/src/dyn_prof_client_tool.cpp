@@ -31,6 +31,11 @@ namespace Dvvp {
 namespace DynProf {
 constexpr long DYN_PROF_MS_PER_SEC = 1000;
 constexpr int32_t DYN_PROF_NS_PER_MS = 1000000;
+// 可读、对端关闭、出错、fd 无效都视为“已就绪”收掉，避免死连接让 poll 反复就绪空转。
+// CodeCheck 要求位运算（& | ^ ~ << >>）的操作数只能是无符号数：POLLIN 等宏是 int、
+// struct pollfd 的 revents 是 short，都是有符号，必须逐个显式转成 uint32_t 再参与运算。
+constexpr uint32_t DYN_PROF_POLL_READY_MASK = static_cast<uint32_t>(POLLIN) | static_cast<uint32_t>(POLLHUP) |
+                                              static_cast<uint32_t>(POLLERR) | static_cast<uint32_t>(POLLNVAL);
 const std::map<std::string, DynProfCliCmd> DYN_PROF_CLI_CMD_MAP = {
     {"start", DynProfCliCmd::DYN_PROF_CLI_CMD_START},
     {"stop", DynProfCliCmd::DYN_PROF_CLI_CMD_STOP},
@@ -444,8 +449,10 @@ std::set<int32_t> DynProfClient::DynProfCliWaitReadable(const std::vector<int32_
         std::vector<int32_t> next;
         next.reserve(pending.size());
         for (size_t i = 0; i < pfds.size(); ++i) {
+            // revents 是 short（有符号），位运算前显式转成 uint32_t，满足“位运算操作数须为无符号数”的要求
+            const uint32_t revents = static_cast<uint32_t>(pfds[i].revents);
             // POLLERR/POLLHUP/POLLNVAL 也一并收掉，否则这些 fd 会让 poll 反复就绪导致空转
-            if ((pfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) == 0) {
+            if ((revents & DYN_PROF_POLL_READY_MASK) == 0U) {
                 next.push_back(pending[i]);
                 continue;
             }
