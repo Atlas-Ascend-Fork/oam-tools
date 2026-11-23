@@ -242,7 +242,7 @@ int check_alloc_memory_size(size_t& alloc_size)
     size_t totalMem = 0;
     size_t reservedMem;
     aclError ret = aclrtGetMemInfo(use_ddr_mem(), &freeMem, &totalMem);
-    if (ret != ACL_ERROR_NONE) {
+    if (ret != ACL_SUCCESS) {
         printf("Get ddr memory info failed.");
         return HCCL_E_MEMORY;
     }
