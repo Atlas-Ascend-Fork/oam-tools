@@ -16,6 +16,7 @@
 #include "input_parser_tool.h"
 #include <cstdio>
 #include <cstdlib>
+#include <dirent.h>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -885,6 +886,14 @@ SHARED_PTR_ALIA<analysis::dvvp::message::ProfileParams> InputParser::MsprofGetOp
         }
     }
 
+    // A PMU switch given "help" has already printed the list; reuse the --help path so the process
+    // exits 0 without starting a collection.
+    if (pmuHelpPrinted_) {
+        params_->usedParams.clear();
+        params_->usedParams.insert(ARGS_HELP);
+        return params_;
+    }
+
     if (!params_->application.empty()) {
         HandleApp();
     }
@@ -1077,6 +1086,12 @@ std::string InputParser::ResolveScriptDir() const
 int32_t InputParser::ParamsCheck() const
 {
     if (params_ == nullptr) {
+        return MSPROF_DAEMON_ERROR;
+    }
+
+    // Catches "--event-sample=system-wide" without any event list, which would otherwise be handed to
+    // the collector and fail there. Runs after parsing, so option order does not matter.
+    if (CheckHostPmuConsistency() != MSPROF_DAEMON_OK) {
         return MSPROF_DAEMON_ERROR;
     }
 
@@ -2370,6 +2385,18 @@ int32_t InputParser::MsprofHostCheckValid(const struct MsprofCmdInfo& cmdInfo, i
         case ARGS_FTRACE_BUFSIZE:
             ret = CheckFtraceBufsizeValid(cmdInfo);
             break;
+        case ARGS_HOST_PMU_SAMPLE:
+            ret = CheckHostPmuSampleValid(cmdInfo);
+            break;
+        case ARGS_HOST_PMU_EVENTS:
+            ret = CheckHostPmuEventsValid(cmdInfo);
+            break;
+        case ARGS_HOST_PMU_OS_EVENTS:
+            ret = CheckHostPmuOsEventsValid(cmdInfo);
+            break;
+        case ARGS_HOST_PMU_INTERVAL:
+            ret = CheckHostPmuIntervalValid(cmdInfo);
+            break;
         default:
             break;
     }
@@ -2685,6 +2712,35 @@ void ArgsManager::AddFtraceArgs()
     argsList_.push_back(ftrace);
     argsList_.push_back(ftracePeriod);
     argsList_.push_back(ftraceBufsize);
+    // PMU counting: names follow nsys so an nsys user can transfer the habit, the values are
+    // pmu event names this node exposes.
+    Args pmuSample = {
+        "event-sample",
+        "Whether to collect CPU PMU counters: 'none' (default) or 'system-wide'. Counting is system-wide: "
+        "every online CPU is counted for all processes on it, so /proc/sys/kernel/perf_event_paranoid must "
+        "be 0 (or CAP_PERFMON). --host-sys-pid does not narrow the scope.",
+        "none"};
+    Args pmuEvents = {
+        "cpu-core-events",
+        "Comma separated hardware PMU counter list, e.g. cycles,instructions,l1d_cache. "
+        "Counted system-wide, one group per online CPU. Run --cpu-core-events=help to list the events "
+        "this node supports. Event names, not the numeric IDs nsys uses. Specifying this option also "
+        "turns --event-sample on.",
+        "cycles,instructions"};
+    Args pmuOsEvents = {
+        "os-events",
+        "Comma separated software (kernel) counter list, e.g. page-faults,context-switches. Unlike "
+        "--cpu-core-events these do not come from the PMU, so they work even when the CPU PMU is "
+        "unavailable. Run --os-events=help for the accepted names (page-faults, minor-faults, "
+        "major-faults, context-switches, cpu-migrations, alignment-faults, emulation-faults, "
+        "task-clock, cpu-clock). Specifying this option also turns --event-sample on.",
+        "page-faults"};
+    Args pmuInterval = {
+        "event-sampling-interval", "How often the counters are read, in milliseconds. Default 100.", "100"};
+    argsList_.push_back(pmuSample);
+    argsList_.push_back(pmuEvents);
+    argsList_.push_back(pmuOsEvents);
+    argsList_.push_back(pmuInterval);
 }
 
 void ArgsManager::AddDynProfArgs()
@@ -3060,6 +3116,216 @@ constexpr int32_t FTRACE_MIN_BUFSIZE_KB = 1024;
 constexpr int32_t FTRACE_MAX_BUFSIZE_KB = 4194304;
 const std::string FTRACE_ON = "on";
 
+// host PMU counting (perf_event_open)
+constexpr char PMU_EVENT_SEPARATOR = ',';
+constexpr size_t PMU_MAX_EVENT_LEN = 64;
+constexpr int32_t PMU_MAX_EVENTS = 32;
+// "0x"/"0X" prefix length, used to spot the hex spelling of a raw encoding.
+constexpr size_t PMU_HEX_PREFIX_LEN = 2;
+// "raw:" is the other spelling the runtime rejects.
+constexpr char PMU_RAW_PREFIX[] = "raw:";
+constexpr size_t PMU_RAW_PREFIX_LEN = sizeof(PMU_RAW_PREFIX) - 1;
+// --cpu-core-events=help prints this many alias names per line.
+constexpr int32_t PMU_HELP_COLUMNS = 6;
+constexpr int32_t PMU_MIN_INTERVAL_MS = 1;
+constexpr int32_t PMU_MAX_INTERVAL_MS = 3600000;
+const std::string PMU_ON = "on";
+const std::string PMU_OFF = "off";
+
+// PMU event names are either a sysfs event ("l1d_cache") or a generic alias ("cycles"). Raw
+// encodings are not accepted in this version, so ':' is not part of the allowed set; the check is
+// otherwise like IsFtraceNameValid, forbidding '/' and whitespace.
+bool IsPmuEventNameValid(const std::string& name)
+{
+    if (name.empty() || name.size() > PMU_MAX_EVENT_LEN) {
+        return false;
+    }
+    for (char chr : name) {
+        const bool validChar = (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
+                               chr == '_' || chr == '-';
+        if (!validChar) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Software ("perf list sw") events the collector can count. The set is fixed by the kernel rather
+// than by the node's PMU, so an unknown name is a typo and can be rejected here instead of failing
+// once collection starts. Keep in sync with SOFTWARE_ALIASES in the runtime's
+// pmu_event_resolver.cpp; nsys shows the same list via --os-events=help.
+constexpr const char* PMU_OS_EVENT_NAMES[] = {
+    "page-faults",      "minor-faults",     "major-faults", "context-switches", "cpu-migrations",
+    "alignment-faults", "emulation-faults", "task-clock",   "cpu-clock",
+};
+
+bool IsPmuOsEventNameValid(const std::string& name)
+{
+    for (const char* known : PMU_OS_EVENT_NAMES) {
+        if (name == known) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// nsys takes numeric event IDs for --cpu-core-events (its own per-machine table, default 2 =
+// Instructions Retired; the Embedded edition takes hex codes). A number means nothing to us, and
+// because it passes the character check it would otherwise produce a column that never opens and a
+// silently empty result, so it is rejected with a pointer to the two forms that do work.
+bool LooksLikeNumericEventId(const std::string& item, bool& isHexCode)
+{
+    isHexCode = false;
+    if (item.empty()) {
+        return false;
+    }
+    bool allDigits = true;
+    for (char chr : item) {
+        if (chr < '0' || chr > '9') {
+            allDigits = false;
+            break;
+        }
+    }
+    if (allDigits) {
+        return true;
+    }
+    if (item.size() > PMU_HEX_PREFIX_LEN && item[0] == '0' &&
+        (item[PMU_HEX_PREFIX_LEN - 1] == 'x' || item[PMU_HEX_PREFIX_LEN - 1] == 'X')) {
+        for (size_t i = PMU_HEX_PREFIX_LEN; i < item.size(); ++i) {
+            const char chr = item[i];
+            const bool isHex = (chr >= '0' && chr <= '9') || (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F');
+            if (!isHex) {
+                return false;
+            }
+        }
+        isHexCode = true;
+        return true;
+    }
+    return false;
+}
+
+// Raw encodings are not supported, but they must be rejected with a reason that says so: the
+// character check alone would call "raw:0x13" an invalid name, and the runtime rejects both
+// spellings, so letting either through here would only fail later during collection setup.
+bool LooksLikeRawEncoding(const std::string& item)
+{
+    // R-prefixed hex is the terse spelling ("r13"), "raw:" the explicit one; both are rejected.
+    if (item.compare(0, PMU_RAW_PREFIX_LEN, PMU_RAW_PREFIX) == 0) {
+        return true;
+    }
+    if (item.size() > 1 && item[0] == 'r') {
+        for (size_t i = 1; i < item.size(); ++i) {
+            const char chr = item[i];
+            const bool isHex = (chr >= '0' && chr <= '9') || (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F');
+            if (!isHex) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+// Appends every event name the CPU PMU of this node exposes, so --cpu-core-events=help can list
+// them the way nsys does. The directory name is discovered rather than hard-coded because the
+// kernel appends an instance suffix (armv8_pmuv3_0 on Kunpeng-920).
+bool ListSysfsPmuEvents(std::vector<std::string>& names, std::string& pmuDir)
+{
+    const std::string root = "/sys/bus/event_source/devices";
+    DIR* rootDir = opendir(root.c_str());
+    if (rootDir == nullptr) {
+        return false;
+    }
+    std::vector<std::string> candidates;
+    struct dirent* entry = nullptr;
+    while ((entry = readdir(rootDir)) != nullptr) {
+        const std::string name = entry->d_name;
+        const bool isArmPmu = name.compare(0, std::strlen("armv8_pmuv3"), "armv8_pmuv3") == 0 ||
+                              name.compare(0, std::strlen("armv9_pmuv3"), "armv9_pmuv3") == 0;
+        if (isArmPmu || name == "cpu") {
+            candidates.push_back(name);
+        }
+    }
+    (void)closedir(rootDir);
+    if (candidates.empty()) {
+        return false;
+    }
+    std::sort(candidates.begin(), candidates.end());
+    // Prefer the unsuffixed name when it exists so the output is stable across kernels.
+    pmuDir = root + "/" + candidates[0];
+    for (const auto& candidate : candidates) {
+        if (candidate == "armv8_pmuv3") {
+            pmuDir = root + "/" + candidate;
+            break;
+        }
+    }
+    DIR* eventsDir = opendir((pmuDir + "/events").c_str());
+    if (eventsDir == nullptr) {
+        return false;
+    }
+    while ((entry = readdir(eventsDir)) != nullptr) {
+        const std::string name = entry->d_name;
+        if (name == "." || name == "..") {
+            continue;
+        }
+        names.push_back(name);
+    }
+    (void)closedir(eventsDir);
+    std::sort(names.begin(), names.end());
+    return !names.empty();
+}
+
+const char* const PMU_HARDWARE_ALIAS_NAMES[] = {
+    "cycles",
+    "cpu-cycles",
+    "instructions",
+    "cache-references",
+    "cache-misses",
+    "branch-instructions",
+    "branches",
+    "branch-misses",
+    "bus-cycles",
+    "stalled-cycles-frontend",
+    "stalled-cycles-backend",
+};
+
+void PrintPmuEventHelp(bool osEvents)
+{
+    if (osEvents) {
+        std::cout << "Software (kernel) events accepted by --os-events:" << std::endl;
+        for (const char* name : PMU_OS_EVENT_NAMES) {
+            std::cout << "  " << name << std::endl;
+        }
+        std::cout << "These are counted by the kernel, not by the CPU PMU, so they are available even "
+                     "when the PMU is not."
+                  << std::endl;
+        return;
+    }
+    std::vector<std::string> sysfsEvents;
+    std::string pmuDir;
+    const bool haveSysfs = ListSysfsPmuEvents(sysfsEvents, pmuDir);
+    if (haveSysfs) {
+        std::cout << "CPU PMU events on this node (" << pmuDir << "/events):" << std::endl;
+        for (const auto& name : sysfsEvents) {
+            std::cout << "  " << name << std::endl;
+        }
+    } else {
+        std::cout << "No CPU PMU event directory was found on this node; only the generic aliases "
+                     "below can be used."
+                  << std::endl;
+    }
+    std::cout << "Generic hardware aliases (always accepted):" << std::endl;
+    const size_t aliasCount = sizeof(PMU_HARDWARE_ALIAS_NAMES) / sizeof(PMU_HARDWARE_ALIAS_NAMES[0]);
+    for (size_t i = 0; i < aliasCount; ++i) {
+        // PMU_HELP_COLUMNS per line, indented, with no trailing space before the newline.
+        std::cout << ((i % PMU_HELP_COLUMNS == 0) ? "  " : " ") << PMU_HARDWARE_ALIAS_NAMES[i];
+        if (i % PMU_HELP_COLUMNS == (PMU_HELP_COLUMNS - 1) || i + 1 == aliasCount) {
+            std::cout << std::endl;
+        }
+    }
+    std::cout << "Software events are selected with --os-events, not with this switch." << std::endl;
+}
+
 bool IsFtraceNameValid(const std::string& name)
 {
     if (name.empty() || name.size() > FTRACE_MAX_EVENT_LEN) {
@@ -3168,6 +3434,287 @@ int32_t InputParser::CheckFtraceBufsizeValid(const struct MsprofCmdInfo& cmdInfo
         return MSPROF_DAEMON_ERROR;
     }
     params_->host_ftrace_bufsize = bufsize;
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckHostPmuSampleValid(const struct MsprofCmdInfo& cmdInfo)
+{
+    if (Platform::instance()->RunSocSide()) {
+        CmdLog::CmdErrorLog("Not in host side, --event-sample is not supported.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const char* value = cmdInfo.args[ARGS_HOST_PMU_SAMPLE];
+    if (value == nullptr) {
+        CmdLog::CmdErrorLog("Argument --event-sample: expected one argument (none or system-wide).");
+        return MSPROF_DAEMON_ERROR;
+    }
+    // nsys semantics: the switch says whether to collect, the event list says what to collect.
+    // "none" is accepted so a caller can turn the feature off without dropping the option.
+    const std::string mode = std::string(value);
+    if (mode != "none" && mode != "system-wide") {
+        CmdLog::CmdErrorLog(
+            "Argument --event-sample: invalid value '%s'. Please input 'none' or 'system-wide'.", value);
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (mode == "none") {
+        hostPmuSampleNone_ = true;
+        params_->host_pmu_profiling = PMU_OFF;
+        // Both lists are cleared: leaving the software list behind would contradict the switch and
+        // makes the parameters look like a half-enabled configuration when read for debugging.
+        params_->host_pmu_events.clear();
+        params_->host_pmu_os_events.clear();
+        return MSPROF_DAEMON_OK;
+    }
+    // Defer the "events must be non-empty" check to the end of parsing so
+    // --event-sample=system-wide --cpu-core-events=cycles works in either order.
+    hostPmuSampleNone_ = false;
+    params_->host_pmu_profiling = PMU_ON;
+    return MSPROF_DAEMON_OK;
+}
+
+// Per-name rules for --cpu-core-events: reject raw encodings and numeric IDs with a reason that says
+// why, then the character rule, then de-duplicate. Kept separate from the entry point so the option
+// handling and the name rules can be read independently.
+int32_t InputParser::CollectHostPmuEventNames(const std::string& args, std::vector<std::string>& normalized) const
+{
+    std::vector<std::string> items = Utils::Split(args, false, "", std::string(1, PMU_EVENT_SEPARATOR));
+    for (const auto& item : items) {
+        if (item.empty()) {
+            continue;
+        }
+        if (LooksLikeRawEncoding(item)) {
+            CmdLog::CmdErrorLog(
+                "Argument --cpu-core-events: '%s' is a raw PMU encoding, which is not supported. "
+                "Use an event name from --cpu-core-events=help.",
+                item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        bool isHexCode = false;
+        if (LooksLikeNumericEventId(item, isHexCode)) {
+            if (isHexCode) {
+                CmdLog::CmdErrorLog(
+                    "Argument --cpu-core-events: '%s' looks like a raw PMU encoding, which is not supported. "
+                    "Use an event name from --cpu-core-events=help.",
+                    item.c_str());
+            } else {
+                CmdLog::CmdErrorLog(
+                    "Argument --cpu-core-events: '%s' is a numeric event ID. nsys numbers events per machine "
+                    "(2 = Instructions Retired), so a number collects nothing here. Use an event name such as "
+                    "cycles or l1d_cache. Run --cpu-core-events=help for the names this node supports.",
+                    item.c_str());
+            }
+            return MSPROF_DAEMON_ERROR;
+        }
+        if (!IsPmuEventNameValid(item)) {
+            CmdLog::CmdErrorLog(
+                "Argument --cpu-core-events: invalid event '%s'. Allowed characters are letters, digits, "
+                "'_' and '-', e.g. cycles, l1d_cache.",
+                item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        if (std::find(normalized.begin(), normalized.end(), item) == normalized.end()) {
+            normalized.emplace_back(item);
+        }
+    }
+    if (normalized.empty()) {
+        CmdLog::CmdErrorLog("Argument --cpu-core-events: no usable event in '%s'.", args.c_str());
+        return MSPROF_DAEMON_ERROR;
+    }
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckHostPmuEventCount(const std::vector<std::string>& normalized, const char* option) const
+{
+    if (static_cast<int32_t>(normalized.size()) > PMU_MAX_EVENTS) {
+        CmdLog::CmdErrorLog(
+            "Argument %s: too many events (%zu), the limit is %d.", option, normalized.size(), PMU_MAX_EVENTS);
+        return MSPROF_DAEMON_ERROR;
+    }
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckHostPmuEventsValid(const struct MsprofCmdInfo& cmdInfo)
+{
+    if (Platform::instance()->RunSocSide()) {
+        CmdLog::CmdErrorLog("Not in host side, --cpu-core-events is not supported.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const char* value = cmdInfo.args[ARGS_HOST_PMU_EVENTS];
+    if (value == nullptr) {
+        CmdLog::CmdErrorLog("Argument --cpu-core-events: expected one argument, e.g. "
+                            "--cpu-core-events=cycles,instructions.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const std::string args = std::string(value);
+    if (args.empty()) {
+        CmdLog::CmdErrorLog("Argument --cpu-core-events is empty. Please input a comma separated counter list.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (args == "help") {
+        PrintPmuEventHelp(false);
+        pmuHelpPrinted_ = true;
+        return MSPROF_DAEMON_OK;
+    }
+    std::vector<std::string> normalized;
+    if (CollectHostPmuEventNames(args, normalized) != MSPROF_DAEMON_OK) {
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (CheckHostPmuEventCount(normalized, "--cpu-core-events") != MSPROF_DAEMON_OK) {
+        return MSPROF_DAEMON_ERROR;
+    }
+    UtilsStringBuilder<std::string> builder;
+    params_->host_pmu_events = builder.Join(normalized, std::string(1, PMU_EVENT_SEPARATOR));
+    // Specifying the list is enough to ask for the feature; requiring --event-sample too would
+    // make the option silently do nothing.
+    if (!hostPmuSampleNone_) {
+        params_->host_pmu_profiling = PMU_ON;
+    }
+    return CheckHostPmuEventBudget();
+}
+
+// The 32-event ceiling comes from the row width, not from either switch, so the two lists share one
+// budget in the collector. Checking each list on its own would accept 32 + 32 here and then fail
+// during collection setup, which reads as a runtime bug rather than a bad command line.
+int32_t InputParser::CheckHostPmuEventBudget() const
+{
+    std::vector<std::string> names;
+    const std::vector<std::string> lists = {params_->host_pmu_events, params_->host_pmu_os_events};
+    for (const auto& list : lists) {
+        for (const auto& item : Utils::Split(list, false, "", std::string(1, PMU_EVENT_SEPARATOR))) {
+            if (item.empty()) {
+                continue;
+            }
+            // The same name in both lists is folded into one column, so it costs one slot, not two.
+            if (std::find(names.begin(), names.end(), item) == names.end()) {
+                names.emplace_back(item);
+            }
+        }
+    }
+    if (static_cast<int32_t>(names.size()) > PMU_MAX_EVENTS) {
+        CmdLog::CmdErrorLog(
+            "Arguments --cpu-core-events and --os-events together name %zu events, the limit is %d. "
+            "Both lists share one counter budget because every event becomes a column in the same row.",
+            names.size(), PMU_MAX_EVENTS);
+        return MSPROF_DAEMON_ERROR;
+    }
+    return MSPROF_DAEMON_OK;
+}
+
+// Requesting the feature without naming anything to count is a user error: the collector would log
+// one line and produce a header-only file, which reads as missing data rather than a bad command.
+int32_t InputParser::CheckHostPmuConsistency() const
+{
+    if (params_->host_pmu_profiling != PMU_ON) {
+        return MSPROF_DAEMON_OK;
+    }
+    if (params_->host_pmu_events.empty() && params_->host_pmu_os_events.empty()) {
+        CmdLog::CmdErrorLog("Argument --event-sample=system-wide requires --cpu-core-events or --os-events; "
+                            "without an event list nothing would be counted.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    // The per-option checks only see one list each, and the collector appends both into one set with a
+    // single 32-event ceiling. Checking the merged set here, after every option was parsed, is the only
+    // place where the two lists can be compared -- otherwise 24 PMU events plus 9 software events pass
+    // the parser and fail in the collector.
+    return CheckHostPmuEventBudget();
+}
+
+// Software events share the mechanics of --cpu-core-events but not its name space: the accepted
+// values are kernel counters (perf list sw), which is why they are checked against a fixed list
+// instead of the looser character rule. Keeping them in a separate option also removes an
+// ambiguity: the resolver prefers a sysfs event over a software one of the same name, so a single
+// combined list could silently collect a PMU event when the user asked for a kernel counter.
+// Per-name rules for --os-events: the accepted set is the fixed list of kernel counters, so a numeric
+// ID or an unknown name gets its own message instead of the looser character rule.
+int32_t InputParser::CollectHostPmuOsEventNames(const std::string& args, std::vector<std::string>& normalized) const
+{
+    std::vector<std::string> items = Utils::Split(args, false, "", std::string(1, PMU_EVENT_SEPARATOR));
+    for (const auto& item : items) {
+        if (item.empty()) {
+            continue;
+        }
+        bool isHexCode = false;
+        if (LooksLikeNumericEventId(item, isHexCode)) {
+            CmdLog::CmdErrorLog(
+                "Argument --os-events: '%s' is not an event name. This switch takes kernel counters such as "
+                "page-faults or context-switches; run --os-events=help for the full list.",
+                item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        if (!IsPmuOsEventNameValid(item)) {
+            CmdLog::CmdErrorLog(
+                "Argument --os-events: invalid event '%s'. Supported values are page-faults, minor-faults, "
+                "major-faults, context-switches, cpu-migrations, alignment-faults, emulation-faults, "
+                "task-clock and cpu-clock.",
+                item.c_str());
+            return MSPROF_DAEMON_ERROR;
+        }
+        if (std::find(normalized.begin(), normalized.end(), item) == normalized.end()) {
+            normalized.emplace_back(item);
+        }
+    }
+    if (normalized.empty()) {
+        CmdLog::CmdErrorLog("Argument --os-events: no usable event in '%s'.", args.c_str());
+        return MSPROF_DAEMON_ERROR;
+    }
+    return MSPROF_DAEMON_OK;
+}
+
+int32_t InputParser::CheckHostPmuOsEventsValid(const struct MsprofCmdInfo& cmdInfo)
+{
+    if (Platform::instance()->RunSocSide()) {
+        CmdLog::CmdErrorLog("Not in host side, --os-events is not supported.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const char* value = cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS];
+    if (value == nullptr) {
+        CmdLog::CmdErrorLog("Argument --os-events: expected one argument, e.g. --os-events=page-faults.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    const std::string args = std::string(value);
+    if (args.empty()) {
+        CmdLog::CmdErrorLog("Argument --os-events is empty. Please input a comma separated counter list.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (args == "help") {
+        PrintPmuEventHelp(true);
+        pmuHelpPrinted_ = true;
+        return MSPROF_DAEMON_OK;
+    }
+    std::vector<std::string> normalized;
+    if (CollectHostPmuOsEventNames(args, normalized) != MSPROF_DAEMON_OK) {
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (CheckHostPmuEventCount(normalized, "--os-events") != MSPROF_DAEMON_OK) {
+        return MSPROF_DAEMON_ERROR;
+    }
+    UtilsStringBuilder<std::string> builder;
+    params_->host_pmu_os_events = builder.Join(normalized, std::string(1, PMU_EVENT_SEPARATOR));
+    if (!hostPmuSampleNone_) {
+        params_->host_pmu_profiling = PMU_ON;
+    }
+    return CheckHostPmuEventBudget();
+}
+
+int32_t InputParser::CheckHostPmuIntervalValid(const struct MsprofCmdInfo& cmdInfo) const
+{
+    if (Platform::instance()->RunSocSide()) {
+        CmdLog::CmdErrorLog("Not in host side, --event-sampling-interval is not supported.");
+        return MSPROF_DAEMON_ERROR;
+    }
+    if (cmdInfo.args[ARGS_HOST_PMU_INTERVAL] == nullptr) {
+        CmdLog::CmdErrorLog("Argument --event-sampling-interval: expected one argument (milliseconds).");
+        return MSPROF_DAEMON_ERROR;
+    }
+    int32_t interval = 0;
+    if (!Utils::StrToInt32(interval, cmdInfo.args[ARGS_HOST_PMU_INTERVAL]) || interval < PMU_MIN_INTERVAL_MS ||
+        interval > PMU_MAX_INTERVAL_MS) {
+        CmdLog::CmdErrorLog(
+            "Argument --event-sampling-interval: invalid value '%s'. Range is [%d, %d] ms.",
+            cmdInfo.args[ARGS_HOST_PMU_INTERVAL], PMU_MIN_INTERVAL_MS, PMU_MAX_INTERVAL_MS);
+        return MSPROF_DAEMON_ERROR;
+    }
+    params_->host_pmu_interval = std::to_string(interval);
     return MSPROF_DAEMON_OK;
 }
 

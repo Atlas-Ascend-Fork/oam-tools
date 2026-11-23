@@ -1935,3 +1935,375 @@ TEST_F(INPUT_PARSER_UTEST, UseInstrProfilingWarnsDeprecated)
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// host PMU counting switches (--event-sample / --cpu-core-events / --os-events /
+// --event-sampling-interval). These exercise the parsing and validation branches that the coverage
+// gate measures: the switches had no UT when they were added, which took msprof_ut below baseline.
+// ---------------------------------------------------------------------------
+namespace {
+constexpr int32_t PMU_TEST_MAX_EVENTS = 32;
+
+// n distinct raw encodings, used to hit the 32-event ceiling from both sides.
+std::string MakePmuEvents(int32_t count)
+{
+    std::string list;
+    for (int32_t i = 0; i < count; ++i) {
+        if (!list.empty()) {
+            list += ",";
+        }
+        list += "event" + std::to_string(i + 1);
+    }
+    return list;
+}
+} // namespace
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuSampleValid)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_SAMPLE));
+
+    cmdInfo.args[ARGS_HOST_PMU_SAMPLE] = "bogus";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_SAMPLE));
+
+    // none turns the feature off and clears BOTH already-configured lists.
+    parser.params_->host_pmu_events = "cycles";
+    parser.params_->host_pmu_os_events = "page-faults";
+    cmdInfo.args[ARGS_HOST_PMU_SAMPLE] = "none";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_SAMPLE));
+    EXPECT_EQ("off", parser.params_->host_pmu_profiling);
+    EXPECT_TRUE(parser.params_->host_pmu_events.empty());
+    EXPECT_TRUE(parser.params_->host_pmu_os_events.empty());
+
+    cmdInfo.args[ARGS_HOST_PMU_SAMPLE] = "system-wide";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_SAMPLE));
+    EXPECT_EQ("on", parser.params_->host_pmu_profiling);
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuSampleNoneRemainsOffWhenEventsFollow)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+
+    cmdInfo.args[ARGS_HOST_PMU_SAMPLE] = "none";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_SAMPLE));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "cycles,instructions";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    EXPECT_EQ("off", parser.params_->host_pmu_profiling);
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "page-faults";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+    EXPECT_EQ("off", parser.params_->host_pmu_profiling);
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuCoreEventsValid)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    // nsys numeric event IDs are rejected instead of silently producing an empty column.
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "2";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    // A bare hex code is pointed at the raw: form.
+    // Raw encodings are out of scope in this version, in both accepted spellings.
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "raw:0x13";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "r13";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "0x13";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "cycles,0x13";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    // 0xZZ is not a valid hex code, so it falls through to the character check and is kept as a name.
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "0xZZ";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "cycles,bad name";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    // Empty items and duplicates are dropped, and the stored list is normalised.
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "cycles,,instructions,cycles";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    EXPECT_EQ("cycles,instructions", parser.params_->host_pmu_events);
+    EXPECT_EQ("on", parser.params_->host_pmu_profiling);
+
+    const std::string maxEvents = MakePmuEvents(PMU_TEST_MAX_EVENTS);
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(maxEvents.c_str());
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    const std::string tooMany = MakePmuEvents(PMU_TEST_MAX_EVENTS + 1);
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(tooMany.c_str());
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+
+    // help prints the node's events and asks the option loop to exit without collecting.
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = "help";
+    std::ostringstream printed;
+    auto* oldBuffer = std::cout.rdbuf(printed.rdbuf());
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_FALSE(printed.str().empty());
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuOsEventsValid)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "2";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    // The accepted set is fixed by the kernel, so an unknown name is a typo and is rejected here.
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "page-fault";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = ",,";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "page-faults,,context-switches,page-faults";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+    EXPECT_EQ("page-faults,context-switches", parser.params_->host_pmu_os_events);
+    EXPECT_EQ("on", parser.params_->host_pmu_profiling);
+
+    std::string manyOs;
+    for (int32_t i = 0; i <= PMU_TEST_MAX_EVENTS; ++i) {
+        if (!manyOs.empty()) {
+            manyOs += ",";
+        }
+        manyOs += "page-faults";
+    }
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = const_cast<char*>(manyOs.c_str());
+    // Duplicates collapse, so 33 identical names still fit under the ceiling.
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] = "help";
+    std::ostringstream printed;
+    auto* oldBuffer = std::cout.rdbuf(printed.rdbuf());
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_NE(std::string::npos, printed.str().find("page-faults"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuIntervalValid)
+{
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_INTERVAL));
+
+    cmdInfo.args[ARGS_HOST_PMU_INTERVAL] = "abc";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_INTERVAL));
+
+    cmdInfo.args[ARGS_HOST_PMU_INTERVAL] = "0";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_INTERVAL));
+
+    cmdInfo.args[ARGS_HOST_PMU_INTERVAL] = "3600001";
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_INTERVAL));
+
+    cmdInfo.args[ARGS_HOST_PMU_INTERVAL] = "100";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_INTERVAL));
+    EXPECT_EQ("100", parser.params_->host_pmu_interval);
+}
+
+// The "=help" path must end parsing through the --help exit: params come back, nothing is started.
+TEST_F(INPUT_PARSER_UTEST, HostPmuHelpExitsThroughHelpPath)
+{
+    const char* argv[] = {"msprof", "--cpu-core-events=help", nullptr};
+    optind = 1;
+    InputParser parser = InputParser();
+    std::ostringstream printed;
+    auto* oldBuffer = std::cout.rdbuf(printed.rdbuf());
+    auto params = parser.MsprofGetOpts(2, argv);
+    std::cout.rdbuf(oldBuffer);
+
+    EXPECT_NE(nullptr, params);
+    EXPECT_TRUE(parser.HasHelpParamOnly());
+    EXPECT_FALSE(printed.str().empty());
+}
+
+// Both lists given together land in the same params object and turn the feature on.
+TEST_F(INPUT_PARSER_UTEST, HostPmuBothListsThroughGetOpts)
+{
+    const char* argv[] = {
+        "msprof",  "--aicpu=on", "--cpu-core-events=cycles,l1d_cache", "--os-events=page-faults", "python3",
+        "test.py", nullptr};
+    optind = 1;
+    InputParser parser = InputParser();
+    auto params = parser.MsprofGetOpts(6, argv);
+
+    EXPECT_NE(nullptr, params);
+    if (params != nullptr) {
+        EXPECT_EQ("cycles,l1d_cache", params->host_pmu_events);
+        EXPECT_EQ("page-faults", params->host_pmu_os_events);
+        EXPECT_EQ("on", params->host_pmu_profiling);
+    }
+}
+
+// The 32-event ceiling is shared by both lists, because every event becomes a column in the same
+// row. --os-events only accepts the nine fixed kernel counters, so the reachable overflow is a full
+// hardware list plus all nine: 41 columns. Rejecting it here beats failing during collection setup,
+// where the same condition reads as a runtime bug.
+TEST_F(INPUT_PARSER_UTEST, HostPmuCombinedEventBudgetRejected)
+{
+    std::string cores;
+    for (int i = 0; i < 32; ++i) {
+        cores += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(cores.c_str());
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] =
+        "page-faults,minor-faults,major-faults,context-switches,cpu-migrations,alignment-faults,"
+        "emulation-faults,task-clock,cpu-clock";
+
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    // The second list is where the shared budget is checked, so this is the call that must fail.
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+}
+
+// Exactly at the ceiling is allowed: 23 hardware + 9 software = 32 columns.
+TEST_F(INPUT_PARSER_UTEST, HostPmuCombinedEventBudgetAcceptsExactlyMax)
+{
+    std::string cores;
+    for (int i = 0; i < 23; ++i) {
+        cores += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(cores.c_str());
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] =
+        "page-faults,minor-faults,major-faults,context-switches,cpu-migrations,alignment-faults,"
+        "emulation-faults,task-clock,cpu-clock";
+
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+}
+
+// A name present in both lists is folded into one column, so it must cost one slot, not two:
+// 24 hardware names including page-faults plus 9 software names is 32 unique columns, not 33.
+TEST_F(INPUT_PARSER_UTEST, HostPmuCombinedBudgetCountsUniqueNames)
+{
+    std::string cores;
+    for (int i = 0; i < 23; ++i) {
+        cores += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    cores += ",page-faults";
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(cores.c_str());
+    cmdInfo.args[ARGS_HOST_PMU_OS_EVENTS] =
+        "page-faults,minor-faults,major-faults,context-switches,cpu-migrations,alignment-faults,"
+        "emulation-faults,task-clock,cpu-clock";
+
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_OS_EVENTS));
+}
+
+// The per-option checks see one list each, so a command whose two lists only overflow together is
+// caught by ParamsCheck(), after every option has been parsed. This is the order-dependent case the
+// reviewer flagged: 24 hardware + 9 software = 33 columns, and whichever list comes first is fine on
+// its own.
+TEST_F(INPUT_PARSER_UTEST, HostPmuParamsCheckRejectsMergedOverflow)
+{
+    InputParser parser = InputParser();
+    std::string cores;
+    for (int i = 0; i < 24; ++i) {
+        cores += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    parser.params_->host_pmu_profiling = "on";
+    parser.params_->host_pmu_events = cores;
+    parser.params_->host_pmu_os_events =
+        "page-faults,minor-faults,major-faults,context-switches,cpu-migrations,alignment-faults,"
+        "emulation-faults,task-clock,cpu-clock";
+    EXPECT_EQ(PROFILING_FAILED, parser.ParamsCheck());
+}
+
+// 23 hardware + 9 software = 32 unique columns is exactly at the ceiling and must pass here too.
+TEST_F(INPUT_PARSER_UTEST, HostPmuParamsCheckAcceptsMergedMax)
+{
+    InputParser parser = InputParser();
+    std::string cores;
+    for (int i = 0; i < 23; ++i) {
+        cores += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    parser.params_->host_pmu_profiling = "on";
+    parser.params_->host_pmu_events = cores;
+    parser.params_->host_pmu_os_events =
+        "page-faults,minor-faults,major-faults,context-switches,cpu-migrations,alignment-faults,"
+        "emulation-faults,task-clock,cpu-clock";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.ParamsCheck());
+}
+
+// The 32-event ceiling must agree with the collector, which refuses the 33rd event rather than the
+// 32nd. 31 and 32 are accepted, 33 is rejected.
+TEST_F(INPUT_PARSER_UTEST, HostPmuEventBoundary31Accepted)
+{
+    std::string list;
+    for (int i = 0; i < 31; ++i) {
+        list += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(list.c_str());
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuEventBoundary32Accepted)
+{
+    std::string list;
+    for (int i = 0; i < 32; ++i) {
+        list += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(list.c_str());
+    EXPECT_EQ(PROFILING_SUCCESS, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+}
+
+TEST_F(INPUT_PARSER_UTEST, HostPmuEventBoundary33Rejected)
+{
+    std::string list;
+    for (int i = 0; i < 33; ++i) {
+        list += (i == 0 ? "" : ",") + std::string("ev") + std::to_string(i);
+    }
+    InputParser parser = InputParser();
+    struct MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_HOST_PMU_EVENTS] = const_cast<char*>(list.c_str());
+    EXPECT_EQ(PROFILING_FAILED, parser.MsprofHostCheckValid(cmdInfo, ARGS_HOST_PMU_EVENTS));
+}
+
+// --event-sample=system-wide on its own asks for counting without naming anything to count; the
+// combination must be rejected before the parameters reach the collector. Both orders are covered
+// because the check runs after parsing rather than inside either validator.
+TEST_F(INPUT_PARSER_UTEST, HostPmuSampleWithoutEventsRejected)
+{
+    // Both orders put the switch before the application name: getopt stops at the first non-option,
+    // so an option placed after the application would simply never be parsed.
+    const char* argvAlone[] = {"msprof", "--event-sample=system-wide", "python3", "test.py", nullptr};
+    optind = 1;
+    InputParser parserAlone = InputParser();
+    EXPECT_EQ(nullptr, parserAlone.MsprofGetOpts(4, argvAlone));
+
+    const char* argvAfterOther[] = {"msprof",  "--aicpu=on", "--event-sample=system-wide",
+                                    "python3", "test.py",    nullptr};
+    optind = 1;
+    InputParser parserAfterOther = InputParser();
+    EXPECT_EQ(nullptr, parserAfterOther.MsprofGetOpts(5, argvAfterOther));
+}

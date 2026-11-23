@@ -2,6 +2,8 @@
 
 完成[安装perf、iotop、ltrace工具](./install_perf_iotop_ltrace.md)后，需要给用户配置依赖权限。可参见如下步骤进行配置。
 
+本章的权限配置同时用于两类采集能力：依赖系统perf的`--host-sys=osrt`，以及Host侧CPU PMU计数（`--cpu-core-events`、`--os-events`）。后者的等级要求与调整方式参见文末[perf_event_paranoid等级与调整方式](#perf_event_paranoid等级与调整方式)。
+
 1. 以root用户登录环境。
 2. 执行如下命令，将原环境perf的安全限制等级配置为0（即允许非root用户访问）。
 
@@ -283,3 +285,71 @@
        ```sh
         echo 4 > /proc/sys/kernel/perf_event_paranoid
        ```
+
+## perf_event_paranoid等级与调整方式
+
+`/proc/sys/kernel/perf_event_paranoid`是内核提供的perf安全限制等级，取值越小权限越宽松。它决定的不是“能不能用perf”，而是“非root用户能对多大范围做采样”。
+
+**表1**  等级说明
+
+|取值|允许的范围|与本工具的关系|
+|--|--|--|
+|-1|几乎不限制，包括内核态采样、raw tracepoint与system-wide计数|满足要求，但范围过宽，不建议使用|
+|0|允许system-wide计数（`pid=-1`并按CPU计数）|**CPU PMU计数要求该等级**；`--host-sys=osrt`的权限要求取决于其调用的perf/ltrace能力，请按对应工具的权限说明配置|
+|1|允许对自身进程做内核态采样，禁止system-wide|PMU计数失败，每个计数器打开均返回权限不足；目标机型默认值|
+|2|仅允许用户态采样，内核态帧不可见|PMU计数失败，且`--host-sys=osrt`的调用栈不完整|
+|3|基本禁止非特权perf|PMU计数失败|
+
+Host侧CPU PMU计数按“每个online CPU一组计数器”的方式采集，统计该核上所有进程的合计，属于system-wide范围，因此要求等级为0或更低。等级为1或2时，`perf_event_open`返回`EACCES`，采集日志中会给出如下提示：
+
+```text
+cpu0: no PMU event could be opened: cycles (permission denied: lower /proc/sys/kernel/perf_event_paranoid or grant CAP_PERFMON)
+```
+
+此时采集不会产生错误数据，只会输出仅含表头的数据文件。
+
+### 方式一：临时调整（推荐用于性能测试）
+
+```sh
+# 查看当前值
+cat /proc/sys/kernel/perf_event_paranoid
+
+# 调整为0
+sudo sysctl -w kernel.perf_event_paranoid=0
+
+# 或使用等价写法
+sudo sh -c 'echo 0 > /proc/sys/kernel/perf_event_paranoid'
+
+# 采集结束后恢复原值（示例中为1）
+sudo sysctl -w kernel.perf_event_paranoid=1
+```
+
+该方式立即生效，重启后失效。
+
+### 方式二：持久化配置
+
+```sh
+echo 'kernel.perf_event_paranoid = 0' | sudo tee /etc/sysctl.d/99-msprof-perf.conf
+sudo sysctl --system
+```
+
+该方式重启后仍有效，但属于全局放开：机器上任何用户都能对整机做system-wide采样。建议仅在专用的性能测试环境使用。
+
+### 方式三：仅授权指定程序（权限最小）
+
+不修改全局等级，改为给二进制文件授予`CAP_PERFMON`能力：
+
+将`<INSTALL_DIR>`替换为CANN软件包的安装目录，例如`/usr/local/Ascend/cann-<cann_version>`。
+
+```sh
+sudo setcap cap_perfmon+ep <INSTALL_DIR>/tools/profiler/bin/msprof
+getcap <INSTALL_DIR>/tools/profiler/bin/msprof
+```
+
+执行`getcap`应输出`cap_perfmon=ep`。该方式只放开指定程序，不影响其它用户；注意升级、替换或重新安装该二进制文件后能力会丢失，需要重新授予。内核版本低于5.8时没有`CAP_PERFMON`，只能使用`cap_sys_admin+ep`，其权限范围大得多，不推荐。
+
+### 使用约束
+
+- 容器内无法修改该等级：容器的`/proc/sys`通常为只读，写入会返回`Read-only file system`。需要在宿主机上调整，或让容器以`--privileged`启动。
+- 调整后未生效时，先确认是否有其它`/etc/sysctl.d/`配置文件覆盖了该值；执行`sudo sysctl --system`后再次`cat`确认。
+- 加固环境下该值可能被设为2或3，应按表1对照实际取值，不能只判断“是否等于1”。

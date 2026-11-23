@@ -117,6 +117,11 @@ enum MsprofArgsType {
     ARGS_FTRACE,
     ARGS_FTRACE_PERIOD,
     ARGS_FTRACE_BUFSIZE,
+    // host PMU counting (perf_event_open)
+    ARGS_HOST_PMU_SAMPLE,
+    ARGS_HOST_PMU_EVENTS,
+    ARGS_HOST_PMU_OS_EVENTS,
+    ARGS_HOST_PMU_INTERVAL,
     ARGS_NTS_METRICS,
     // end
     NR_ARGS
@@ -208,6 +213,15 @@ const OsalStructOption LONG_OPTIONS[] = {
     {"ftrace", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE},
     {"ftrace-period", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE_PERIOD},
     {"ftrace-bufsize", OSAL_OPTIONAL_ARG, nullptr, ARGS_FTRACE_BUFSIZE},
+    // host PMU counting, option names and semantics follow nsys:
+    //   --event-sample            none | system-wide (whether to collect at all)
+    //   --cpu-core-events         hardware PMU counter list, e.g. cycles,instructions,l1d_cache
+    //   --os-events               software kernel counter list, e.g. page-faults,context-switches
+    //   --event-sampling-interval reading period in ms
+    {"event-sample", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_PMU_SAMPLE},
+    {"cpu-core-events", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_PMU_EVENTS},
+    {"os-events", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_PMU_OS_EVENTS},
+    {"event-sampling-interval", OSAL_OPTIONAL_ARG, nullptr, ARGS_HOST_PMU_INTERVAL},
     {"nts-metrics", OSAL_REQUIRED_ARG, nullptr, ARGS_NTS_METRICS},
     // end
     {nullptr, OSAL_NO_ARG, nullptr, ARGS_HELP}};
@@ -265,6 +279,27 @@ private:
     int32_t CheckFtracePeriodValid(const struct MsprofCmdInfo& cmdInfo) const;
     int32_t CheckFtraceBufsizeValid(const struct MsprofCmdInfo& cmdInfo) const;
     int32_t ParseFtraceEvents(const std::string& ftraceArgs);
+    int32_t CheckHostPmuSampleValid(const struct MsprofCmdInfo& cmdInfo);
+    int32_t CheckHostPmuEventsValid(const struct MsprofCmdInfo& cmdInfo);
+    int32_t CheckHostPmuOsEventsValid(const struct MsprofCmdInfo& cmdInfo);
+    int32_t CheckHostPmuIntervalValid(const struct MsprofCmdInfo& cmdInfo) const;
+    // Both event lists share one column budget, so the pair is checked after either list is stored.
+    int32_t CheckHostPmuEventBudget() const;
+    // Validates one comma separated list and returns its de-duplicated names. Split out of the two
+    // Check*Valid entry points so neither grows past a screen: the entry points keep the argument and
+    // help handling, this keeps the per-name rules.
+    int32_t CollectHostPmuEventNames(const std::string& args, std::vector<std::string>& normalized) const;
+    int32_t CollectHostPmuOsEventNames(const std::string& args, std::vector<std::string>& normalized) const;
+    // Rejects a list longer than the shared ceiling, naming the option in the message.
+    int32_t CheckHostPmuEventCount(const std::vector<std::string>& normalized, const char* option) const;
+    // Rejects "--event-sample=system-wide" with neither event list; called from ParamsCheck().
+    int32_t CheckHostPmuConsistency() const;
+    // Set when a PMU switch was given "help" and the event list has been printed; the option loop
+    // then exits through the --help path instead of starting a collection.
+    bool pmuHelpPrinted_ = false;
+    // An explicit --event-sample=none disables host PMU collection even when an event list appears
+    // later on the command line. A later --event-sample=system-wide clears this override.
+    bool hostPmuSampleNone_ = false;
     int32_t MsprofCmdCheckValid(const struct MsprofCmdInfo& cmdInfo, int32_t opt);
     int32_t MsprofCmdCheckValid2(const struct MsprofCmdInfo& cmdInfo, int32_t opt);
     int32_t MsprofFreqCheckValid(const struct MsprofCmdInfo& cmdInfo, int32_t opt);

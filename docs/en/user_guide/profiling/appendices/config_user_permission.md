@@ -285,3 +285,40 @@ After [installing the perf, iotop, and ltrace tools](./install_perf_iotop_ltrace
        ```sh
         echo 4 > /proc/sys/kernel/perf_event_paranoid
        ```
+
+## Host CPU PMU Counter Permissions
+
+Host CPU PMU counting opens one system-wide counter group for each online CPU and counts all processes scheduled on that CPU. It therefore requires `perf_event_paranoid` to be 0 or lower, or the `CAP_PERFMON` capability. At level 1 or 2, `perf_event_open` may fail with `EACCES`; the PMU output files may then contain only headers and no samples.
+
+|Value|Access allowed|Effect on Host CPU PMU counting|
+|--|--|--|
+|-1|Broad access, including kernel sampling, raw tracepoints, and system-wide counting|Satisfies the requirement, but is broader than necessary.|
+|0|System-wide counting (`pid=-1`, counted per CPU)|Required for unprivileged Host CPU PMU counting.|
+|1|Kernel sampling for the calling process; system-wide access is denied|PMU counter opens fail with a permission error.|
+|2|User-space sampling only; kernel frames are unavailable|PMU counter opens fail with a permission error.|
+|3|Most unprivileged perf access is denied|PMU counter opens fail with a permission error.|
+
+### Option 1: Temporarily lower the restriction level
+
+```sh
+# Record the current value so it can be restored after collection.
+cat /proc/sys/kernel/perf_event_paranoid
+
+sudo sysctl -w kernel.perf_event_paranoid=0
+
+# Restore the original value after collection; 1 is only an example.
+sudo sysctl -w kernel.perf_event_paranoid=1
+```
+
+The change takes effect immediately and does not persist after reboot. This is a system-wide permission change; use it in a dedicated performance-test environment.
+
+### Option 2: Grant CAP_PERFMON to msprof
+
+Instead of changing the global restriction level, grant the capability to the msprof executable. Replace `<INSTALL_DIR>` with the CANN installation directory, for example `/usr/local/Ascend/cann-<cann_version>`.
+
+```sh
+sudo setcap cap_perfmon+ep <INSTALL_DIR>/tools/profiler/bin/msprof
+getcap <INSTALL_DIR>/tools/profiler/bin/msprof
+```
+
+The `getcap` command should report `cap_perfmon=ep`. The capability is lost when the executable is upgraded, replaced, or reinstalled, so it must be granted again. `CAP_PERFMON` is available on Linux kernel 5.8 and later. Older kernels may require `CAP_SYS_ADMIN`, which grants much broader permissions and is not recommended.

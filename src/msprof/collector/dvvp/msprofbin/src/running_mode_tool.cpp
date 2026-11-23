@@ -108,6 +108,7 @@ using namespace Collector::Dvvp::DynProf;
 namespace {
 // App mode accepts every profiling switch; a file scope table keeps the constructor short while the
 // list itself stays easy to extend next to the other mode definitions.
+// clang-format off
 const int32_t APP_MODE_WHITE_SET[] = {
     ARGS_OUTPUT,
     ARGS_STORAGE_LIMIT,
@@ -167,7 +168,14 @@ const int32_t APP_MODE_WHITE_SET[] = {
     ARGS_AICORE_SHAPE,
     ARGS_FTRACE,
     ARGS_FTRACE_PERIOD,
-    ARGS_FTRACE_BUFSIZE};
+    ARGS_FTRACE_BUFSIZE,
+    // Host CPU PMU counting works in app mode too: it measures the host counters of the machine the
+    // application runs on, and the application is what makes the run worth measuring.
+    ARGS_HOST_PMU_SAMPLE,
+    ARGS_HOST_PMU_EVENTS,
+    ARGS_HOST_PMU_OS_EVENTS,
+    ARGS_HOST_PMU_INTERVAL};
+// clang-format on
 
 std::set<int32_t> BuildAppModeWhiteSet()
 {
@@ -1097,6 +1105,7 @@ SystemMode::~SystemMode() {}
 SystemMode::SystemMode(std::string preCheckParams, SHARED_PTR_ALIA<ProfileParams> params)
     : RunningMode(preCheckParams, "system", params)
 {
+    // clang-format off
     whiteSet_ = {
         ARGS_OUTPUT,
         ARGS_STORAGE_LIMIT,
@@ -1133,8 +1142,17 @@ SystemMode::SystemMode(std::string preCheckParams, SHARED_PTR_ALIA<ProfileParams
         ARGS_HOST_SYS_PID,
         ARGS_HOST_SYS_USAGE,
         ARGS_HOST_SYS_USAGE_FREQ,
+        // System mode collects the same host PMU counters, so these switches belong in this
+        // whitelist too. Without them a PMU-only system-mode run does collect data but prints
+        // "--cpu-core-events is useless when --sys-devices is not empty", which reads as if the
+        // request had been ignored.
+        ARGS_HOST_PMU_SAMPLE,
+        ARGS_HOST_PMU_EVENTS,
+        ARGS_HOST_PMU_OS_EVENTS,
+        ARGS_HOST_PMU_INTERVAL,
         ARGS_PYTHON_PATH,
         ARGS_MEM_SERVICEFLOW};
+    // clang-format on
     neccessarySet_ = {ARGS_SYS_PERIOD};
 }
 
