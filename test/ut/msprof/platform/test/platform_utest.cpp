@@ -113,6 +113,7 @@ TEST_F(PLATFORM_UTEST, DavidV121_FeatureIsSupport)
     EXPECT_TRUE(platform->FeatureIsSupport(PLATFORM_MC2));
     EXPECT_TRUE(platform->FeatureIsSupport(PLATFORM_STARS_QOS));
     EXPECT_FALSE(platform->FeatureIsSupport(PLATFORM_TASK_FWK));
+    EXPECT_FALSE(platform->FeatureIsSupport(PLATFORM_TASK_PUEXCT_PMU));
 }
 
 TEST_F(PLATFORM_UTEST, TaskPmuResourceNotResetOnlySupportedOnDavidV121)

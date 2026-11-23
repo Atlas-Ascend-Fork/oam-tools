@@ -1978,23 +1978,15 @@ int32_t InputParser::CheckCmdOpTypeIsValid(const struct MsprofCmdInfo& cmdInfo) 
 std::string InputParser::GeneratePrompts() const
 {
     // Generate the ERROR print. Consider changing to another file location.
-    std::vector<std::string> metricsHint;
     std::stringstream result;
-    metricsHint.push_back("[ArithmeticUtilization|PipeUtilization|Memory|MemoryL0|MemoryUB");
-    if (Platform::instance()->CheckIfSupport(PLATFORM_TASK_L2_CACHE_PMU)) {
-        metricsHint.push_back("|L2Cache");
-    }
-    if (Platform::instance()->CheckIfSupport(PLATFORM_TASK_RCR_PMU)) {
-        metricsHint.push_back("|ResourceConflictRatio");
-    }
-    if (Platform::instance()->CheckIfSupport(PLATFORM_TASK_PEU_PMU)) {
-        metricsHint.push_back("|PipelineExecuteUtilization");
-    }
-    if (Platform::instance()->CheckIfSupport(PLATFORM_TASK_MEMORY_ACCESS_PMU)) {
-        metricsHint.push_back("|MemoryAccess");
-    }
-    for (auto metrics : metricsHint) {
-        result << metrics;
+    result << "[";
+    bool isFirstMetric = true;
+    for (const auto& metrics : METRIC_FEATURE_MAP) {
+        if (!Platform::instance()->CheckIfSupport(metrics.second)) {
+            continue;
+        }
+        result << (isFirstMetric ? "" : "|") << metrics.first;
+        isFirstMetric = false;
     }
     result << "]";
     const std::string minEvent = Platform::instance()->CheckIfSupport(PLATFORM_AICORE_EVENT_FROM_ZERO) ? "0x0" : "0x1";

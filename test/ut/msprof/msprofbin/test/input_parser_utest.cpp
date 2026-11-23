@@ -78,6 +78,19 @@ std::string CaptureHelpForPlatform(PlatformType platformType)
     return helpOutput.str();
 }
 
+std::vector<std::string> ParseAiCoreMetricsPrompt(const std::string& prompt)
+{
+    const auto begin = prompt.find('[') + 1;
+    const auto end = prompt.find(']');
+    std::vector<std::string> metrics;
+    std::string metric;
+    std::istringstream metricsStream(prompt.substr(begin, end - begin));
+    while (std::getline(metricsStream, metric, '|')) {
+        metrics.push_back(metric);
+    }
+    return metrics;
+}
+
 class INPUT_PARSER_UTEST : public testing::Test {
 protected:
     void SetUp() override {}
@@ -730,6 +743,63 @@ TEST_F(INPUT_PARSER_UTEST, InvalidAicMetricsErrorDoesNotDuplicateBracket)
     Platform::instance()->Uninit();
 }
 
+TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptOmitsDavidPipeUtilizationExct)
+{
+    SetPlatformTypeForTest(PlatformType::CHIP_CLOUD_V3);
+    Platform::instance()->Uninit();
+    (void)Platform::instance()->Init();
+    InputParser parser;
+
+    const std::string prompt = parser.GeneratePrompts();
+    Platform::instance()->Uninit();
+
+    EXPECT_EQ(std::string::npos, prompt.find("PipeUtilizationExct"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptIncludesAllSupportedPmuOptions)
+{
+    SetPlatformTypeForTest(PlatformType::CLOUD_TYPE);
+    Platform::instance()->Uninit();
+    (void)Platform::instance()->Init();
+    MOCKER_CPP(static_cast<bool (Platform::*)(const PlatformFeature) const>(&Platform::CheckIfSupport))
+        .stubs()
+        .with(any())
+        .will(returnValue(true));
+    InputParser parser;
+
+    const std::string prompt = parser.GeneratePrompts();
+    GlobalMockObject::verify();
+    Platform::instance()->Uninit();
+
+    std::vector<std::string> expectedMetrics;
+    for (const auto& metric : METRIC_FEATURE_MAP) {
+        expectedMetrics.push_back(metric.first);
+    }
+    EXPECT_EQ(expectedMetrics, ParseAiCoreMetricsPrompt(prompt));
+}
+
+TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptOmitsUnsupportedPmuOptions)
+{
+    SetPlatformTypeForTest(PlatformType::CLOUD_TYPE);
+    Platform::instance()->Uninit();
+    (void)Platform::instance()->Init();
+    MOCKER_CPP(static_cast<bool (Platform::*)(const PlatformFeature) const>(&Platform::CheckIfSupport))
+        .stubs()
+        .with(eq(PLATFORM_TASK_AU_PMU))
+        .will(returnValue(true));
+    MOCKER_CPP(static_cast<bool (Platform::*)(const PlatformFeature) const>(&Platform::CheckIfSupport))
+        .defaults()
+        .will(returnValue(false));
+    InputParser parser;
+
+    const std::string prompt = parser.GeneratePrompts();
+    GlobalMockObject::verify();
+    Platform::instance()->Uninit();
+
+    const std::vector<std::string> expectedMetrics = {"ArithmeticUtilization"};
+    EXPECT_EQ(expectedMetrics, ParseAiCoreMetricsPrompt(prompt));
+}
+
 TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsAicMetricsEventLimitByPlatform)
 {
     const std::string help = CaptureHelpForPlatform(PlatformType::CHIP_CLOUD_V3);
@@ -748,6 +818,23 @@ TEST_F(INPUT_PARSER_UTEST, AicMetricsAllowsZeroCustomEventOnDavid)
     cmdInfo.args[ARGS_AIC_METRICS] = "Custom:0x0";
     EXPECT_EQ(PROFILING_SUCCESS, parser.CheckAiCoreMetricsValid(cmdInfo, ARGS_AIC_METRICS));
     Platform::instance()->Uninit();
+}
+
+TEST_F(INPUT_PARSER_UTEST, AicMetricsRejectsZeroCustomEventWithoutFromZeroCapability)
+{
+    SetPlatformTypeForTest(PlatformType::CLOUD_TYPE);
+    Platform::instance()->Uninit();
+    Platform::instance()->Init();
+
+    InputParser parser;
+    MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_AIC_METRICS] = "Custom:0x0";
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(PROFILING_FAILED, parser.CheckAiCoreMetricsValid(cmdInfo, ARGS_AIC_METRICS));
+    const std::string error = testing::internal::GetCapturedStdout();
+    Platform::instance()->Uninit();
+
+    EXPECT_NE(std::string::npos, error.find("[0x1, 0x7FFFFFFF]"));
 }
 
 TEST_F(INPUT_PARSER_UTEST, AicMetricsRejectsCustomEventAboveUpperLimit)
