@@ -16,7 +16,6 @@
 #ifndef MSPROF_FTRACE_COLLECTOR_FTRACE_CONSTANTS_H
 #define MSPROF_FTRACE_COLLECTOR_FTRACE_CONSTANTS_H
 
-#include <cstddef>
 #include <cstdint>
 #include <sys/types.h>
 
