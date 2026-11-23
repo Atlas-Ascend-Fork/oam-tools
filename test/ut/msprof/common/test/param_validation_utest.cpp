@@ -774,6 +774,23 @@ TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckAiCoreEventsIsValidModena)
 
     events = {"0x80000000"};
     EXPECT_EQ(false, ParamValidation::instance()->CheckAiCoreEventsIsValid(events));
+
+    events = {"0x100000001"};
+    EXPECT_EQ(false, ParamValidation::instance()->CheckAiCoreEventsIsValid(events));
+}
+
+TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, InvalidAiCoreEventLogShowsInputValue)
+{
+    MOCKER_CPP(&Platform::GetMaxMonitorNumber).stubs().will(returnValue(MODENA_MAX_MONITOR_NUM));
+    MOCKER_CPP(&Platform::GetPlatformType).stubs().will(returnValue(PlatformTypeEnum::CHIP_5162A));
+    const std::vector<std::string> events = {"0x100000001"};
+
+    testing::internal::CaptureStdout();
+    EXPECT_FALSE(ParamValidation::instance()->CheckAiCoreEventsIsValid(events));
+    const std::string log = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(std::string::npos, log.find("ai core event[0x100000001] out of range"));
+    EXPECT_EQ(std::string::npos, log.find("ai core event[0x1] out of range"));
 }
 
 TEST_F(COMMON_VALIDATION_PARAM_VALIDATION_TEST, CheckParamL0L1InvalidBasicResult)

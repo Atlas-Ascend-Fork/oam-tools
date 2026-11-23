@@ -142,13 +142,18 @@ void Uploader::Run(const error_message::ErrorManagerContext& errorContext)
                     sentLen);
             }
         } else {
-            if (transport_->SendBuffer(fileChunkReq) != PROFILING_SUCCESS) {
-                MSPROF_LOGE("Failed to upload data");
-                MSPROF_INNER_ERROR("EK9999", "Failed to upload data");
+            const int32_t ret = transport_->SendBuffer(fileChunkReq);
+            if (ret != PROFILING_SUCCESS) {
+                MSPROF_LOGE(
+                    "Failed to upload file chunk, id: %s, fileName: %s, data_len: %zu bytes, ret: %d",
+                    fileChunkReq->id.c_str(), fileChunkReq->fileName.c_str(), fileChunkReq->chunkSize, ret);
+                MSPROF_INNER_ERROR(
+                    "EK9999", "Failed to upload file chunk, id: %s, fileName: %s, data_len: %zu bytes, ret: %d",
+                    fileChunkReq->id.c_str(), fileChunkReq->fileName.c_str(), fileChunkReq->chunkSize, ret);
             }
             if (pipeTransport_ != nullptr && pipeTransport_->IsRegisterRawDataCallback()) {
-                int32_t ret = pipeTransport_->SendBuffer(fileChunkReq);
-                if (ret != PROFILING_SUCCESS) {
+                int32_t pipeRet = pipeTransport_->SendBuffer(fileChunkReq);
+                if (pipeRet != PROFILING_SUCCESS) {
                     MSPROF_LOGE("PipeTransport failed to upload raw data");
                 }
             }

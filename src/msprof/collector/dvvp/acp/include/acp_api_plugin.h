@@ -17,6 +17,7 @@
 #define PROF_ACP_PLUGIN_H
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 #include "singleton/singleton_tool.h"
@@ -102,6 +103,7 @@ private:
     RtMemcpyFunc rtMemcpy_{nullptr};
     MsprofGetInjectionFuncT msprofGetInjectionFunc_{nullptr};
     std::map<std::string, ApiStubInfo> apiStubInfoMap_;
+    std::mutex apiStubMutex_;
 };
 
 } // namespace Acp

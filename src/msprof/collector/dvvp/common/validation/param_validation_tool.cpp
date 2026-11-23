@@ -200,6 +200,10 @@ bool ParamValidation::CheckAicoreMetricsIsValid(const std::string& aicoreMetrics
             MSPROF_LOGE("The aic_metrics[%s] of input config is invalid", aicoreMetrics.c_str());
             return false;
         }
+        const std::vector<std::string> eventsList = Utils::Split(aicoreEvent, false, "", ",");
+        if (!CheckAiCoreEventsIsValid(eventsList)) {
+            return false;
+        }
         return true;
     }
     auto featureMetrics = Platform::instance()->PmuToFeature(aicoreMetrics);
@@ -1159,11 +1163,11 @@ bool ParamValidation::CheckAiCoreEventsIsValid(const std::vector<std::string>& e
         maxEvent = maxAiPmuEvent;
     }
     for (uint32_t i = 0; i < events.size(); ++i) {
-        const int32_t eventVal = strtol(events[i].c_str(), nullptr, BASE_HEX);
-        if (eventVal < minEvent || eventVal > maxEvent) {
+        const int64_t parsedEvent = strtoll(events[i].c_str(), nullptr, BASE_HEX);
+        if (parsedEvent < static_cast<int64_t>(minEvent) || parsedEvent > static_cast<int64_t>(maxEvent)) {
             MSPROF_LOGE(
-                "ai core event[0x%x] out of range1-%d(0x1-0x%x). please check ai core pmu event.", eventVal, maxEvent,
-                maxEvent);
+                "ai core event[%s] out of range1-%d(0x1-0x%x). please check ai core pmu event.", events[i].c_str(),
+                maxEvent, maxEvent);
             return false;
         }
     }

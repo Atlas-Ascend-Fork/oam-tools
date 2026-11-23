@@ -108,6 +108,13 @@ msprof [options] <app>
   - Ascend 950PR&950DT系列产品：不支持
     <!-- end id14 -->
 
+- Custom：支持自定义需要采集的寄存器，例如：--aic-metrics=Custom:0x49,0x8,0x15,0x1b,0x64,0x10。Custom字段表示自定义类型，配置为具体的寄存器值，范围[0x1, 0x7FFFFFFF]。并非所有的可取值都有对应的PMU寄存器，若配置的值无对应PMU寄存器，则采集结果可能为0。配置的寄存器数最多不能超过8个，寄存器通过“,”区分开。寄存器的值支持十六进制或十进制。
+
+  <!-- npu="950" id66 -->
+  > [!NOTE]说明
+  >Ascend 950PR&950DT系列产品配置的寄存器数最多不能超过10个，取值范围是[0x0, 0x7FFFFFFF]。
+  <!-- end id66 -->
+
 默认值：
 
 <!-- npu="310b" id15 -->
@@ -130,8 +137,6 @@ msprof [options] <app>
 <!-- end id20 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00002 -->
-
-支持自定义需要采集的寄存器，例如：--aic-metrics=Custom:0x49,0x8,0x15,0x1b,0x64,0x10。Custom字段表示自定义类型，配置为具体的寄存器值，范围\[0x1, 0x7FFFFFFF\]。并非所有的可取值都有对应的PMU寄存器，若配置的值无对应PMU寄存器，则采集结果可能为0。配置的寄存器数最多不能超过8个，寄存器通过“,”区分开。寄存器的值支持十六进制或十进制。
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00003 -->
 

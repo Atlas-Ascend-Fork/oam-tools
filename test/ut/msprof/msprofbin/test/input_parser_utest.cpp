@@ -703,6 +703,80 @@ TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsNtsMetricsOnTargetChip)
     EXPECT_NE(std::string::npos, help.find("[0x0, 0x71b]"));
 }
 
+TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsAicMetricsCustomEvents)
+{
+    const std::string help = CaptureHelpForPlatform(PlatformType::CLOUD_TYPE);
+    EXPECT_NE(std::string::npos, help.find("--aic-metrics"));
+    EXPECT_NE(std::string::npos, help.find("Custom:<event-list>"));
+    EXPECT_NE(std::string::npos, help.find("[0x1, 0x7FFFFFFF]"));
+    EXPECT_NE(std::string::npos, help.find("up to 8 events"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, InvalidAicMetricsErrorDoesNotDuplicateBracket)
+{
+    SetPlatformTypeForTest(PlatformType::CLOUD_TYPE);
+    Platform::instance()->Uninit();
+    Platform::instance()->Init();
+    InputParser parser;
+    MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_AIC_METRICS] = "invalid";
+
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(PROFILING_FAILED, parser.CheckAiCoreMetricsValid(cmdInfo, ARGS_AIC_METRICS));
+    const std::string error = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(std::string::npos, error.find("] or Custom:<event-list>"));
+    EXPECT_EQ(std::string::npos, error.find("]] or Custom:<event-list>"));
+    Platform::instance()->Uninit();
+}
+
+TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsAicMetricsEventLimitByPlatform)
+{
+    const std::string help = CaptureHelpForPlatform(PlatformType::CHIP_CLOUD_V3);
+    EXPECT_NE(std::string::npos, help.find("up to 10 events"));
+    EXPECT_EQ(std::string::npos, help.find("up to 8 events"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, AicMetricsAllowsZeroCustomEventOnDavid)
+{
+    SetPlatformTypeForTest(PlatformType::CHIP_CLOUD_V3);
+    Platform::instance()->Uninit();
+    Platform::instance()->Init();
+
+    InputParser parser;
+    MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_AIC_METRICS] = "Custom:0x0";
+    EXPECT_EQ(PROFILING_SUCCESS, parser.CheckAiCoreMetricsValid(cmdInfo, ARGS_AIC_METRICS));
+    Platform::instance()->Uninit();
+}
+
+TEST_F(INPUT_PARSER_UTEST, AicMetricsRejectsCustomEventAboveUpperLimit)
+{
+    SetPlatformTypeForTest(PlatformType::CHIP_5162A);
+    Platform::instance()->Uninit();
+    Platform::instance()->Init();
+
+    InputParser parser;
+    MsprofCmdInfo cmdInfo = {{nullptr}};
+    cmdInfo.args[ARGS_AIC_METRICS] = "Custom:0x80000000";
+    EXPECT_EQ(PROFILING_FAILED, parser.CheckAiCoreMetricsValid(cmdInfo, ARGS_AIC_METRICS));
+    Platform::instance()->Uninit();
+}
+
+TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsDavidZeroEventRange)
+{
+    const std::string help = CaptureHelpForPlatform(PlatformType::CHIP_CLOUD_V3);
+    EXPECT_NE(std::string::npos, help.find("[0x0, 0x7FFFFFFF]"));
+    EXPECT_EQ(std::string::npos, help.find("[0x1, 0x7FFFFFFF]"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, PrintHelpShowsModenaZeroEventRange)
+{
+    const std::string help = CaptureHelpForPlatform(PlatformType::CHIP_5162A);
+    EXPECT_NE(std::string::npos, help.find("[0x0, 0x7FFFFFFF]"));
+    EXPECT_EQ(std::string::npos, help.find("[0x1, 0x7FFFFFFF]"));
+}
+
 TEST_F(INPUT_PARSER_UTEST, PrintHelpHidesNtsMetricsOnOtherPlatform)
 {
     const std::string help = CaptureHelpForPlatform(PlatformType::CLOUD_TYPE);

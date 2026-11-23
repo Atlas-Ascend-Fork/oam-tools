@@ -17,8 +17,10 @@
 #include <string>
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
+#define private public
 #include "acp_aclrt_injection_tool.h"
 #include "acp_api_plugin.h"
+#undef private
 #include "acp_manager_tool.h"
 #include "acp_pipe_transfer_tool.h"
 #include "prof_params.h"
@@ -34,6 +36,8 @@ using namespace analysis::dvvp::common::utils;
 namespace {
 constexpr int32_t HOOK_COUNT_IN_TEST = 13;
 
+void ResetAcpApiPluginForTest();
+
 int32_t g_originStub() { return 0; }
 
 std::map<std::string, AclrtApiFuncT> g_hookMap;
@@ -41,6 +45,8 @@ std::map<std::string, AclrtApiFuncT> g_originMap;
 std::map<std::string, bool> g_getBeforeSet;
 bool g_tableReady = false;
 bool g_originMissing = false;
+bool g_aclApiInRuntimeOnly = false;
+bool g_aclRtLoaded = false;
 int32_t g_setCallCount = 0;
 int32_t g_getCallCount = 0;
 
@@ -51,10 +57,53 @@ void ResetMockState()
     g_getBeforeSet.clear();
     g_tableReady = false;
     g_originMissing = false;
+    g_aclApiInRuntimeOnly = false;
+    g_aclRtLoaded = false;
     g_setCallCount = 0;
     g_getCallCount = 0;
     ResetAclrtHooksForTest();
 }
+
+class AclApiPluginStateGuard {
+public:
+    ~AclApiPluginStateGuard() { ResetAcpApiPluginForTest(); }
+};
+
+class AcpApiPluginTestAccessor {
+public:
+    static void Prepare(AcpApiPlugin& plugin, VOID_PTR runtimeHandle)
+    {
+        Reset(plugin);
+        plugin.acpRuntimeLibHandle_ = runtimeHandle;
+        Reload(plugin);
+    }
+
+    static void Reset(AcpApiPlugin& plugin)
+    {
+        plugin.apiLoadFlag_ = PTHREAD_ONCE_INIT;
+        plugin.acpRuntimeLibHandle_ = nullptr;
+        plugin.apiStubInfoMap_.clear();
+        plugin.rtStreamSynchronize_ = nullptr;
+        plugin.rtGetBinaryDeviceBaseAddress_ = nullptr;
+        plugin.aclrtBinaryGetDevAddress_ = nullptr;
+        plugin.rtMemcpy_ = nullptr;
+        plugin.msprofGetInjectionFunc_ = nullptr;
+    }
+
+private:
+    static void Reload(AcpApiPlugin& plugin)
+    {
+        plugin.apiStubInfoMap_.clear();
+        plugin.rtStreamSynchronize_ = nullptr;
+        plugin.rtGetBinaryDeviceBaseAddress_ = nullptr;
+        plugin.aclrtBinaryGetDevAddress_ = nullptr;
+        plugin.rtMemcpy_ = nullptr;
+        plugin.msprofGetInjectionFunc_ = nullptr;
+        plugin.LoadRuntimeApi();
+    }
+};
+
+void ResetAcpApiPluginForTest() { AcpApiPluginTestAccessor::Reset(*AcpApiPlugin::instance()); }
 
 int32_t MockSetFunc(const char* name, AclrtApiFuncT func)
 {
@@ -119,6 +168,46 @@ int32_t g_functionGetBinaryStub(const void*, aclrtBinHandle* binHandle)
         *binHandle = reinterpret_cast<aclrtBinHandle>(0x1234);
     }
     return ACL_SUCCESS;
+}
+
+int32_t g_originApiStub() { return 0; }
+
+int32_t g_mockLibRuntime;
+int32_t g_mockLibAclRt;
+
+void* MockApiDlopen(const char* fileName, int mode)
+{
+    (void)mode;
+    if (std::string(fileName) == "libruntime.so") {
+        return &g_mockLibRuntime;
+    }
+    if (std::string(fileName) == "libacl_rt.so") {
+        return g_aclRtLoaded ? &g_mockLibAclRt : nullptr;
+    }
+    return nullptr;
+}
+
+void* MockApiDlsym(void* handle, const char* symbol)
+{
+    if (handle == &g_mockLibRuntime) {
+        const bool isRtApi = std::string(symbol) == "rtStreamSynchronize";
+        const bool isAclApi =
+            (std::string(symbol) == "aclrtBinaryGetDevAddress") || (std::string(symbol) == "aclrtFunctionGetBinary");
+        return (isRtApi || (g_aclApiInRuntimeOnly && isAclApi)) ? reinterpret_cast<VOID_PTR>(&g_originApiStub) :
+                                                                  nullptr;
+    }
+    if (handle == &g_mockLibAclRt) {
+        const bool isAclApi =
+            (std::string(symbol) == "aclrtBinaryGetDevAddress") || (std::string(symbol) == "aclrtFunctionGetBinary");
+        return (!g_aclApiInRuntimeOnly && isAclApi) ? reinterpret_cast<VOID_PTR>(&g_functionGetBinaryStub) : nullptr;
+    }
+    return nullptr;
+}
+
+int MockApiDlclose(void* handle)
+{
+    (void)handle;
+    return 0;
 }
 
 } // namespace
@@ -452,6 +541,60 @@ TEST_F(AcpAclrtInjectionUtest, GetPluginApiStubFuncNotFound)
     const auto func = AcpApiPlugin::instance()->GetPluginApiStubFunc("acp_not_exist_api");
     EXPECT_TRUE((func == nullptr) || (func != nullptr)); // 取决于宿主 once 状态，仅驱动执行
     SUCCEED();
+}
+
+TEST_F(AcpAclrtInjectionUtest, LoadRuntimeApiResolvesAclApiFromAclRt)
+{
+    // libruntime.so 只有 rt 层符号；aclrt* 公开包装函数在 libacl_rt.so 中。
+    g_aclRtLoaded = true;
+    MOCKER(dlopen).stubs().will(invoke(MockApiDlopen));
+    MOCKER(dlsym).stubs().will(invoke(MockApiDlsym));
+    MOCKER(dlclose).stubs().will(invoke(MockApiDlclose));
+    AclApiPluginStateGuard stateGuard;
+    auto& plugin = *AcpApiPlugin::instance();
+    AcpApiPluginTestAccessor::Prepare(plugin, MockApiDlopen("libruntime.so", RTLD_NOW));
+    EXPECT_EQ(
+        reinterpret_cast<VOID_PTR>(&g_functionGetBinaryStub), plugin.GetPluginApiStubFunc("aclrtFunctionGetBinary"));
+    EXPECT_EQ(
+        reinterpret_cast<VOID_PTR>(&g_functionGetBinaryStub), plugin.GetPluginApiStubFunc("aclrtBinaryGetDevAddress"));
+    EXPECT_EQ(reinterpret_cast<VOID_PTR>(&g_originApiStub), plugin.GetPluginApiStubFunc("rtStreamSynchronize"));
+    GlobalMockObject::verify();
+}
+
+TEST_F(AcpAclrtInjectionUtest, LoadRuntimeApiRetriesAclApiAfterAclRtLoaded)
+{
+    // The first preload happens before libacl_rt is loaded; the later call must recover lazily.
+    g_aclRtLoaded = false;
+    MOCKER(dlopen).stubs().will(invoke(MockApiDlopen));
+    MOCKER(dlsym).stubs().will(invoke(MockApiDlsym));
+    MOCKER(dlclose).stubs().will(invoke(MockApiDlclose));
+    AclApiPluginStateGuard stateGuard;
+    auto& plugin = *AcpApiPlugin::instance();
+    AcpApiPluginTestAccessor::Prepare(plugin, MockApiDlopen("libruntime.so", RTLD_NOW));
+    EXPECT_EQ(nullptr, plugin.GetPluginApiStubFunc("aclrtFunctionGetBinary"));
+
+    g_aclRtLoaded = true;
+    EXPECT_EQ(
+        reinterpret_cast<VOID_PTR>(&g_functionGetBinaryStub), plugin.GetPluginApiStubFunc("aclrtFunctionGetBinary"));
+    EXPECT_EQ(
+        reinterpret_cast<VOID_PTR>(&g_functionGetBinaryStub), plugin.GetPluginApiStubFunc("aclrtBinaryGetDevAddress"));
+    GlobalMockObject::verify();
+}
+
+TEST_F(AcpAclrtInjectionUtest, LoadRuntimeApiFallsBackToRuntimeForLegacyAclApi)
+{
+    // 历史库布局中 aclrt* 公开包装函数仍由 libruntime.so 导出，需回退解析。
+    g_aclApiInRuntimeOnly = true;
+    g_aclRtLoaded = true;
+    MOCKER(dlopen).stubs().will(invoke(MockApiDlopen));
+    MOCKER(dlsym).stubs().will(invoke(MockApiDlsym));
+    MOCKER(dlclose).stubs().will(invoke(MockApiDlclose));
+    AclApiPluginStateGuard stateGuard;
+    auto& plugin = *AcpApiPlugin::instance();
+    AcpApiPluginTestAccessor::Prepare(plugin, MockApiDlopen("libruntime.so", RTLD_NOW));
+    EXPECT_EQ(reinterpret_cast<VOID_PTR>(&g_originApiStub), plugin.GetPluginApiStubFunc("aclrtFunctionGetBinary"));
+    EXPECT_EQ(reinterpret_cast<VOID_PTR>(&g_originApiStub), plugin.GetPluginApiStubFunc("aclrtBinaryGetDevAddress"));
+    GlobalMockObject::verify();
 }
 
 TEST_F(AcpAclrtInjectionUtest, TaskStartRegistersStarsAndBiuJobs)

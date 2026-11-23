@@ -27,6 +27,8 @@ using namespace analysis::dvvp::common::error;
 using namespace analysis::dvvp::common::utils;
 
 static const char RUNTIME_LIB_PATH[] = "libruntime.so";
+static const char ACL_API_LIB_PATH[] = "libacl_rt.so";
+static const std::set<std::string> g_aclApiStubSet = {"aclrtBinaryGetDevAddress", "aclrtFunctionGetBinary"};
 
 static std::set<std::string> g_pluginApiStubSet = {
     "rtSetDevice",
@@ -61,15 +63,34 @@ AcpApiPlugin::~AcpApiPlugin()
     }
 }
 
+static VOID_PTR LoadAclApiStubAddr(const std::string& funcName)
+{
+    VOID_PTR aclApiLibHandle = dlopen(ACL_API_LIB_PATH, RTLD_LAZY | RTLD_NOLOAD);
+    if (aclApiLibHandle == nullptr) {
+        const char* dlError = dlerror();
+        MSPROF_LOGW("Dlopen api from %s failed, dlopen error: %s", ACL_API_LIB_PATH, dlError == nullptr ? "" : dlError);
+        return nullptr;
+    }
+
+    VOID_PTR addr = dlsym(aclApiLibHandle, funcName.c_str());
+    (void)dlclose(aclApiLibHandle);
+    return addr;
+}
+
 void AcpApiPlugin::LoadRuntimeApi()
 {
     FUNRET_CHECK_EXPR_ACTION(acpRuntimeLibHandle_ == nullptr, return, "Runtime handle is nullptr, load api failed.");
     for (auto& it : g_pluginApiStubSet) {
-        auto addr = dlsym(acpRuntimeLibHandle_, it.c_str());
-        FUNRET_CHECK_EXPR_ACTION_LOGW(
-            addr == nullptr, continue, "Unable to load API %s from %s.", it.c_str(), RUNTIME_LIB_PATH);
+        const bool isAclApi = g_aclApiStubSet.find(it) != g_aclApiStubSet.cend();
+        VOID_PTR addr = isAclApi ? LoadAclApiStubAddr(it) : nullptr;
+        const char* libName = isAclApi ? ACL_API_LIB_PATH : RUNTIME_LIB_PATH;
+        if (addr == nullptr) {
+            addr = dlsym(acpRuntimeLibHandle_, it.c_str());
+            libName = RUNTIME_LIB_PATH;
+        }
+        FUNRET_CHECK_EXPR_ACTION_LOGW(addr == nullptr, continue, "Unable to load API %s from %s.", it.c_str(), libName);
 
-        MSPROF_LOGI("Load api[%s] from %s success.", it.c_str(), RUNTIME_LIB_PATH);
+        MSPROF_LOGI("Load api[%s] from %s success.", it.c_str(), libName);
         apiStubInfoMap_.insert({it, {it, addr}});
     }
 
@@ -146,13 +167,27 @@ rtError_t AcpApiPlugin::ApiGetBinaryData(aclrtBinHandle handle, std::vector<uint
 VOID_PTR AcpApiPlugin::GetPluginApiStubFunc(const std::string funcName)
 {
     ProfAPI::PthreadOnce(&apiLoadFlag_, []() -> void { AcpApiPlugin::instance()->LoadRuntimeApi(); });
-    auto it = apiStubInfoMap_.find(funcName);
-    if (it == apiStubInfoMap_.cend()) {
-        MSPROF_LOGE("Can't find api %s", funcName.c_str());
-        return nullptr;
+    {
+        const std::lock_guard<std::mutex> lock(apiStubMutex_);
+        auto it = apiStubInfoMap_.find(funcName);
+        if (it != apiStubInfoMap_.cend()) {
+            return it->second.funcAddr;
+        }
+
+        // libacl_rt may be loaded after the one-time runtime API preload. Retry ACL wrappers
+        // lazily so late loading can recover without resetting the process-wide once flag.
+        if (g_aclApiStubSet.find(funcName) != g_aclApiStubSet.cend()) {
+            VOID_PTR addr = LoadAclApiStubAddr(funcName);
+            if (addr != nullptr) {
+                MSPROF_LOGI("Load api[%s] from %s success after retry.", funcName.c_str(), ACL_API_LIB_PATH);
+                apiStubInfoMap_.insert({funcName, {funcName, addr}});
+                return addr;
+            }
+        }
     }
 
-    return it->second.funcAddr;
+    MSPROF_LOGE("Can't find api %s", funcName.c_str());
+    return nullptr;
 }
 
 void* AcpApiPlugin::GetMsprofInjectionFunc(uint32_t type)

@@ -138,6 +138,42 @@ TEST_F(UPLOADER_TEST, run_with_data)
     GlobalMockObject::reset();
 }
 
+TEST_F(UPLOADER_TEST, UploaderFileChunkFailureMessageIncludesContext)
+{
+    GlobalMockObject::verify();
+    using namespace analysis::dvvp::transport;
+
+    constexpr int32_t uploadRet = -12;
+    auto chunk = std::make_shared<analysis::dvvp::ProfileFileChunk>();
+    chunk->id = "0.1";
+    chunk->fileName = "host_op_summary.csv";
+    chunk->chunkSize = 128;
+    chunk->chunkModule = analysis::dvvp::common::config::PROFILING_IS_FROM_MSPROF_HOST;
+
+    std::shared_ptr<Uploader> uploader(new Uploader(_transport));
+    MOCKER_CPP_VIRTUAL(
+        *_transport.get(), &MsptiPipeTransport::SendBuffer,
+        int32_t(MsptiPipeTransport::*)(SHARED_PTR_ALIA<analysis::dvvp::ProfileFileChunk>))
+        .stubs()
+        .will(returnValue(uploadRet));
+
+    EXPECT_EQ(PROFILING_SUCCESS, uploader->Init());
+    EXPECT_EQ(PROFILING_SUCCESS, uploader->UploadData(chunk));
+    uploader->forceQuit_ = true;
+    uploader->queue_->Quit();
+    auto errorContext = MsprofErrorManager::instance()->GetErrorManagerContext();
+    testing::internal::CaptureStdout();
+    uploader->Run(errorContext);
+    const std::string logMsg = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(std::string::npos, logMsg.find("id: 0.1"));
+    EXPECT_NE(std::string::npos, logMsg.find("fileName: host_op_summary.csv"));
+    EXPECT_NE(std::string::npos, logMsg.find("data_len: 128 bytes"));
+    EXPECT_NE(std::string::npos, logMsg.find("ret: -12"));
+    uploader.reset();
+    GlobalMockObject::reset();
+}
+
 TEST_F(UPLOADER_TEST, Flush)
 {
     GlobalMockObject::verify();

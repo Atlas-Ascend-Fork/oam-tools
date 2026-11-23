@@ -1994,6 +1994,10 @@ std::string InputParser::GeneratePrompts() const
         result << metrics;
     }
     result << "]";
+    const std::string minEvent = Platform::instance()->CheckIfSupport(PLATFORM_AICORE_EVENT_FROM_ZERO) ? "0x0" : "0x1";
+    const std::string maxEventNum = std::to_string(Platform::instance()->GetMaxMonitorNumber());
+    result << " or Custom:<event-list>. Custom event list supports hexadecimal or decimal integers in the range ["
+           << minEvent << ", 0x7FFFFFFF], separated by comma, up to " << maxEventNum << " events.";
     return result.str();
 }
 
@@ -2468,11 +2472,15 @@ void ArgsManager::AddAicMetricsArgs()
     if (Platform::instance()->CheckIfSupport(PLATFORM_TASK_MEMORY_ACCESS_PMU)) {
         memoryAccess = ", MemoryAccess";
     }
+    const std::string minEvent = Platform::instance()->CheckIfSupport(PLATFORM_AICORE_EVENT_FROM_ZERO) ? "0x0" : "0x1";
+    const std::string maxEventNum = std::to_string(Platform::instance()->GetMaxMonitorNumber());
     Args aicMetricsArgs = {
         "aic-metrics",
         "The aic metrics groups, include ArithmeticUtilization, PipeUtilization" + pipExe + ", Memory, MemoryL0" +
-            resource + ", MemoryUB" + l2Cache + memoryAccess + ".\n" + "\t\t\t\t\t\t   the default value is " + option +
-            ".",
+            resource + ", MemoryUB" + l2Cache + memoryAccess + " or Custom:<event-list>.\n" +
+            "\t\t\t\t\t\t   Custom event list supports hexadecimal or decimal integers in the range [" + minEvent +
+            ", 0x7FFFFFFF], separated by comma, up to " + maxEventNum + " events.\n" +
+            "\t\t\t\t\t\t   the default value is " + option + ".",
         option};
     argsList_.push_back(aicMetricsArgs);
 }
