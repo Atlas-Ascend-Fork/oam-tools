@@ -6,7 +6,7 @@
 
 - launch方式：msprof命令行启动动态采集时，同步调起AI任务并进入性能数据采集交互模式，可以通过命令随时启动和停止采集。
 
-  若使用msprof --application命令拉起的进程即为实际用卡的业务进程（例如msprof --application=main --dynamic=on，main即为实际业务进程程序），推荐使用该方式。
+  若使用msprof --application命令拉起的进程即为实际用卡的业务进程（例如msprof --application=main --dynamic=on，main即为实际业务进程），推荐使用该方式。
 
 - attach方式：用户先自行启动AI任务，再启动msprof动态采集并进入性能数据采集交互模式，可以通过命令随时启动和停止采集。
 

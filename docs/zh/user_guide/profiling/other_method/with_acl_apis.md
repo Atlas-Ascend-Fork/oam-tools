@@ -389,7 +389,7 @@ aclprofFinalize();
 <!-- end id19 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id20 -->
-详细的性能数据信息如请参考[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
+详细的性能数据信息请参考[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
 <!-- end id20 -->
 
 <!-- end id21 -->

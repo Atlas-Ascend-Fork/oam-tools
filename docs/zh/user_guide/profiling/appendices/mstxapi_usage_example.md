@@ -5,7 +5,7 @@
 1. 请确保安装Ascend-cann-toolkit包。
 
    <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-   参见[《CANN 软件安装》](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
+   参见[《CANN软件安装》](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
    <!-- end id1 -->
 2. mstx API样例代码集成在Ascend-cann-toolkit包中，路径为$\{INSTALL\_DIR\}/tools/mstx/samples。
 
@@ -17,7 +17,7 @@
 ```cpp
 aclrtContext context_;
 aclrtStream stream_;
- 
+
 // 1.AscendCL初始化
 aclError ret = ACL_ERROR_NONE;
 ret = aclInit(nullptr);
@@ -25,7 +25,7 @@ if (ret != ACL_SUCCESS) {
     ERROR_LOG("aclInit failed");
     return FAILED;
 }
- 
+
 // 2.申请运行管理资源，包括设置用于计算的Device、创建Context、创建Stream
 ret = aclrtSetDevice(0);
 if (ret != ACL_ERROR_NONE) {
@@ -43,7 +43,7 @@ if (ret != ACL_ERROR_NONE) {
     return FAILED;
 }
 ....
- 
+
 // 3.在想采集耗时的代码位置添加打点代码，比如在执行模型前后打点，获取模型执行耗时
 mstxRangeId rangeId = mstxRangeStartA("model execute", nullptr); // 第二个入参设置nullptr，只记录host侧range耗时(适用于纯host侧代码段)；设置有效的stream，同时记录host侧和对应device侧耗时(适用于下发计算任务或通信任务)
 ret = aclmdlExecute(modelId, input, output); // 执行模型样例代码
@@ -54,8 +54,8 @@ mstxDomainHandle_t selfDomain = mstxDomainCreateA("self_domain");
 mstxRangeId domainRangeId = mstxDomainRangeStartA(selfDomain, "model execute", nullptr);
 ret = aclmdlExecute(modelId, input, output); // 执行模型样例代码
 mstxDomainRangeEnd(selfDomain, domainRangeId);
- 
+
 // 5.释放运行管理资源
- 
+
 // 6.AscendCL去初始化
 ```

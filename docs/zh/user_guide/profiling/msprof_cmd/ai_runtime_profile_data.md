@@ -54,7 +54,7 @@ app为必选，相关参数说明请参见[app参数说明](general_collect_comm
 <!-- npu="950,A3,910b,910,310p,310b" id2 -->
 ### aicpu
 
---aicpu=<aicpu-value\>：可选，采集AICPU算子的详细信息，如：计算耗时、数据拷贝耗时等。可选on或off，默认值为off。
+--aicpu=<aicpu-value\>：可选，采集AI CPU算子的详细信息，如：计算耗时、数据拷贝耗时等。可选on或off，默认值为off。
 <!-- end id2 -->
 
 ### ai-core
@@ -131,7 +131,7 @@ app为必选，相关参数说明请参见[app参数说明](general_collect_comm
 <!-- npu="310b" id13 -->
 - Atlas 200I/500 A2推理产品：PipelineExecuteUtilization
 <!-- end id13 -->
-<!-- npu="310b" id14 -->
+<!-- npu="310p" id14 -->
 - Atlas推理系列产品：PipeUtilization
 <!-- end id14 -->
 <!-- npu="910" id15 -->
@@ -164,7 +164,7 @@ app为必选，相关参数说明请参见[app参数说明](general_collect_comm
 --sys-hardware-mem-freq=<sys-hardware-mem-freq-value\>：可选，--sys-hardware-mem的采集频率，范围\[1,100\]，默认值为50，单位Hz。
 
 <!-- npu="950" id19 -->
-Ascend 950PR&950DT系列产品，QoS和SoC支持的采集频率最大支持配置10000，其他采集项支持的最大采集频率仍为100，若配置超出范围，其他采集项则按照最大采集频率100进行采集。
+Ascend 950PR&950DT系列产品，QoS和SoC支持的采集频率最大可配置10000，其他采集项支持的最大采集频率仍为100，若配置超出范围，其他采集项则按照最大采集频率100进行采集。
 <!-- end id19 -->
 
 设置该参数需要`--sys-hardware-mem`参数设置为on。

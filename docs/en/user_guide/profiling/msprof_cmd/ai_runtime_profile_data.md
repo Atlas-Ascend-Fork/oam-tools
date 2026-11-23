@@ -126,7 +126,7 @@ Default:
 <!-- npu="310b" id13 -->
 - Atlas 200I/500 A2 inference products: PipelineExecuteUtilization
 <!-- end id13 -->
-<!-- npu="310b" id14 -->
+<!-- npu="310p" id14 -->
 - Atlas inference products: PipeUtilization
 <!-- end id14 -->
 <!-- npu="910" id15 -->

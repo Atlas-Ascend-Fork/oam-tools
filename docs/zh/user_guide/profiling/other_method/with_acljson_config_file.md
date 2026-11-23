@@ -199,7 +199,7 @@ AI Core性能指标采集项。task_time或task_trace配置为on、l1或l2时，
 - Atlas训练系列产品：支持采集L2 Cache的命中率
 <!-- end id21 -->
 <!-- npu="910b" id22 -->
-- Atlas A2系列产品：支持采集L2 Cache和TLB页表缓存的命中率；分析AI Core命中L2次数推荐使用aic-metrics=L2Cache。
+- Atlas A2系列产品：支持采集L2 Cache和TLB页表缓存的命中率；分析AI Core命中L2次数推荐使用aic\_metrics=L2Cache。
 <!-- end id22 -->
 <!-- npu="A3" id23 -->
 - Atlas A3系列产品：支持采集L2 Cache和TLB页表缓存的命中率；分析AI Core命中L2次数推荐使用aic\_metrics=L2Cache。

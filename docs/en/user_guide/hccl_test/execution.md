@@ -111,7 +111,7 @@
          export HCCL_TEST_PROFILING_PATH=/home/profiling
          ```
 
-         If HCCL_TEST_PROFILING is enabled, profiling data is generated in the directory specified by HCCL_TEST_PROFILING_PATH after HCCL Test execution is complete. For details about how to parse the performance data, see the "msProf Performance Data Parsing" section in *[Performance Tuning Tool](https://gitcode.com/cann/docs/blob/master/docs/zh/profiling/profiling_menu.md)*.
+         If HCCL_TEST_PROFILING is enabled, profiling data is generated in the directory specified by HCCL_TEST_PROFILING_PATH after HCCL Test execution is complete. For details about how to parse the performance data, see the "msProf Performance Data Parsing" section in *[Performance Tuning Tool](https://gitcode.com/cann/docs/blob/master/docs/en/profiling/profiling_menu.md)*.
 
          > [!CAUTION] Caution
          > Enabling profiling affects the performance of collective communication operators.

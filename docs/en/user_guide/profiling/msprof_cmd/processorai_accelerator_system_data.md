@@ -366,9 +366,9 @@ Log in to the running environment and run the following command in any directory
 msprof --output=/home/projects/output --sys-devices=<ID> --sys-period=<period> --ai-core=on --sys-hardware-mem=on --sys-cpu-profiling=on --sys-profiling=on --sys-pid-profiling=on --dvpp-profiling=on
 ```
 
-In the Ascend EP scenario, a PROF_XXX directory is generated in the directory specified by --output to store the automatically parsed performance data. For details about the result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md).
+In the Ascend EP scenario, a PROF_XXX directory is generated in the directory specified by --output to store the automatically parsed performance data. For details about the result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/profile_data_file_references.md).
 
-In the Ascend RC scenario, a PROF_XXX directory is generated in the directory specified by --output. The files in this directory cannot be viewed without parsing. You need to upload the PROF_XXX directory to the development environment for data parsing. For details, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md).
+In the Ascend RC scenario, a PROF_XXX directory is generated in the directory specified by --output. The files in this directory cannot be viewed without parsing. You need to upload the PROF_XXX directory to the development environment for data parsing. For details, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md).
 <!-- end id4 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00004 -->

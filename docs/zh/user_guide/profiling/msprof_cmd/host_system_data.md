@@ -44,7 +44,6 @@ msprof --output=/home/projects/output --host-sys=cpu /home/projects/MyApp/out/ma
 ```sh
 msprof --output=/home/projects/output --host-sys=cpu --ftrace=sched/sched_switch,sched/sched_wakeup,irq/irq_handler_entry --ftrace-period=5 /home/projects/MyApp/out/main
 ```
-```
 
 或者：
 

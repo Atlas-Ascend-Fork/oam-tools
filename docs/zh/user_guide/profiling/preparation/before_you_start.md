@@ -8,7 +8,7 @@
 
 1. 根据实际用户场景选择CANN相关软件包安装并配置CANN环境变量。
    <!-- npu="950,A3,910b,910,310p,310b" id6 -->
-   具体请参见[《CANN 软件安装》](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
+   具体请参见[《CANN软件安装》](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
    <!-- end id6 -->
 
     <!-- npu="950,A3,910b,910,310p,310b" id1 -->

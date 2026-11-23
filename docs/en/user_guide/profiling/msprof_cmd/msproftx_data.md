@@ -5,7 +5,7 @@
 When you need to locate performance bottlenecks in an application or an upper-layer framework program, you can use specific APIs to record the time span of specific events during application execution and write the data to a performance data file.
 
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-- General scenario: It is recommended to use [mstx API](https://gitcode.com/Ascend/op-plugin/blob/master/docs/en/custom_APIs/menu_Pytorch_API.md) (or optionally [msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)).
+- General scenario: It is recommended to use [mstx API](https://gitcode.com/Ascend/op-plugin/blob/master/docs/en/custom_APIs/menu_Pytorch_API.md) (or optionally [msproftx API](https://gitcode.com/cann/runtime/blob/master/docs/en/api_ref/19-02_msproftx_extension_apis.md)).
 - PyTorch scenario: Use [TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/master/docs/en/developer_notes/ascend_pytorch_profiler_user_guide.md).
 <!-- end id1 -->
 
