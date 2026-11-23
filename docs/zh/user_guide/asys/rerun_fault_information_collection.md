@@ -72,6 +72,11 @@ asys launch --task="sh ../app_run.sh" --tar="True" --output=path
            ├── ops                      // 算子编译信息，包括算子编译*.o和*.json文件、算子编译过程信息、自定义算子配置信息等
            ├── stackcore                // 报错触发coredump时的core文件信息
            ├── atrace                   // trace落盘信息，包括trace二进制文件解析的明文文件
+           ├── system_info              // 其他模块维测信息，如事件调度模块维测信息、驱动proc日志、TEE日志等
+           ├── ub_info                  // UB（Unified Bus）维测信息；仅Ascend 950PR&950DT系列环境收集
+           ├── ao_info                  // AO（Always Online）维测信息：ao_self（AO区日志）、ao_cnt（AO计数）、ao_uart（串口录音）；仅Ascend 950PR&950DT系列环境收集
+           ├── ccu_info                 // CCU维测信息；仅Ascend 950PR&950DT系列环境收集
+           ├── network_info             // network维测信息；仅Ascend 950PR&950DT系列环境收集
            └── log
                ├── device
                │     ├──dev-os-{id}
@@ -88,7 +93,9 @@ asys launch --task="sh ../app_run.sh" --tar="True" --output=path
                     └── user_cmd        // 用户执行任务的命令
     ```
 
-    **其中，用户可根据需求自行定义software\_info.txt文件中收集的第三方依赖软件的版本信息**。在asys工具目录下的“ascend\_system\_advisor/conf/dependent\_package.csv”文件中，增加或删除配置项，每行对应一个配置项，逗号分割依赖项名字和查询指令，逗号后无空格。示例片段如下：
+    上述system\_info、ub\_info、ao\_info、ccu\_info和network\_info目录内容的详细信息，请参见[《msnpureport工具使用指南》](https://support.huawei.com/enterprise/zh/ascend-computing/ascend-hdk-pid-252764743?category=reference-guides&subcategory=command-reference)。
+
+    **其中，用户可根据需求自行定义software\_info.txt文件中收集的第三方依赖软件的版本信息**。在asys工具目录下的“ascend\_system\_advisor/asys/conf/dependent\_package.csv”文件中，增加或删除配置项，每行对应一个配置项，逗号分割依赖项名字和查询指令，逗号后无空格。示例片段如下：
 
     ```bash
     make,make --version
