@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include <set>
+#include <algorithm>
 #include "mockcpp/mockcpp.hpp"
 #include "gtest/gtest.h"
 #include <iostream>
@@ -30,6 +31,7 @@
 #include "platform/platform_tool.h"
 #include <fstream>
 #include <sys/wait.h>
+#include <unistd.h>
 #include <memory>
 #include "dyn_prof_client_tool.h"
 
@@ -253,6 +255,58 @@ int32_t ExecCmdStub(
     g_argv = argv;
     return PROFILING_SUCCESS;
 }
+
+// 记录每次 ExecCmd 的 argv 与参数形态，并返回可控退出码，用于校验探测与 -reports 的拼装。
+std::vector<std::vector<std::string>> g_exportArgvList;
+ExecCmdParams g_exportCmdParams("", true, "");
+int32_t g_exportExitCode = 0;
+bool g_exportTerminatedBySignal = false;
+// fork 时刻本进程 fd 2 指向的目标，用于确认探测期间子进程 stderr 已被屏蔽。
+std::string g_stderrTargetAtExec = "";
+std::string ReadStderrTarget()
+{
+    char target[256] = {0};
+    ssize_t len = readlink("/proc/self/fd/2", target, sizeof(target) - 1);
+    return len > 0 ? std::string(target, static_cast<size_t>(len)) : std::string();
+}
+
+int32_t ExecCmdCaptureStub(
+    const ExecCmdParams& execCmdParams, const std::vector<std::string>& argv, const std::vector<std::string>& envp,
+    int& exitCodeP, OsalProcess& childProcess)
+{
+    g_exportArgvList.push_back(argv);
+    g_exportCmdParams = execCmdParams;
+    g_stderrTargetAtExec = ReadStderrTarget();
+    childProcess = 1;
+    return PROFILING_SUCCESS;
+}
+
+// 按 g_exportExitCode / g_exportTerminatedBySignal 构造真实 wait status，
+// 保证被信号终止与正常退出两种形态都能被生产代码的 WIFSIGNALED/WEXITSTATUS 正确解析。
+int32_t WaitProcessStub(OsalProcess, bool& isExited, int32_t& exitCode, bool)
+{
+    isExited = true;
+    exitCode = g_exportTerminatedBySignal ? g_exportExitCode : static_cast<int32_t>(g_exportExitCode << 8);
+    return PROFILING_SUCCESS;
+}
+
+class ExportArgvHelper {
+public:
+    static void Reset() { g_exportArgvList.clear(); }
+
+    static size_t Count() { return g_exportArgvList.size(); }
+
+    static bool Contains(const std::vector<std::string>& argv, const std::string& value)
+    {
+        return std::find(argv.begin(), argv.end(), value) != argv.end();
+    }
+
+    static bool HasReports(const std::vector<std::string>& argv)
+    {
+        return std::any_of(
+            argv.begin(), argv.end(), [](const std::string& arg) { return arg.rfind("-reports=", 0) == 0; });
+    }
+};
 TEST_F(RUNNING_MODE_UTEST, StopRunningTasks)
 {
     GlobalMockObject::verify();
@@ -335,7 +389,11 @@ TEST_F(RUNNING_MODE_UTEST, StartExportTask)
     rMode.analysisPath_ = "path_test";
     params->exportModelId = 1;
     params->exportIterationId = 1;
-    MOCKER_CPP(&RunningMode::RunExportSummaryTask)
+    // 缺省导出类型 text：走 timeline + summary 两次调用。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
+    MOCKER_CPP(
+        &RunningMode::RunExportSummaryTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
         .stubs()
         .will(returnValue(PROFILING_FAILED))
         .then(returnValue(PROFILING_SUCCESS));
@@ -348,6 +406,7 @@ TEST_F(RUNNING_MODE_UTEST, StartExportTask)
     GlobalMockObject::verify();
 
     // export summary
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
     MOCKER(Utils::ExecCmd).stubs().will(returnValue(PROFILING_FAILED)).then(returnValue(PROFILING_SUCCESS));
 
     EXPECT_EQ(PROFILING_FAILED, rMode.StartExportTask());
@@ -356,6 +415,7 @@ TEST_F(RUNNING_MODE_UTEST, StartExportTask)
 
     GlobalMockObject::verify();
     // export timeline
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
     MOCKER(Utils::ExecCmd)
         .stubs()
         .will(returnValue(PROFILING_SUCCESS))
@@ -370,6 +430,239 @@ TEST_F(RUNNING_MODE_UTEST, StartExportTask)
     EXPECT_EQ(PROFILING_FAILED, rMode.StartExportTask());
     EXPECT_EQ(PROFILING_FAILED, rMode.StartExportTask());
     EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+}
+
+TEST_F(RUNNING_MODE_UTEST, StartExportTaskWithDefaultTypeKeepsTwoCalls)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::ExportMode rMode("export", params);
+    rMode.jobResultDir_ = "123";
+    rMode.analysisPath_ = "path_test";
+    // 缺省导出类型为 text，不因解析包支持 export all 而改变：不得走单次导出。
+    EXPECT_EQ(params->exportType, "text");
+
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    // export all 若被调用会失败，从而暴露"默认不开 all"被破坏。
+    MOCKER_CPP(&RunningMode::RunExportAllTask).stubs().will(returnValue(PROFILING_FAILED));
+    MOCKER_CPP(&RunningMode::RunExportTimelineTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(
+        &RunningMode::RunExportSummaryTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
+        .stubs()
+        .will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, StartExportTaskWithExportTypeAll)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::ExportMode rMode("export", params);
+    rMode.jobResultDir_ = "123";
+    rMode.analysisPath_ = "path_test";
+    params->exportType = "all";
+
+    // --type=all 且解析包支持时，一次调用完成导出。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    MOCKER_CPP(&RunningMode::RunExportAllTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    GlobalMockObject::verify();
+
+    // export all 执行失败时直接失败：text 分支不参与，不会因它返回成功而掩盖失败。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    MOCKER_CPP(&RunningMode::RunExportAllTask).stubs().will(returnValue(PROFILING_FAILED));
+    MOCKER_CPP(&RunningMode::RunExportTimelineTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(
+        &RunningMode::RunExportSummaryTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
+        .stubs()
+        .will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_FAILED, rMode.StartExportTask());
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, StartExportTaskWithExportTypeAllUnsupportedPackage)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::ExportMode rMode("export", params);
+    rMode.jobResultDir_ = "123";
+    rMode.analysisPath_ = "path_test";
+    params->exportType = "all";
+
+    // 解析包不支持 export all 时，--type=all 必须回退到 timeline + summary 两次调用。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
+    // export all 若被调用会失败，从而暴露"未回退"的实现错误。
+    MOCKER_CPP(&RunningMode::RunExportAllTask).stubs().will(returnValue(PROFILING_FAILED));
+    MOCKER_CPP(&RunningMode::RunExportTimelineTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(
+        &RunningMode::RunExportSummaryTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
+        .stubs()
+        .will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    GlobalMockObject::verify();
+
+    // 回退路径中 timeline 失败时整体失败，不能因回退而吞掉错误。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
+    MOCKER_CPP(&RunningMode::RunExportTimelineTask).stubs().will(returnValue(PROFILING_FAILED));
+    MOCKER_CPP(
+        &RunningMode::RunExportSummaryTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
+        .stubs()
+        .will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_FAILED, rMode.StartExportTask());
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, StartExportTaskWithExportTypeDbSkipsExportAll)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::ExportMode rMode("export", params);
+    rMode.jobResultDir_ = "123";
+    rMode.analysisPath_ = "path_test";
+    params->exportType = "db";
+
+    // --type=db 只导出统一 db；export all 若被调用会返回失败，从而暴露分支错误。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    MOCKER_CPP(&RunningMode::RunExportAllTask).stubs().will(returnValue(PROFILING_FAILED));
+    MOCKER_CPP(
+        &RunningMode::RunExportDbTask,
+        int32_t(RunningMode::*)(const ExecCmdParams&, std::vector<std::string>&, int32_t&, bool))
+        .stubs()
+        .will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, IsExportAllSupportedJudgesByExitCode)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+
+    // 分析路径缺失时不得探测，直接判为不支持。
+    EXPECT_FALSE(rMode.IsExportAllSupported());
+    rMode.analysisPath_ = "path_test";
+
+    // 探测命令行固定为 export all --help，且走异步路径避免父进程 chdir。
+    g_exportExitCode = 0;
+    ExportArgvHelper::Reset();
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(WaitProcessStub));
+    EXPECT_TRUE(rMode.IsExportAllSupported());
+    EXPECT_EQ(ExportArgvHelper::Count(), 1);
+    if (ExportArgvHelper::Count() == 1) {
+        const std::vector<std::string>& argv = g_exportArgvList[0];
+        EXPECT_EQ(argv.size(), 4);
+        if (argv.size() == 4) {
+            EXPECT_EQ(argv[1], "export");
+            EXPECT_EQ(argv[2], "all");
+            EXPECT_EQ(argv[3], "--help");
+        }
+    }
+    // 探测必须使用异步路径：同步路径会在父进程内 chdir，污染后续子进程的工作目录。
+    EXPECT_TRUE(g_exportCmdParams.async);
+    // 输出重定向到空设备，避免 --help 正文与 argparse 报错污染 msprof 输出流。
+    EXPECT_EQ(g_exportCmdParams.stdoutRedirectFile, "/dev/null");
+    // fork 时刻子进程的 stderr 必须也被屏蔽：老包 argparse 的 invalid choice 写 fd 2，
+    // 只重定向 stdout 会让报错泄漏到屏幕。同时确认探测结束后已恢复，未污染后续输出。
+    EXPECT_EQ(g_stderrTargetAtExec, "/dev/null");
+    EXPECT_NE(ReadStderrTarget(), "/dev/null");
+    GlobalMockObject::verify();
+
+    // 老分析包不认识 all，argparse 以非 0 退出，必须判为不支持。
+    g_exportExitCode = 2;
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(WaitProcessStub));
+    EXPECT_FALSE(rMode.IsExportAllSupported());
+    GlobalMockObject::verify();
+
+    // 子进程被信号终止时 wait status 不是退出码，必须判为不支持而非误读成 0。
+    g_exportExitCode = 9;
+    g_exportTerminatedBySignal = true;
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER(Utils::WaitProcess).stubs().will(invoke(WaitProcessStub));
+    EXPECT_FALSE(rMode.IsExportAllSupported());
+    g_exportTerminatedBySignal = false;
+    GlobalMockObject::verify();
+
+    // 探测进程启动失败时直接判为不支持，不再等待。
+    MOCKER(Utils::ExecCmd).stubs().will(returnValue(PROFILING_FAILED));
+    EXPECT_FALSE(rMode.IsExportAllSupported());
+    GlobalMockObject::verify();
+}
+
+TEST_F(RUNNING_MODE_UTEST, ExportReportsIsOnlySentWhereAnalysisPackageAcceptsIt)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::ExportMode rMode("export", params);
+    rMode.jobResultDir_ = "123";
+    rMode.analysisPath_ = "path_test";
+    params->reportsPath = "reports.json";
+
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER_CPP(&RunningMode::WaitRunningProcess).stubs().will(returnValue(PROFILING_SUCCESS));
+
+    // 新分析包：export all 与 export db 都接受 -reports，必须下发。
+    params->exportType = "all";
+    ExportArgvHelper::Reset();
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    EXPECT_EQ(ExportArgvHelper::Count(), 1);
+    if (ExportArgvHelper::Count() == 1) {
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[0], "all"));
+        EXPECT_TRUE(ExportArgvHelper::HasReports(g_exportArgvList[0]));
+    }
+
+    params->exportType = "db";
+    ExportArgvHelper::Reset();
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    EXPECT_EQ(ExportArgvHelper::Count(), 1);
+    if (ExportArgvHelper::Count() == 1) {
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[0], "db"));
+        EXPECT_TRUE(ExportArgvHelper::HasReports(g_exportArgvList[0]));
+    }
+    GlobalMockObject::verify();
+
+    // text 走 timeline + summary 两次调用：-reports 由 all/report 是否同时支持决定，
+    // 新包（支持 export all）两条命令都下发，老包只有 timeline 自始支持、summary 不得下发。
+    // verify() 已清除上面的桩，此处必须重新注册，否则会走真实探测并因 analysisPath_ 不存在而失败。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(true));
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER_CPP(&RunningMode::WaitRunningProcess).stubs().will(returnValue(PROFILING_SUCCESS));
+
+    params->exportType = "text";
+    ExportArgvHelper::Reset();
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    EXPECT_EQ(ExportArgvHelper::Count(), 2);
+    if (ExportArgvHelper::Count() == 2) {
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[0], "timeline"));
+        EXPECT_TRUE(ExportArgvHelper::HasReports(g_exportArgvList[0]));
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[1], "summary"));
+        EXPECT_TRUE(ExportArgvHelper::HasReports(g_exportArgvList[1]));
+    }
+    GlobalMockObject::verify();
+
+    // 老分析包：summary 不接受 -reports，不得下发；timeline 自始支持，仍按原样下发。
+    MOCKER_CPP(&RunningMode::IsExportAllSupported, bool(RunningMode::*)(void) const).stubs().will(returnValue(false));
+    MOCKER(Utils::ExecCmd).stubs().will(invoke(ExecCmdCaptureStub));
+    MOCKER_CPP(&RunningMode::WaitRunningProcess).stubs().will(returnValue(PROFILING_SUCCESS));
+
+    ExportArgvHelper::Reset();
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.StartExportTask());
+    EXPECT_EQ(ExportArgvHelper::Count(), 2);
+    if (ExportArgvHelper::Count() == 2) {
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[0], "timeline"));
+        EXPECT_TRUE(ExportArgvHelper::HasReports(g_exportArgvList[0]));
+        EXPECT_TRUE(ExportArgvHelper::Contains(g_exportArgvList[1], "summary"));
+        EXPECT_FALSE(ExportArgvHelper::HasReports(g_exportArgvList[1]));
+    }
+    GlobalMockObject::verify();
 }
 
 TEST_F(RUNNING_MODE_UTEST, StopNoWait)

@@ -158,6 +158,8 @@ const std::string CSV_FORMAT = "csv";
 const std::string JSON_FORMAT = "json";
 const std::string TEXT_EXPORT_TYPE = "text";
 const std::string DB_EXPORT_TYPE = "db";
+// 一次性导出 timeline、summary 与 db 的导出类型，底层对应解析包的 export all 子命令。
+const std::string ALL_EXPORT_TYPE = "all";
 const std::string NTS_PIPE_UTILIZATION = "PipeUtilization";
 const std::string NTS_CUSTOM_PREFIX = "Custom:";
 constexpr uint64_t NTS_EVENT_MAX = 0x71b;
@@ -1915,10 +1917,11 @@ int32_t InputParser::CheckExportType(const struct MsprofCmdInfo& cmdInfo) const
         return MSPROF_DAEMON_ERROR;
     }
     params_->exportType = cmdInfo.args[ARGS_EXPORT_TYPE];
-    if (params_->exportType != TEXT_EXPORT_TYPE && params_->exportType != DB_EXPORT_TYPE) {
+    if (params_->exportType != TEXT_EXPORT_TYPE && params_->exportType != DB_EXPORT_TYPE &&
+        params_->exportType != ALL_EXPORT_TYPE) {
         CmdLog::CmdErrorLog(
             "Argument --type: invalid value: %s. "
-            "Please input 'text' or 'db'.",
+            "Please input 'text', 'db' or 'all'.",
             cmdInfo.args[ARGS_EXPORT_TYPE]);
         return MSPROF_DAEMON_ERROR;
     }
@@ -2491,12 +2494,14 @@ void ArgsManager::AddAnalysisArgs()
         return;
     }
     std::string typeDesc = "The export type, only used when argument `export` is on \n"
-                           "\t\t\t\t\t\t   or when collecting data, include text, db.\n"
-                           "\t\t\t\t\t\t   the default value is text.";
+                           "\t\t\t\t\t\t   or when collecting data, include text, db, all.\n"
+                           "\t\t\t\t\t\t   the default value is text. 'all' exports timeline, summary\n"
+                           "\t\t\t\t\t\t   and db in one pass.";
     if (Platform::instance()->CheckIfSupport(PLATFORM_EXPORT_TYPE)) {
         typeDesc = "The export type, only used when argument `export` is on \n"
-                   "\t\t\t\t\t\t   or when collecting data, include text, db.\n"
-                   "\t\t\t\t\t\t   the default value is text(which will also export the database).";
+                   "\t\t\t\t\t\t   or when collecting data, include text, db, all.\n"
+                   "\t\t\t\t\t\t   the default value is text(which will also export the database).\n"
+                   "\t\t\t\t\t\t   'all' exports timeline, summary and db in one pass.";
     }
     std::vector<Args> argsList;
     argsList = {

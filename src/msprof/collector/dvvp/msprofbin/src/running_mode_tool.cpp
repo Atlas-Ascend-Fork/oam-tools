@@ -17,7 +17,9 @@
 #include <algorithm>
 #include <iterator>
 #include <chrono>
+#include <fcntl.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #include "errno/error_code_tool.h"
 #include "input_parser_tool.h"
 #include "cmd_log/cmd_log_tool.h"
@@ -48,6 +50,50 @@ void RestoreSampleConfigEnv(const std::string& originalValue, bool originalValue
     }
     (void)unsetenv(PROFILER_SAMPLE_CONFIG_ENV);
 }
+
+// 临时把本进程的 stderr 指向空设备。子进程创建只重定向 fd 1（stdoutRedirectFile），
+// 而 argparse 的参数错误走 stderr，因此探测这类会打报错的命令时需要一并屏蔽 fd 2。
+// 恢复到析构时进行，作用域应尽量只包住 fork 本身，避免影响其它线程的输出。
+class ScopedStderrSilencer {
+public:
+    ScopedStderrSilencer()
+    {
+        int32_t nullFd = open("/dev/null", O_WRONLY);
+        if (nullFd < 0) {
+            return;
+        }
+        int32_t savedFd = dup(STDERR_FILENO);
+        if (savedFd < 0) {
+            (void)close(nullFd);
+            return;
+        }
+        if (dup2(nullFd, STDERR_FILENO) < 0) {
+            (void)close(savedFd);
+            (void)close(nullFd);
+            return;
+        }
+        nullFd_ = nullFd;
+        savedFd_ = savedFd;
+    }
+
+    ~ScopedStderrSilencer()
+    {
+        if (savedFd_ >= 0) {
+            (void)dup2(savedFd_, STDERR_FILENO);
+            (void)close(savedFd_);
+        }
+        if (nullFd_ >= 0) {
+            (void)close(nullFd_);
+        }
+    }
+
+    ScopedStderrSilencer(const ScopedStderrSilencer&) = delete;
+    ScopedStderrSilencer& operator=(const ScopedStderrSilencer&) = delete;
+
+private:
+    int32_t nullFd_ = -1;
+    int32_t savedFd_ = -1;
+};
 } // namespace
 using namespace analysis::dvvp::message;
 using namespace analysis::dvvp::common::cmdlog;
@@ -448,9 +494,15 @@ int32_t RunningMode::StartQueryTask()
 }
 
 int32_t RunningMode::RunExportDbTask(
-    const ExecCmdParams& execCmdParams, std::vector<std::string>& envsV, int32_t& exitCode)
+    const ExecCmdParams& execCmdParams, std::vector<std::string>& envsV, int32_t& exitCode, bool exportAllSupported)
 {
     std::vector<std::string> argsDbV = {analysisPath_, "export", "db", "-dir=" + jobResultDir_};
+    // export 子命令上的 -reports 与 export all 由同一新版本引入，all 与 report 同时支持，
+    // 因此以 exportAllSupported 作为唯一判据；老包传入会以参数非法失败。
+    // 注意 export timeline 自始支持 -reports，不受此约束。
+    if (exportAllSupported && !params_->reportsPath.empty()) {
+        argsDbV.emplace_back("-reports=" + params_->reportsPath);
+    }
 
     int32_t ret = analysis::dvvp::common::utils::Utils::ExecCmd(execCmdParams, argsDbV, envsV, exitCode, taskPid_);
     if (ret == PROFILING_FAILED) {
@@ -468,7 +520,7 @@ int32_t RunningMode::RunExportDbTask(
 }
 
 int32_t RunningMode::RunExportSummaryTask(
-    const ExecCmdParams& execCmdParams, std::vector<std::string>& envsV, int32_t& exitCode)
+    const ExecCmdParams& execCmdParams, std::vector<std::string>& envsV, int32_t& exitCode, bool exportAllSupported)
 {
     std::vector<std::string> argsSummaryV = {
         analysisPath_, "export", "summary", "-dir=" + jobResultDir_, "--format=" + params_->exportSummaryFormat};
@@ -480,6 +532,11 @@ int32_t RunningMode::RunExportSummaryTask(
     }
     if (params_->exportIterationId != DEFAULT_INTERATION_ID) {
         argsSummaryV.emplace_back("--iteration-id=" + params_->exportIterationId);
+    }
+    // export 子命令上的 -reports 与 export all 由同一新版本引入，all 与 report 同时支持，
+    // 因此以 exportAllSupported 作为唯一判据；老包传入会以参数非法失败。
+    if (exportAllSupported && !params_->reportsPath.empty()) {
+        argsSummaryV.emplace_back("-reports=" + params_->reportsPath);
     }
     int32_t ret = analysis::dvvp::common::utils::Utils::ExecCmd(execCmdParams, argsSummaryV, envsV, exitCode, taskPid_);
     if (ret == PROFILING_FAILED) {
@@ -524,6 +581,89 @@ int32_t RunningMode::RunExportTimelineTask(
     return PROFILING_SUCCESS;
 }
 
+int32_t RunningMode::RunExportAllTask(
+    const ExecCmdParams& execCmdParams, std::vector<std::string>& envsV, int32_t& exitCode)
+{
+    std::vector<std::string> argsAllV = {analysisPath_, "export", "all", "-dir=" + jobResultDir_};
+    if (params_->clearSwitch == "on") {
+        argsAllV.emplace_back("--clear");
+    }
+    if (params_->exportModelId != DEFAULT_MODEL_ID) {
+        argsAllV.emplace_back("--model-id=" + params_->exportModelId);
+    }
+    if (params_->exportIterationId != DEFAULT_INTERATION_ID) {
+        argsAllV.emplace_back("--iteration-id=" + params_->exportIterationId);
+    }
+    if (!params_->reportsPath.empty()) {
+        argsAllV.emplace_back("-reports=" + params_->reportsPath);
+    }
+    // --summary-format 仍然透传：export all 接受该参数但恒按 csv 产出 summary。
+    argsAllV.emplace_back("--format=" + params_->exportSummaryFormat);
+
+    int32_t ret = analysis::dvvp::common::utils::Utils::ExecCmd(execCmdParams, argsAllV, envsV, exitCode, taskPid_);
+    if (ret == PROFILING_FAILED) {
+        MSPROF_LOGE("Failed to launch export all task, data path: %s", Utils::BaseName(jobResultDir_).c_str());
+        return PROFILING_FAILED;
+    }
+    ret = WaitRunningProcess(taskName_ + " all");
+    if (ret != PROFILING_SUCCESS) {
+        MSPROF_LOGE("Failed to wait export all process %d to exit, ret=%d", static_cast<int32_t>(taskPid_), ret);
+        return PROFILING_FAILED;
+    }
+    taskPid_ = MSVP_PROCESS;
+    exitCode = INVALID_EXIT_CODE;
+    return PROFILING_SUCCESS;
+}
+
+bool RunningMode::IsExportAllSupported() const
+{
+    if (analysisPath_.empty() || params_ == nullptr) {
+        return false;
+    }
+    // 以子命令是否被解析器接受作为判定依据：支持时退出码为 0，旧版本会以参数非法退出。
+    // 探测输出对用户无意义：--help 正文走 stdout，由 stdoutRedirectFile 丢弃；老包的
+    // invalid choice 报错走 stderr，需在 fork 前临时屏蔽 fd 2，避免污染 msprof 输出流。
+    static const std::string NULL_DEVICE = "/dev/null";
+    // 与仓库其余调用点一致使用异步路径：同步路径会在父进程内 chdir，改变本进程的工作目录，
+    // 进而影响后续 fork 的导出/查询子进程对相对路径的解析。
+    ExecCmdParams execCmdParams(params_->pythonPath, true, NULL_DEVICE);
+    std::vector<std::string> envsV;
+    SetEnvList(envsV);
+    std::vector<std::string> argsV = {analysisPath_, "export", "all", "--help"};
+    // 探测不属于导出任务，使用独立句柄，避免占用 taskPid_。
+    OsalProcess probePid = MSVP_PROCESS;
+    int32_t exitCode = 0;
+    int32_t ret = PROFILING_SUCCESS;
+    {
+        // 只包住 fork 本身：子进程在此处继承指向空设备的 fd 2，随后立即恢复本进程的 stderr。
+        ScopedStderrSilencer silencer;
+        ret = analysis::dvvp::common::utils::Utils::ExecCmd(execCmdParams, argsV, envsV, exitCode, probePid);
+    }
+    if (ret != PROFILING_SUCCESS) {
+        // 仅记录不支持；探测自身异常属内部细节，INFO 日志不体现失败措辞。
+        MSPROF_LOGI("[Export Mode] export all is not supported by the analysis package.");
+        return false;
+    }
+    // 异步模式只返回子进程句柄，退出码需自行回收进程后从 wait status 解析。
+    bool isExited = false;
+    int32_t waitStatus = 0;
+    ret = analysis::dvvp::common::utils::Utils::WaitProcess(probePid, isExited, waitStatus, true);
+    if (ret != PROFILING_SUCCESS || !isExited) {
+        MSPROF_LOGI("[Export Mode] export all is not supported by the analysis package.");
+        return false;
+    }
+    // 被信号终止时 wait status 不是退出码，判为不支持。
+    const uint32_t status = static_cast<uint32_t>(waitStatus);
+    const bool terminatedBySignal = IsSignalTerminationStatus(status);
+    const bool supported = !terminatedBySignal && (WEXITSTATUS(status) == 0);
+    if (!supported) {
+        MSPROF_LOGI("[Export Mode] export all is not supported by the analysis package.");
+        return false;
+    }
+    MSPROF_LOGI("[Export Mode] export all is supported by the analysis package.");
+    return true;
+}
+
 int32_t RunningMode::StartExportTask()
 {
     if (isQuit_) {
@@ -549,17 +689,33 @@ int32_t RunningMode::StartExportTask()
     std::vector<std::string> envsV;
     int32_t exitCode = INVALID_EXIT_CODE;
     SetEnvList(envsV);
+    // 分析包是否支持 export all 子命令：--type=all 是对应的上层开关。
+    // -reports 与 export all 由同一新版本引入（all 与 report 同时支持），因此 summary、db 的
+    // -reports 门控同样以该探测为准。
+    const bool exportAllSupported = IsExportAllSupported();
     if (params_->exportType == "db") {
-        if (RunExportDbTask(execCmdParams, envsV, exitCode) != PROFILING_SUCCESS) {
+        if (RunExportDbTask(execCmdParams, envsV, exitCode, exportAllSupported) != PROFILING_SUCCESS) {
             MSPROF_LOGE("Export db failed in %s.", Utils::BaseName(jobResultDir_).c_str());
             return PROFILING_FAILED;
         }
+    } else if (params_->exportType == "all" && exportAllSupported) {
+        if (RunExportAllTask(execCmdParams, envsV, exitCode) != PROFILING_SUCCESS) {
+            // export all 失败说明分析包支持该能力但执行出错，不回退到两次调用，避免重复解析并掩盖真实错误。
+            MSPROF_LOGE("Export all failed in %s.", Utils::BaseName(jobResultDir_).c_str());
+            return PROFILING_FAILED;
+        }
     } else {
+        if (params_->exportType == "all") {
+            // --type=all 但解析包不支持 export all：回退到 timeline + summary 两次调用。
+            // 回退原因只记录到日志，不向用户打屏。
+            MSPROF_LOGW(
+                "The analysis package does not support 'export all', fall back to export timeline and summary.");
+        }
         if (RunExportTimelineTask(execCmdParams, envsV, exitCode) != PROFILING_SUCCESS) {
             MSPROF_LOGE("Export timeline failed in %s.", Utils::BaseName(jobResultDir_).c_str());
             return PROFILING_FAILED;
         }
-        if (RunExportSummaryTask(execCmdParams, envsV, exitCode) != PROFILING_SUCCESS) {
+        if (RunExportSummaryTask(execCmdParams, envsV, exitCode, exportAllSupported) != PROFILING_SUCCESS) {
             MSPROF_LOGE("Export summary failed in %s.", Utils::BaseName(jobResultDir_).c_str());
             return PROFILING_FAILED;
         }

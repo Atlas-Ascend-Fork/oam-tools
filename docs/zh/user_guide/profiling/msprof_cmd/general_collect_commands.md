@@ -88,6 +88,7 @@ msprof命令行工具提供了**AI任务运行性能数据**、**AI处理器系�
 - --type=<type\>：可选，设置性能数据解析结果文件格式，即可以选择msprof命令行执行采集后自动解析的结果文件格式，取值为：
   - text：表示解析为.json、.csv格式的文件和.db格式文件（msprof\_时间戳.db）。默认为text。
   - db：仅解析为一个汇总所有性能数据的.db格式文件（msprof\_时间戳.db），使用MindStudio Insight工具展示。
+  - all：导出全量的交付件内容，目前包含.json、.csv、.db格式文件。
     <!-- end id2 -->
 
 - --environment=<env\>：可选，执行采集时运行环境上需要的自定义环境变量。

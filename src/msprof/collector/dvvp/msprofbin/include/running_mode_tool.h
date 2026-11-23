@@ -56,13 +56,18 @@ protected:
     int32_t StartExportTask();
     int32_t RunExportSummaryTask(
         const analysis::dvvp::common::utils::ExecCmdParams& execCmdParams, std::vector<std::string>& envsV,
-        int32_t& exitCode);
+        int32_t& exitCode, bool exportAllSupported);
     int32_t RunExportTimelineTask(
         const analysis::dvvp::common::utils::ExecCmdParams& execCmdParams, std::vector<std::string>& envsV,
         int32_t& exitCode);
     int32_t RunExportDbTask(
         const analysis::dvvp::common::utils::ExecCmdParams& execCmdParams, std::vector<std::string>& envsV,
+        int32_t& exitCode, bool exportAllSupported);
+    int32_t RunExportAllTask(
+        const analysis::dvvp::common::utils::ExecCmdParams& execCmdParams, std::vector<std::string>& envsV,
         int32_t& exitCode);
+    // 分析包是否支持一次导出全部交付件；不支持时回退到 timeline + summary 两次调用。
+    bool IsExportAllSupported() const;
     int32_t CheckAnalysisEnv();
     int32_t WaitRunningProcess(std::string processUsage);
     // for parse, export, query mode
