@@ -172,6 +172,28 @@ class TestAtraceCollect(AssertTest):
             else:
                 self.assertTrue(False)
 
+    @pytest.mark.parametrize("item_type", [9, 99, 200])
+    def test_parse_msg_data_unsupported_item_type(self, item_type):
+        data_file = os.path.join(
+            ut_root_path,
+            "data/atrace/trace_17965_17965_20240302100542653636/stackcore_tracer_35_12345_2024.bin",
+        )
+        parse_trace = ParseTrace(is_file=True)
+        with open(data_file, "rb") as fp:
+            try:
+                parse_trace.parse_msg_data(fp, ["item_name", item_type, 0, 1], 2)
+            except ValueError as e:
+                self.assertTrue(
+                    f"The data type item_name(type {item_type}) is not supported"
+                    in str(e)
+                )
+            except TypeError as e:
+                raise AssertionError(f"TypeError raised: {e}") from e
+            else:
+                raise AssertionError(
+                    f"item_type={item_type} did not raise, UNPACK table may cover it"
+                )
+
     def test_parse_data_segment_failed(self, mocker):
         data_file = os.path.join(
             ut_root_path,
@@ -195,6 +217,24 @@ class TestAtraceCollect(AssertTest):
         parse_trace = ParseTrace(is_file=True)
         parse_trace.parse("test.log")
         self.assertTrue("The test.log cannot be read or cannot be found" in caplog.text)
+
+    def test_parse_value_error_logged_in_batch_mode(self, caplog):
+        # collect_trace() builds ParseTrace() with is_file=False, where
+        # self.error() is a no-op. parse() must still log the ValueError
+        # so a version-mismatched .bin is not silently skipped on collect.
+        data_file = os.path.join(
+            ut_root_path,
+            "data/atrace/trace_17965_17965_20240302100542653636/stackcore_tracer_35_12345_2024.bin",
+        )
+        parse_trace = ParseTrace()
+        with open(data_file, "rb") as fp:
+            try:
+                parse_trace.parse_msg_data(fp, ["item_name", 200, 0, 1], 2)
+            except ValueError:
+                parse_trace.parse(data_file)
+            else:
+                raise AssertionError("fixture did not raise as expected")
+        self.assertTrue("Parse" in caplog.text and "failed" in caplog.text)
 
 
 def _timezone_trace_bytes(version, offset):

@@ -230,7 +230,14 @@ class ParseTrace:
         Parse the data based on the item parameter.
         """
         item_name, item_type, item_mode, item_length = item_list
-        msg_byte = UNPACK.get(item_type)[1]
+        unpack_list = UNPACK.get(item_type)
+        if unpack_list is None:
+            raise ValueError(
+                f"The data type {item_name}(type {item_type}) is not supported, "
+                "check whether the version matches or whether the file content "
+                "is complete."
+            )
+        msg_byte = unpack_list[1]
         data_list = ""
         use_byte = 0
         while item_length > 0 and txt_size > 0:
@@ -328,6 +335,10 @@ class ParseTrace:
             with open(trace_file, "rb") as fp:
                 msg_txt = self.parse_data_segment(fp, trace_file)
         except ValueError as e:
+            # The batch collect path (collect_trace) builds ParseTrace with
+            # is_file=False, where self.error() drops the message silently.
+            # Log unconditionally so both entries leave the same trace.
+            log_warning(f"Parse {trace_file} failed: {e}")
             self.error(e)
         except IOError:
             self.error(f"The {trace_file} cannot be read or cannot be found.")
