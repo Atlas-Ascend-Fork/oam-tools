@@ -8,7 +8,7 @@
 
 ## 环境准备
 
-- HCCL性能测试工具的编译运行依赖CANN开发套件包（ Ascend-cann-toolkit）与算子包（Ascend-cann-ops），所以使用此工具前请确保环境中已部署好CANN相关软件包。
+- HCCL性能测试工具的编译运行依赖CANN开发套件包（Ascend-cann-toolkit）与算子包（Ascend-cann-ops），所以使用此工具前请确保环境中已部署好CANN相关软件包。
 
 - HCCL性能测试工具源码存放\$\{INSTALL_DIR\}/tools/hccl_test路径下，\$\{INSTALL_DIR\}请替换为CANN软件安装后文件存储路径。以root用户安装为例，安装后文件默认存储路径为：/usr/local/Ascend/cann。
 
@@ -57,6 +57,6 @@ Atlas推理系列产品
 
 例如单机8卡做allreduce操作，则“数据量”除以“做完allreduce的耗时”就是allreduce算子执行的算法带宽。
 
-使用HCCL性能测试工具进行测试时，带宽数据即指的“算法带宽”。
+使用HCCL性能测试工具进行测试时，带宽数据即指“算法带宽”。
 
 影响算法带宽的主要因素有：通信链路物理带宽以及通信算法自身的编排实现。

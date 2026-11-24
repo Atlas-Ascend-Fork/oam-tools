@@ -76,7 +76,7 @@ HCCL Test工具依赖MPI启动多个进程，所以需要先安装MPI软件，�
 
     其中“node3”为主机名，可通过执行“ hostname”命令获取。
 
-    注意如果是Euler OS操作系统，需要执行如下命令使更新后的“/etc/hosts”文件生效：
+    注意如果是EulerOS操作系统，需要执行如下命令使更新后的“/etc/hosts”文件生效：
 
     ```text
     nmcli c reload
@@ -161,7 +161,7 @@ HCCL Test工具依赖MPI启动多个进程，所以需要先安装MPI软件，�
 
     - --disable-fortran：禁用Fortran语言支持。
     - --enable-ipv6：启用IPv6支持。
-    - --prefix：配置的Open MPI的安装路径，用户可自定义。
+    - --prefix：配置的Open MPI安装路径，用户可自定义。
     - --with-zlib：指定zlib压缩库的头文件和库文件搜索路径。
 
 4. 编译并安装Open MPI。
@@ -187,7 +187,7 @@ HCCL Test工具依赖MPI启动多个进程，所以需要先安装MPI软件，�
     fec0::b6ef:998f:f3eb:4617 node4
     ```
 
-    注意如果是Euler OS操作系统，需要执行如下命令使更新后的“/etc/hosts”文件生效：
+    注意如果是EulerOS操作系统，需要执行如下命令使更新后的“/etc/hosts”文件生效：
 
     ```text
     nmcli c reload

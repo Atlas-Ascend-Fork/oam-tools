@@ -118,7 +118,7 @@
 
     Hostfile文件用于指定需要在哪些节点上启动通信进程，Hostfile文件是文本文件，需要用户自定义。
 
-    “$\{INSTALL_DIR\}/tools/hccl_test/”路径下已存在默认Hostfile模版文件，命名为“hostfile”，您可以直接基于该模版进行编辑，也可以自定义文件存储路径与名称。
+    “$\{INSTALL_DIR\}/tools/hccl_test/”路径下已存在默认Hostfile模板文件，命名为“hostfile”，您可以直接基于该模板进行编辑，也可以自定义文件存储路径与名称。
 
     - 安装MPICH的场景，仅支持通信协议IPv4，内容格式如下：
 
@@ -239,7 +239,7 @@ data_size(Bytes): |   avg_time(us): | alg_bandwidth(GB/s): | check_result:
 
 **data_size**：单个NPU上参与集合通信的数据量，单位为Bytes。
 
-**aveg_time**：集合通信算子执行耗时，单位为us。
+**avg_time**：集合通信算子执行耗时，单位为us。
 
 **alg_bandwidth**：集合通信算子执行带宽，单位为GB/s。
 
