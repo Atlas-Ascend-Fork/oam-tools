@@ -632,10 +632,10 @@ def main():
     print()
     print(f"{len(checks) - len(failures)} passed / {len(failures)} failed")
     if failures:
-        print("\nFix the conversion. Do not satisfy a check by generating data the "
+        print("Fix the conversion. Do not satisfy a check by generating data the "
               "capture does not contain.")
         return 1
-    print("\nConversion is self-consistent. Hand off to the UI skill's validators, "
+    print("Conversion is self-consistent. Hand off to the UI skill's validators, "
           "which are authoritative for the report.")
     return 0
 

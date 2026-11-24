@@ -93,7 +93,7 @@ def run(cmd, **kwargs):
 
 def die(status, stage, message, **extra):
     print(json.dumps({"status": status, "stage": stage, "message": message, **extra},
-                      ensure_ascii=False, indent=1))
+                      ensure_ascii=False))
     sys.exit(0 if status.startswith("awaiting") else 1)
 
 
@@ -468,7 +468,7 @@ def main():
         "breakdown_report": None,
         "ui_report": os.path.join(repo, "report/index.html"),
         "serve": f"cd {repo} && python3 -m http.server 8081   # then open /report/",
-    }, ensure_ascii=False, indent=1))
+    }, ensure_ascii=False))
     sys.exit(0)
 
 

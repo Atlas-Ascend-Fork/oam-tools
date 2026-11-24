@@ -106,7 +106,7 @@ def main():
         "flow_events_missing_id": sum(1 for e in events
                                       if e.get("ph") in ("s", "t", "f")
                                       and flow_key(e) is None),
-    }, indent=1))
+    }))
 
 
 if __name__ == "__main__":

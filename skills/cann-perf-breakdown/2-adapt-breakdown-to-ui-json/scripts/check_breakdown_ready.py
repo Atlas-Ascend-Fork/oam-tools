@@ -173,7 +173,7 @@ def main():
     print(f"NOT READY  {len(blockers)} blocker(s):")
     for blocker in blockers:
         print(f"  - {blocker}")
-    print("\nFix the breakdown. Do not convert an unverified breakdown.")
+    print("Fix the breakdown. Do not convert an unverified breakdown.")
     return 1
 
 
