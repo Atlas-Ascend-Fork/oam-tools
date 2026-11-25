@@ -9,13 +9,13 @@ This section describes the parameters of the HCCL Test performance testing tool.
 - Scenario where MPICH is installed
 
     ```bash
-    mpirun [-f <hostfile>] -n <number> ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
+    mpirun [-f <hostfile>] -n <number> ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-R <nroot>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
     ```
 
 - Scenario where Open MPI is installed
 
     ```bash
-    mpirun [--prefix <mpi_install_path>] [-hostfile <hostfile>] -n <number> -x <env> [--allow-run-as-root] [--mca <key value>] ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
+    mpirun [--prefix <mpi_install_path>] [-hostfile <hostfile>] -n <number> -x <env> [--allow-run-as-root] [--mca <key value>] ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-R <nroot>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
     ```
 
 - The parameters following mpirun are MPI command-related parameters. For details about MPI command-related parameters, see [MPICH Command Parameters](#mpich-command-parameters) and [Open MPI Command Parameters](#open-mpi-command-parameters).
@@ -108,6 +108,16 @@ This section describes only the common parameters of the Open MPI tool. For more
 - **-r \<root\> or --root \<root\>**: optional. When the execution command is broadcast_test, reduce_test, or scatter_test, use this parameter to specify the Device ID of the root node.
 
   Value range: [0, actual number of Devices - 1]. The default value is 0.
+
+- **-R \<nroot\> or --nroot \<nroot\>**: optional. Specifies the number of root groups for the scalable multi-root initialization flow.
+
+  If this parameter is not specified, the original single-root initialization flow is used.
+
+  If this parameter is specified, HCCL Test evenly groups the ranks participating in the test by `nroot` (the total number of ranks divided by the number of roots, with the remainder distributed to the first groups in order). The first rank in each group calls `HcclGetRootInfoScalable` to generate the rootInfo for that group, and the rootInfo values are collected through `MPI_Allgatherv` before `HcclCommInitRootInfoScalable` is called to set up the communication domain.
+
+  Value range: `(0, rank_size]`, where `rank_size` is the total number of ranks participating in the test.
+
+  **Constraint**: `-R/--nroot` must be consistent across all ranks, that is, all ranks must either specify the same value or all omit it; otherwise, the collective communication sequences on different ranks may become inconsistent and the test may hang.
 
 - **-d \<datatype\> or --datatype \<datatype\>**: optional. Specifies the data type supported by HCCL Test. The default value is fp32.
 

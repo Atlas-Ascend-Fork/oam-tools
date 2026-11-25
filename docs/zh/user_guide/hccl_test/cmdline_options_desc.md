@@ -7,13 +7,13 @@
 - 安装MPICH的场景
 
     ```bash
-    mpirun [-f <hostfile>] -n <number> ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
+    mpirun [-f <hostfile>] -n <number> ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-R <nroot>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
     ```
 
 - 安装Open MPI的场景
 
     ```bash
-    mpirun [--prefix <mpi_install_path>] [-hostfile <hostfile>] -n <number> -x <env> [--allow-run-as-root] [--mca <key value>] ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
+    mpirun [--prefix <mpi_install_path>] [-hostfile <hostfile>] -n <number> -x <env> [--allow-run-as-root] [--mca <key value>] ./bin/<executable_file> [-p <npus>] [-b <minbytes>] [-e <maxbytes>] [-f <incfactor>] [-o <operator>] [-r <root>] [-R <nroot>] [-d <datatype>] [-z <0/1>] [-n <iters_count>] [-w <warmup_iters_count>] [-c <0/1>]
     ```
 
 - mpirun后跟随的是MPI命令相关参数，MPI命令相关参数说明请参见[MPICH命令参数](#mpich命令参数)与[Open MPI命令参数](#open-mpi命令参数)。
@@ -106,6 +106,16 @@
 - **-r \<root\>或--root \<root\>**：可选，执行命令为broadcast_test、reduce_test、scatter_test时，需要通过此参数指定根节点的Device ID。
 
   取值范围：[0, 实际Device数量-1]，默认值为：0。
+
+- **-R \<nroot\>或--nroot \<nroot\>**：可选，指定scalable多root初始化流程的root分组数量。
+
+  不指定此参数时，保持原有单root初始化流程。
+
+  指定此参数后，HCCL Test按`nroot`对参与测试的rank进行平均分组（rank总数除以root数量，余数依次分配到前若干组），每组首个rank调用`HcclGetRootInfoScalable`生成本组rootInfo，再通过`MPI_Allgatherv`汇集后调用`HcclCommInitRootInfoScalable`建立通信域。
+
+  取值范围：`(0, rank_size]`，其中`rank_size`为参与测试的rank总数。
+
+  **使用约束**：`-R/--nroot`需在所有rank上保持一致，即所有rank同时指定相同的取值或同时不指定；否则各rank的集合通信序列可能不一致，导致测试挂死。
 
 - **-d \<datatype\>或--datatype \<datatype\>**：可选，HCCL Test支持的数据类型，默认值为fp32。
 
