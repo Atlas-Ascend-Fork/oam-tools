@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include "input_parser_tool.h"
+#include <array>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <dirent.h>
@@ -24,6 +26,7 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <string_view>
 #include <sys/stat.h>
 #include "cmd_log/cmd_log_tool.h"
 #include "errno/error_code_tool.h"
@@ -890,7 +893,7 @@ SHARED_PTR_ALIA<analysis::dvvp::message::ProfileParams> InputParser::MsprofGetOp
     // exits 0 without starting a collection.
     if (pmuHelpPrinted_) {
         params_->usedParams.clear();
-        params_->usedParams.insert(ARGS_HELP);
+        (void)params_->usedParams.insert(ARGS_HELP);
         return params_;
     }
 
@@ -3121,14 +3124,15 @@ constexpr char PMU_EVENT_SEPARATOR = ',';
 constexpr size_t PMU_MAX_EVENT_LEN = 64;
 constexpr int32_t PMU_MAX_EVENTS = 32;
 // "0x"/"0X" prefix length, used to spot the hex spelling of a raw encoding.
-constexpr size_t PMU_HEX_PREFIX_LEN = 2;
+constexpr size_t PMU_HEX_PREFIX_LEN = 2U;
 // "raw:" is the other spelling the runtime rejects.
-constexpr char PMU_RAW_PREFIX[] = "raw:";
-constexpr size_t PMU_RAW_PREFIX_LEN = sizeof(PMU_RAW_PREFIX) - 1;
+constexpr std::string_view PMU_RAW_PREFIX = "raw:";
 // --cpu-core-events=help prints this many alias names per line.
-constexpr int32_t PMU_HELP_COLUMNS = 6;
+constexpr size_t PMU_HELP_COLUMNS = 6U;
 constexpr int32_t PMU_MIN_INTERVAL_MS = 1;
 constexpr int32_t PMU_MAX_INTERVAL_MS = 3600000;
+constexpr std::string_view PMU_ARMV8_NAME_PREFIX = "armv8_pmuv3";
+constexpr std::string_view PMU_ARMV9_NAME_PREFIX = "armv9_pmuv3";
 const std::string PMU_ON = "on";
 const std::string PMU_OFF = "off";
 
@@ -3140,9 +3144,9 @@ bool IsPmuEventNameValid(const std::string& name)
     if (name.empty() || name.size() > PMU_MAX_EVENT_LEN) {
         return false;
     }
-    for (char chr : name) {
-        const bool validChar = (chr >= 'a' && chr <= 'z') || (chr >= 'A' && chr <= 'Z') || (chr >= '0' && chr <= '9') ||
-                               chr == '_' || chr == '-';
+    for (const char chr : name) {
+        const unsigned char code = static_cast<unsigned char>(chr);
+        const bool validChar = code <= 0x7fU && (std::isalnum(code) != 0 || chr == '_' || chr == '-');
         if (!validChar) {
             return false;
         }
@@ -3154,7 +3158,7 @@ bool IsPmuEventNameValid(const std::string& name)
 // than by the node's PMU, so an unknown name is a typo and can be rejected here instead of failing
 // once collection starts. Keep in sync with SOFTWARE_ALIASES in the runtime's
 // pmu_event_resolver.cpp; nsys shows the same list via --os-events=help.
-constexpr const char* PMU_OS_EVENT_NAMES[] = {
+constexpr std::array<const char*, 9> PMU_OS_EVENT_NAMES = {
     "page-faults",      "minor-faults",     "major-faults", "context-switches", "cpu-migrations",
     "alignment-faults", "emulation-faults", "task-clock",   "cpu-clock",
 };
@@ -3180,8 +3184,9 @@ bool LooksLikeNumericEventId(const std::string& item, bool& isHexCode)
         return false;
     }
     bool allDigits = true;
-    for (char chr : item) {
-        if (chr < '0' || chr > '9') {
+    for (const char chr : item) {
+        const unsigned char code = static_cast<unsigned char>(chr);
+        if (code > 0x7fU || std::isdigit(code) == 0) {
             allDigits = false;
             break;
         }
@@ -3190,11 +3195,10 @@ bool LooksLikeNumericEventId(const std::string& item, bool& isHexCode)
         return true;
     }
     if (item.size() > PMU_HEX_PREFIX_LEN && item[0] == '0' &&
-        (item[PMU_HEX_PREFIX_LEN - 1] == 'x' || item[PMU_HEX_PREFIX_LEN - 1] == 'X')) {
+        (item[PMU_HEX_PREFIX_LEN - 1U] == 'x' || item[PMU_HEX_PREFIX_LEN - 1U] == 'X')) {
         for (size_t i = PMU_HEX_PREFIX_LEN; i < item.size(); ++i) {
-            const char chr = item[i];
-            const bool isHex = (chr >= '0' && chr <= '9') || (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F');
-            if (!isHex) {
+            const unsigned char code = static_cast<unsigned char>(item[i]);
+            if (code > 0x7fU || std::isxdigit(code) == 0) {
                 return false;
             }
         }
@@ -3210,14 +3214,13 @@ bool LooksLikeNumericEventId(const std::string& item, bool& isHexCode)
 bool LooksLikeRawEncoding(const std::string& item)
 {
     // R-prefixed hex is the terse spelling ("r13"), "raw:" the explicit one; both are rejected.
-    if (item.compare(0, PMU_RAW_PREFIX_LEN, PMU_RAW_PREFIX) == 0) {
+    if (item.rfind(PMU_RAW_PREFIX, 0U) == 0U) {
         return true;
     }
     if (item.size() > 1 && item[0] == 'r') {
         for (size_t i = 1; i < item.size(); ++i) {
-            const char chr = item[i];
-            const bool isHex = (chr >= '0' && chr <= '9') || (chr >= 'a' && chr <= 'f') || (chr >= 'A' && chr <= 'F');
-            if (!isHex) {
+            const unsigned char code = static_cast<unsigned char>(item[i]);
+            if (code > 0x7fU || std::isxdigit(code) == 0) {
                 return false;
             }
         }
@@ -3238,10 +3241,10 @@ bool ListSysfsPmuEvents(std::vector<std::string>& names, std::string& pmuDir)
     }
     std::vector<std::string> candidates;
     struct dirent* entry = nullptr;
-    while ((entry = readdir(rootDir)) != nullptr) {
+    for (entry = readdir(rootDir); entry != nullptr; entry = readdir(rootDir)) {
         const std::string name = entry->d_name;
-        const bool isArmPmu = name.compare(0, std::strlen("armv8_pmuv3"), "armv8_pmuv3") == 0 ||
-                              name.compare(0, std::strlen("armv9_pmuv3"), "armv9_pmuv3") == 0;
+        const bool isArmPmu = name.compare(0, PMU_ARMV8_NAME_PREFIX.size(), PMU_ARMV8_NAME_PREFIX) == 0 ||
+                              name.compare(0, PMU_ARMV9_NAME_PREFIX.size(), PMU_ARMV9_NAME_PREFIX) == 0;
         if (isArmPmu || name == "cpu") {
             candidates.push_back(name);
         }
@@ -3263,19 +3266,18 @@ bool ListSysfsPmuEvents(std::vector<std::string>& names, std::string& pmuDir)
     if (eventsDir == nullptr) {
         return false;
     }
-    while ((entry = readdir(eventsDir)) != nullptr) {
+    for (entry = readdir(eventsDir); entry != nullptr; entry = readdir(eventsDir)) {
         const std::string name = entry->d_name;
-        if (name == "." || name == "..") {
-            continue;
+        if (name != "." && name != "..") {
+            names.push_back(name);
         }
-        names.push_back(name);
     }
     (void)closedir(eventsDir);
     std::sort(names.begin(), names.end());
     return !names.empty();
 }
 
-const char* const PMU_HARDWARE_ALIAS_NAMES[] = {
+constexpr std::array<const char*, 11> PMU_HARDWARE_ALIAS_NAMES = {
     "cycles",
     "cpu-cycles",
     "instructions",
@@ -3315,11 +3317,16 @@ void PrintPmuEventHelp(bool osEvents)
                   << std::endl;
     }
     std::cout << "Generic hardware aliases (always accepted):" << std::endl;
-    const size_t aliasCount = sizeof(PMU_HARDWARE_ALIAS_NAMES) / sizeof(PMU_HARDWARE_ALIAS_NAMES[0]);
+    const size_t aliasCount = PMU_HARDWARE_ALIAS_NAMES.size();
     for (size_t i = 0; i < aliasCount; ++i) {
         // PMU_HELP_COLUMNS per line, indented, with no trailing space before the newline.
-        std::cout << ((i % PMU_HELP_COLUMNS == 0) ? "  " : " ") << PMU_HARDWARE_ALIAS_NAMES[i];
-        if (i % PMU_HELP_COLUMNS == (PMU_HELP_COLUMNS - 1) || i + 1 == aliasCount) {
+        if (i % PMU_HELP_COLUMNS == 0U) {
+            std::cout << "  ";
+        } else {
+            std::cout << " ";
+        }
+        std::cout << PMU_HARDWARE_ALIAS_NAMES[i];
+        if (i % PMU_HELP_COLUMNS == (PMU_HELP_COLUMNS - 1U) || i + 1U == aliasCount) {
             std::cout << std::endl;
         }
     }
@@ -3513,7 +3520,7 @@ int32_t InputParser::CollectHostPmuEventNames(const std::string& args, std::vect
             return MSPROF_DAEMON_ERROR;
         }
         if (std::find(normalized.begin(), normalized.end(), item) == normalized.end()) {
-            normalized.emplace_back(item);
+            (void)normalized.emplace_back(item);
         }
     }
     if (normalized.empty()) {
@@ -3525,7 +3532,7 @@ int32_t InputParser::CollectHostPmuEventNames(const std::string& args, std::vect
 
 int32_t InputParser::CheckHostPmuEventCount(const std::vector<std::string>& normalized, const char* option) const
 {
-    if (static_cast<int32_t>(normalized.size()) > PMU_MAX_EVENTS) {
+    if (normalized.size() > static_cast<size_t>(PMU_MAX_EVENTS)) {
         CmdLog::CmdErrorLog(
             "Argument %s: too many events (%zu), the limit is %d.", option, normalized.size(), PMU_MAX_EVENTS);
         return MSPROF_DAEMON_ERROR;
@@ -3586,11 +3593,11 @@ int32_t InputParser::CheckHostPmuEventBudget() const
             }
             // The same name in both lists is folded into one column, so it costs one slot, not two.
             if (std::find(names.begin(), names.end(), item) == names.end()) {
-                names.emplace_back(item);
+                (void)names.emplace_back(item);
             }
         }
     }
-    if (static_cast<int32_t>(names.size()) > PMU_MAX_EVENTS) {
+    if (names.size() > static_cast<size_t>(PMU_MAX_EVENTS)) {
         CmdLog::CmdErrorLog(
             "Arguments --cpu-core-events and --os-events together name %zu events, the limit is %d. "
             "Both lists share one counter budget because every event becomes a column in the same row.",
@@ -3650,7 +3657,7 @@ int32_t InputParser::CollectHostPmuOsEventNames(const std::string& args, std::ve
             return MSPROF_DAEMON_ERROR;
         }
         if (std::find(normalized.begin(), normalized.end(), item) == normalized.end()) {
-            normalized.emplace_back(item);
+            (void)normalized.emplace_back(item);
         }
     }
     if (normalized.empty()) {
