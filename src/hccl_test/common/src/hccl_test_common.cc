@@ -98,6 +98,25 @@ int get_accelerator_config_value_from_str(char* str)
     return -1;
 }
 
+static u32 get_scalable_root_index(u32 nRanks, u32 nRoot, u32 rank)
+{
+    const u32 rpr = nRanks / nRoot;
+    const u32 rmr = nRanks % nRoot;
+    const u32 rlim = rmr * (rpr + 1); // 前 rmr 个 root 的 rank 总数边界
+    if (rank < rlim) {
+        return rank / (rpr + 1);
+    }
+    return (rank - rlim) / rpr + rmr;
+}
+
+static u32 get_scalable_first_rank(u32 nRanks, u32 nRoot, u32 rootIndex)
+{
+    const u32 rpr = nRanks / nRoot;
+    const u32 rmr = nRanks % nRoot;
+    const u32 head = (rootIndex < rmr) ? rootIndex : rmr; // rootIndex 之前多带 rank 的 root 个数
+    return rootIndex * rpr + head;
+}
+
 static void get_host_name(char* hostName, int maxlen)
 {
     gethostname(hostName, maxlen);
@@ -293,6 +312,7 @@ std::vector<struct option> build_longopts(bool isNewGenSoc)
         opts.push_back({"zero_copy", required_argument, 0, 'z'});
         opts.push_back({"nslb", required_argument, 0, 's'});
     }
+    opts.push_back({"nroot", required_argument, 0, 'R'});
     opts.push_back({0, 0, 0, 0});
     return opts;
 }
@@ -316,6 +336,7 @@ void HcclTest::print_help()
     printf("[-w,--warmup_iters <warmup iteration count>] \n\t");
     printf("[-c,--check <result verification> 0:disabled 1:quiet 2:verbose (default 1)] \n\t");
     printf("[-p,--npus <npus used for one node>] \n\t");
+    printf("[-R,--nroot <number of roots>] \n\t");
     printf("[-m,--symmetric_memory  0:disabled 1:enabled.] \n\t");
     if (!IsNewGenSoc()) {
         printf("[-z,--zero_copy  0:disabled 1:enabled.] \n\t");
@@ -469,6 +490,11 @@ int HcclTest::check_cmd_line()
             "Error: [-r,--root <root>] is invalid, root rank must be greater than or equal to 0 and less than or "
             "equal to %d.\n",
             rank_size - 1);
+        return -1;
+    }
+
+    if (nRoot_flag == 1 && (nRoot <= 0 || nRoot > rank_size)) {
+        printf("Error: [-R,--nroot] must be in (0, rank_size(%d)].\n", rank_size);
         return -1;
     }
 
@@ -638,6 +664,10 @@ int HcclTest::parse_opt(int opt)
             npus = strtol_alldigit(optarg);
             npus_flag = 1;
             break;
+        case 'R':
+            nRoot = strtol_alldigit(optarg);
+            nRoot_flag = 1;
+            break;
         case 'z':
             enable_zero_copy = std::stoi(optarg);
             break;
@@ -668,7 +698,7 @@ int HcclTest::parse_cmd_line(int argc, char* argv[])
     int ret = 0;
     long parsed;
     bool isNewGenSoc = IsNewGenSoc();
-    std::string shortopts = isNewGenSoc ? "o:d:b:e:i:f:r:n:w:c:p:a:t:m:h" : "o:d:b:e:i:f:r:n:w:c:p:z:s:t:m:h";
+    std::string shortopts = isNewGenSoc ? "o:d:b:e:i:f:r:n:w:c:p:a:t:m:R:h" : "o:d:b:e:i:f:r:n:w:c:p:z:s:t:m:R:h";
     std::vector<struct option> longopts = build_longopts(isNewGenSoc);
 
     const char* opModeEnv = getenv("HCCL_OP_EXPANSION_MODE");
@@ -901,6 +931,55 @@ int HcclTest::device_init()
     return 0;
 }
 
+int HcclTest::get_scalable_root_info_list()
+{
+    if (nRoot <= 0 || nRoot > rank_size) {
+        printf("invalid nRoot[%d], rank_size[%d]\n", nRoot, rank_size);
+        return -1;
+    }
+    root_info_list.resize(nRoot);
+
+    // 获取当前rank所在组号
+    const u32 rootIndex = get_scalable_root_index(rank_size, nRoot, rank_id);
+    // 获取组内第一个rank id（该组root）
+    const u32 firstRank = get_scalable_first_rank(rank_size, nRoot, rootIndex);
+
+    // 仅组内第一个rank调用HcclGetRootInfoScalable获取自身rootInfo
+    HcclRootInfo myRootInfo = {};
+    if (rank_id == firstRank) {
+        HcclResult getRootInfoScalable = HcclGetRootInfoScalable(&myRootInfo);
+        if (getRootInfoScalable != HCCL_SUCCESS) {
+            printf("Process %d HcclGetRootInfoScalable failed, notify other process to exit\n", rank_id);
+            memset(myRootInfo.internal, 0, HCCL_ROOT_INFO_BYTES);
+            memcpy(myRootInfo.internal, "invalid", sizeof("invalid"));
+        }
+    }
+
+    // 汇集各组root生成的rootInfo：每个分组仅组内第一个rank贡献一个rootInfo，落到root_info_list[rootIndex]
+    std::vector<int> recvCounts(rank_size, 0);
+    std::vector<int> displs(rank_size, 0);
+    for (int r = 0; r < rank_size; ++r) {
+        const u32 ri = get_scalable_root_index(rank_size, nRoot, r);
+        const u32 fr = get_scalable_first_rank(rank_size, nRoot, ri);
+        if (r == fr) {
+            recvCounts[r] = HCCL_ROOT_INFO_BYTES;
+            displs[r] = ri * HCCL_ROOT_INFO_BYTES;
+        }
+    }
+    const int mySendCount = (rank_id == firstRank) ? HCCL_ROOT_INFO_BYTES : 0;
+    MPI_Allgatherv(
+        &myRootInfo, mySendCount, MPI_CHAR, root_info_list.data(), recvCounts.data(), displs.data(), MPI_CHAR,
+        MPI_COMM_WORLD);
+
+    for (u32 i = 0; i < nRoot; ++i) {
+        if (strncmp(root_info_list[i].internal, "invalid", sizeof("invalid") - 1) == 0) {
+            printf("Process %d received invalid root info from root %u\n", rank_id, i);
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int HcclTest::init_hcclComm_without_nslb()
 {
     if (accelerator_config > 0 || enable_symmetric_memory) {
@@ -921,8 +1000,74 @@ int HcclTest::init_hcclComm_without_nslb()
     return 0;
 }
 
+int HcclTest::init_hcclComm_scalable_without_nslb()
+{
+    HcclCommConfig config = {0};
+    HcclCommConfigInit(&config);
+    if (accelerator_config > 0 || enable_symmetric_memory) {
+        config.hcclWorldRankID = rank_id;
+        config.hcclOpExpansionMode = accelerator_config;
+        if (enable_symmetric_memory) {
+            size_t reserve_size = get_max_symmetric_memory_size();
+            size_t max_mem_size_per_rank = std::max(
+                SYMMETRIC_MEMORY_STRIDE, (reserve_size + static_cast<size_t>(GIGA) - 1) / static_cast<size_t>(GIGA));
+            config.hcclSymWinMaxMemSizePerRank = max_mem_size_per_rank;
+        }
+    }
+    HCCLCHECK(HcclCommInitRootInfoScalable(rank_size, nRoot, root_info_list.data(), rank_id, 0, &config, &hccl_comm));
+    return 0;
+}
+
+int HcclTest::init_hcclComm_scalable()
+{
+    int ret = get_scalable_root_info_list();
+    if (ret != 0) {
+        printf("Process %d get_scalable_root_info_list failed, ret[%d].\n", rank_id, ret);
+        return ret;
+    }
+
+    // 初始化集合通信域
+    if (nslb_flag == 1) {
+        // HCCL_COMM_CONFIG_RESERVED 字段小于7，代表当前版本未适配DP场景
+        if (HcclGetCommConfigCapability() < NSLBDP_SUPPORT_VERSION) {
+            printf("The current version of hccl_test does not support the nslb-dp capability.\n");
+            HcclCommConfig config = {0};
+            HcclCommConfigInit(&config);
+            HCCLCHECK(
+                HcclCommInitRootInfoScalable(rank_size, nRoot, root_info_list.data(), rank_id, 0, &config, &hccl_comm));
+            return 0;
+        }
+        // 配置nslb使能的场景 == 1 才生效
+        HcclCommConfig config = {0};
+        HcclCommConfigInit(&config);
+        const u32 rootIndex = get_scalable_root_index(rank_size, nRoot, rank_id);
+        const char* ip = root_info_list[rootIndex].internal;
+        // 当前port字段目的只是提供一个拼接的id， 不具有实际意义
+        uint32_t port = 11;
+        uint32_t ipaddress = (uint32_t)inet_addr(ip);
+        config.hcclWorldRankID = rank_id;
+        config.hcclJobID = ((uint64_t)port << NSLBDP_PORT_OFFSET) | (uint64_t)ipaddress;
+        config.hcclOpExpansionMode = accelerator_config;
+        HCCLCHECK(
+            HcclCommInitRootInfoScalable(rank_size, nRoot, root_info_list.data(), rank_id, 0, &config, &hccl_comm));
+    } else {
+        auto ret = init_hcclComm_scalable_without_nslb();
+        if (ret != 0) {
+            printf("Process %d init_hcclComm_scalable_without_nslb failed, ret[%d].\n", rank_id, ret);
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
 int HcclTest::init_hcclComm()
 {
+    // -R/--nroot 显式指定时走 scalable 多 root 初始化，否则保持原有单 root 流程
+    if (nRoot_flag == 1) {
+        return init_hcclComm_scalable();
+    }
+
     // 将root_info广播到通信域内的其他rank
     MPI_Request request;
     MPI_Status status;

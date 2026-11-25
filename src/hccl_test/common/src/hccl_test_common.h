@@ -178,6 +178,13 @@ private:
     bool IsNewGenSoc();
     bool IsCcuSchedMode();
 
+    // scalable多root初始化：
+    // 各root组内第一个rank调用HcclGetRootInfoScalable
+    // 再通过MPI_Allgatherv汇集全部root的rootInfo到root_info_list
+    int get_scalable_root_info_list();
+    int init_hcclComm_scalable();
+    int init_hcclComm_scalable_without_nslb();
+
 public:
     DataSize* data{nullptr};
     void* vir_ptr{nullptr};
@@ -203,6 +210,7 @@ public:
     int stepbytes_flag = 0;
     int op_flag = 0;
     int root_rank = 0;
+    int nRoot = 0; // scalable的root个数
     uint32_t dev_id = 0;
     int rank_id = 0;
     int rank_size = 0;
@@ -235,7 +243,10 @@ private:
     aclprofConfig* profiling_config = NULL;
     int npus_flag = 0;
     int nslb_flag = 0;
+    int nRoot_flag = 0; // 是否走 scalable 初始化流程
     u64 hccl_buffsize = 200;
+    // scalable多root初始化用的全部root的rootInfo列表，长度nRoot
+    std::vector<HcclRootInfo> root_info_list;
 };
 
 HcclTest* init_opbase_ptr(HcclTest* opbase);
