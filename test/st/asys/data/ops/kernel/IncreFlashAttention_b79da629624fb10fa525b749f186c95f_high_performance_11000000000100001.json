@@ -28,7 +28,6 @@
             "kernelName": "te_gatherv2_097ab5be870f5abfbee16f82ff39732eccfee1dbe76f3bcd6ef32b08996dd346_2__kernel0"
         }
     ],
-        "optionalInputMode": "gen_placeholder",
-        "deterministic": "ignore"
-    }
+    "optionalInputMode": "gen_placeholder",
+    "deterministic": "ignore"
 }
