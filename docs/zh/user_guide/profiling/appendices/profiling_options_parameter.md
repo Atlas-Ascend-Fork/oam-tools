@@ -63,6 +63,7 @@
     <!-- npu="950" id5 -->
     - Ascend 950PR&950DT系列产品：不支持该参数。
     <!-- end id5 -->
+    <!-- @ref: oam-tools/res/docs/zh/user_guide/profiling/appendices/profiling_options_parameter_res.md#id1 -->
 
     > [!NOTE]说明
     >支持自定义需要采集的寄存器，例如："aic\_metrics":"Custom:0x49,0x8,0x15,0x1b,0x64,0x10"。

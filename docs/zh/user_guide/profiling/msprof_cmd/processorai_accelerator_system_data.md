@@ -93,7 +93,7 @@ msprof [options] <app>
   - Ascend 950PR&950DT系列产品：不支持
     <!-- end id10 -->
 
-- MemoryAccess：
+- MemoryAccess：算子在核上访存的带宽数据量。
 
     <!-- npu="310b" id11 -->
   - Atlas 200I/500 A2推理产品：不支持
@@ -107,6 +107,7 @@ msprof [options] <app>
     <!-- npu="950" id14 -->
   - Ascend 950PR&950DT系列产品：不支持
     <!-- end id14 -->
+  <!-- @ref: oam-tools/res/docs/zh/user_guide/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id5 -->
 
 - Custom：支持自定义需要采集的寄存器，例如：--aic-metrics=Custom:0x49,0x8,0x15,0x1b,0x64,0x10。Custom字段表示自定义类型，配置为具体的寄存器值，范围[0x1, 0x7FFFFFFF]。并非所有的可取值都有对应的PMU寄存器，若配置的值无对应PMU寄存器，则采集结果可能为0。配置的寄存器数最多不能超过8个，寄存器通过“,”区分开。寄存器的值支持十六进制或十进制。
 
