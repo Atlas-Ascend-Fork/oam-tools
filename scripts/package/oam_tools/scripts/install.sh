@@ -1628,13 +1628,6 @@ user group (${_DEFAULT_USERGROUP}) for devel mode? [y/n]"
 #            aicpuinfofile "add"
             # repairaicpu "${target_dir}"
             # uprate precheck info to ${target_dir}/bin/prereq_check.bash
-            if [ -f "${target_dir}/../../tools/profiler/profiler_tool/msprof-0.0.1-py3-none-any.whl" ]; then
-                logandprint "[INFO]: msprof_install.sh"
-                bash ${target_dir}/oam_tools/script/msprof_install.sh --install-path=${target_dir}/../..
-                if [ "$?" != 0 ]; then
-                    _upgrade_ret=1
-                fi
-            fi
             logandprint "[INFO]: Set precheck info."
             logoperationretstatus "upgrade" "${install_type}" "${_upgrade_ret}" "${in_cmd_list}"
         fi
@@ -1655,10 +1648,6 @@ user group (${_DEFAULT_USERGROUP}) for devel mode? [y/n]"
         logoperationretstatus "install" "${in_install_type}" "1" "${in_cmd_list}"
     fi
 
-    if [ -f "${target_dir}/../../tools/profiler/profiler_tool/msprof-0.0.1-py3-none-any.whl" ]; then
-        logandprint "[INFO]: msprof_install.sh"
-        bash ${target_dir}/oam_tools/script/msprof_install.sh --install-path=${target_dir}/../..
-    fi
     logandprint "[INFO]: ${target_dir} ${opp_platform_dir}"
     logoperationretstatus "install" "${in_install_type}" "$?" "${in_cmd_list}"
     logandprint "[INFO]: Oam tools install successfully"
@@ -1686,10 +1675,6 @@ if [ "${is_upgrade}" = "y" ];then
         chown "root":"root" "${target_dir}/${opp_platform_dir}" 2> /dev/null
     fi
     # uprate precheck info to ${target_dir}/bin/prereq_check.bash
-    if [ -f "${target_dir}/../../tools/profiler/profiler_tool/msprof-0.0.1-py3-none-any.whl" ]; then
-        logandprint "[INFO]: msprof_install.sh"
-        bash ${target_dir}/oam_tools/script/msprof_install.sh --install-path=${target_dir}/../..
-    fi
     logandprint "[INFO]: Set precheck info."
     logoperationretstatus "upgrade" "${install_type}" "$?" "${in_cmd_list}"
 fi

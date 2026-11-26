@@ -154,7 +154,6 @@ class TestExtractInstallConsistency:
 
     --noexec --extract 产生的 staging 目录树应当与 --full 安装产生的
     ${install}/cann/ 目录树在共有路径上保持一致（解压目录是安装目录的子集）。
-    特别关注 tools/profiler/profiler_tool 子树（msprof whl 解包目标）。
     """
 
     @staticmethod
@@ -190,52 +189,4 @@ class TestExtractInstallConsistency:
         assert not missing, (
             "Entries present after --noexec --extract but missing in "
             f"--full install root: {sorted(missing)[:20]}"
-        )
-
-    @staticmethod
-    def test_profiler_tool_tree_matches(run_package, install_dir):
-        extract_dir = os.path.join(install_dir, "extract")
-        install_root = os.path.join(install_dir, "install_root")
-        os.makedirs(install_root, exist_ok=True)
-
-        extract_res = subprocess.run(
-            [_BASH, run_package, "--noexec", f"--extract={extract_dir}"],
-            capture_output=True, text=True, timeout=180,
-        )
-        assert extract_res.returncode == 0, (
-            f"--noexec --extract failed: {_output(extract_res)}"
-        )
-        _assert_clean_log(extract_res, "--noexec --extract")
-        install_res = _run(run_package, install_root, "--full")
-        assert install_res.returncode == 0, (
-            f"--full install failed: {_output(install_res)}"
-        )
-        _assert_clean_log(install_res, "--full install")
-
-        rel = os.path.join("tools", "profiler", "profiler_tool")
-        extract_subtree_root = os.path.join(extract_dir, rel)
-        install_subtree_root = os.path.join(install_root, "cann", rel)
-
-        assert os.path.isdir(extract_subtree_root), (
-            f"profiler_tool missing in extract dir: {extract_subtree_root}"
-        )
-        assert os.path.isdir(install_subtree_root), (
-            f"profiler_tool missing in install dir: {install_subtree_root}"
-        )
-
-        # __pycache__ 由运行期 compileall 用目标机 python3 生成（cmake 构建期已
-        # 把 staging 里的 .pyc 清掉，避免锁死在构建机 Python 版本），因此解压目录
-        # 无 __pycache__、安装目录有。比较时排除该子树。
-        def _drop_pycache(entries):
-            return {(p, k) for (p, k) in entries
-                    if "__pycache__" not in p.split(os.sep)}
-
-        extract_subtree = _drop_pycache(_collect_tree(extract_subtree_root))
-        install_subtree = _drop_pycache(_collect_tree(install_subtree_root))
-
-        assert extract_subtree == install_subtree, (
-            "profiler_tool subtree differs between extract and install "
-            "(ignoring __pycache__).\n"
-            f"only in extract: {sorted(extract_subtree - install_subtree)[:20]}\n"
-            f"only in install: {sorted(install_subtree - extract_subtree)[:20]}"
         )

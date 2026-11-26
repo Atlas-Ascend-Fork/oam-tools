@@ -66,11 +66,7 @@
         <file value="libaml_stl_kernel_ascend960dt.so" file_type="shared"  optional="true"/>
         <file value="mx.bin" optional="true"/>
     </file_info>
-    <file_info value="profiler_lib" copy_type="delivery" src_path="" dst_path="tools/profiler/lib64" install_path="tools/profiler/lib64" install_mod="440">
-        <file value="libascend_profinj.so" file_type="shared" optional="true"/>
-    </file_info>
     <file_info value="profiler_bin" copy_type="delivery" src_path="" dst_path="tools/profiler/bin" install_path="tools/profiler/bin" install_mod="550">
-        <file value="acp" file_type="shared" optional="true"/>
         <file value="msprof" file_type="shared"/>
         <file value="ftrace_collector" file_type="shared"/>
     </file_info>
@@ -98,9 +94,6 @@
         <path value="tools/operator_cmp"/>
         <path value="tools/profiler"/>
         <path value="tools/profiler/bin"/>
-        <path value="tools/profiler/lib64"/>
-        <path value="tools/profiler/profiler_tool" install_mod="750"/>
-        <path value="tools/profiler/profiler_tool/analysis" install_mod="750"/>
         <path value="tools/ascend_system_advisor"/>
         <path value="tools/ascend_system_advisor/asys"/>
     </dir_info>
