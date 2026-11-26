@@ -77,7 +77,7 @@ Before using this tool, understand the related usage constraints:
 - Compatibility and scenario constraints
   - The tool requires Python 3.7.5 or later.
   - You must call the `aclInit()` API to complete initialization and the `aclFinalize()` API to complete deinitialization before complete performance data can be obtained.
-  <!-- npu="950,A3,910b,910,310p,310b,IPV350" id5 -->
+  <!-- npu="950,A3,910b,910,310p,310b" id5 -->
   - Application project development must follow the [*Application Development \(C&C++\)*](https://hiascend.com/document/redirect/cannCommunityadevguide) manual. If the application has invoked the `aclInit()` API to complete initialization and invoked the `aclFinalize()` API, causing the tool collection process to end abnormally, the collected data will be incomplete. The data collected in the last 1 second may be lost because it is not written to disk in time, but the lost data is not greater than 2M and does not affect the analysis of the performance data written to disk.
   <!-- end id5 -->
   <!-- npu="950,A3,910b,910,310p,310b" id3 -->

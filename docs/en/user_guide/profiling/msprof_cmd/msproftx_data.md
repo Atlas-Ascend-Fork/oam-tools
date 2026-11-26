@@ -5,8 +5,8 @@
 When you need to locate performance bottlenecks in an application or an upper-layer framework program, you can use specific APIs to record the time span of specific events during application execution and write the data to a performance data file.
 
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-- General scenario: It is recommended to use [mstx API](https://gitcode.com/Ascend/op-plugin/blob/master/docs/en/custom_APIs/menu_Pytorch_API.md) (or optionally [msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)).
-- PyTorch scenario: Use [TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/master/docs/en/developer_notes/ascend_pytorch_profiler_user_guide.md).
+- General scenario: It is recommended to use [mstx API](https://gitcode.com/Ascend/op-plugin/blob/26.2.0/docs/en/custom_APIs/menu_Pytorch_API.md) (or optionally [msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/930beta2/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)).
+- PyTorch scenario: Use [TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/v2.14.0-26.2.0/docs/en/developer_notes/ascend_pytorch_profiler_user_guide.md).
 <!-- end id1 -->
 
 ## Prerequisites
@@ -55,7 +55,7 @@ Log in to the runtime environment and run the following command in any directory
 msprof --msproftx=on /home/projects/MyApp/out/main
 ```
 
-A PROF_XXX directory is generated in the directory specified by --output to store the automatically parsed performance data. For details about the related result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/profile_data_file_references.md).
+A PROF_XXX directory is generated in the directory specified by --output to store the automatically parsed performance data. For details about the related result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/profile_data_file_references.md).
 <!-- end id5 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/msproftx_data_res.md#id00002 -->

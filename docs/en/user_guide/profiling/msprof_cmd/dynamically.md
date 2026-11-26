@@ -97,7 +97,7 @@ The special characters that cannot be included in the path specified by --output
 
 ## Output Description
 
-A PROF_XXX directory is generated in the directory specified by --output. It is recommended to use the [parsing command](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md) to parse and export the profile data.
+A PROF_XXX directory is generated in the directory specified by --output. It is recommended to use the [parsing command](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md) to parse and export the profile data.
 
 During dynamic collection, if multiple PIDs are configured, each PID process generates its own PROF\_XXX directory in the directory specified by --output. In this case, you are advised to set --output to the parent directory of PROF_\_*XXX during parsing so that multiple PROF*\__XXX directories can be parsed at the same time.
 

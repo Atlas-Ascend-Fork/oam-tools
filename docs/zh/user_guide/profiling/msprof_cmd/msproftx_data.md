@@ -3,8 +3,8 @@
 当用户需要定位应用程序或上层框架程序的性能瓶颈时，可通过特定接口，记录应用程序执行期间特定事件发生的时间跨度，写入性能数据文件。
 
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-- 通用场景：推荐使用[mstx API](https://gitcode.com/Ascend/op-plugin/blob/master/docs/zh/custom_APIs/menu_Pytorch_API.md)（也可选[msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)）。
-- PyTorch场景：使用[TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/master/docs/zh/developer_notes/ascend_pytorch_profiler_user_guide.md)。
+- 通用场景：推荐使用[mstx API](https://gitcode.com/Ascend/op-plugin/blob/26.2.0/docs/zh/custom_APIs/menu_Pytorch_API.md)（也可选[msproftx API](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/930beta2/API/runtimeapi/docs/zh/api_ref/19-02_msproftx_extension_apis.md)）。
+- PyTorch场景：使用[TorchNPU Profiler API](https://gitcode.com/Ascend/pytorch/blob/v2.14.0-26.2.0/docs/zh/developer_notes/ascend_pytorch_profiler_user_guide.md)。
 <!-- end id1 -->
 
 ## 前提条件
@@ -53,7 +53,7 @@ app参数说明请参见[app参数说明](general_collect_commands.md#app参数�
 msprof --msproftx=on /home/projects/MyApp/out/main
 ```
 
-在--output指定的目录下生成PROF_XXX目录，存放自动解析后的性能数据，相关结果文件请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
+在--output指定的目录下生成PROF_XXX目录，存放自动解析后的性能数据，相关结果文件请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/profile_data_file_references.md)。
 <!-- end id5 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/msproftx_data_res.md#id00002 -->

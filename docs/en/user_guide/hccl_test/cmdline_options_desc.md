@@ -67,7 +67,7 @@ This section describes only the common parameters of the Open MPI tool. For more
   The test commands supported by the HCCL Test tool include: broadcast_test, all_gather_test, all_gatherv_test, reduce_test, all_reduce_test, scatter_test, reduce_scatter_test, reduce_scatterv_test, alltoall_test, alltoallv_test, and alltoallvc_test.
 
   > [!NOTE] Note
-  > The support of each test command on different products is subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/master/docs/zh/api_ref/comm_op_interface/README.md).
+  > The support of each test command on different products is subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/9.3.0-beta.2/docs/en/api_ref/comm_op_interface/README.md).
 
 - **-p \<npus\> or --npus \<npus\>**: optional. Number of NPUs participating in training on a single compute node.
 
@@ -103,7 +103,7 @@ This section describes only the common parameters of the Open MPI tool. For more
   Reduce-related execution commands include all_reduce_test, reduce_scatter_test, reduce_scatterv_test, and reduce_test.
 
   > [!NOTE] Note
-  > The support of each test command on different products is subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/master/docs/en/api_ref/comm_op_interface/README.md).
+  > The support of each test command on different products is subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/9.3.0-beta.2/docs/en/api_ref/comm_op_interface/README.md).
 
 - **-r \<root\> or --root \<root\>**: optional. When the execution command is broadcast_test, reduce_test, or scatter_test, use this parameter to specify the Device ID of the root node.
 
@@ -114,7 +114,7 @@ This section describes only the common parameters of the Open MPI tool. For more
   The data types supported by HCCL Test include int8, uint8, int16, uint16, int32, uint32, int64, uint64, fp16, fp32, fp64, bfp16, fp8e5m2, fp8e4m3, fp8e8m0, and hif8.
 
   > [!NOTE] Note
-  > The data types supported by each test command on different products are subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/master/docs/en/api_ref/comm_op_interface/README.md).
+  > The data types supported by each test command on different products are subject to the actual support capability of the corresponding communication operator API. For details, see [Communication Operator API](https://gitcode.com/cann/hccl/blob/9.3.0-beta.2/docs/en/api_ref/comm_op_interface/README.md).
 
   <!-- npu="A3" id1 -->
 - **-z \<0/1\> or --zero_copy \<0/1\>**: optional. Specifies whether to enable the zero-copy feature.

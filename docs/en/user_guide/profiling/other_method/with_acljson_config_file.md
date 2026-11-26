@@ -7,7 +7,7 @@ In offline inference scenarios, you can call the acl.json file in the inference 
 After raw performance data is collected successfully, you can transfer the collected raw data to a development environment with the tools installed for performance data parsing and view the parsing results.
 
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-For parsing operations, see [Using the msprof Command to Parse, Query, and Export Performance Data](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md). For an introduction to the parsing result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/profile_data_file_references.md).
+For parsing operations, see [Using the msprof Command to Parse, Query, and Export Performance Data](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md). For an introduction to the parsing result files, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/profile_data_file_references.md).
 <!-- end id1 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id50 -->

@@ -115,7 +115,7 @@ Log in to the runtime environment and run the following command in any directory
 msprof --output=/home/projects/output /home/projects/MyApp/out/main
 ```
 
-After the msprof command is executed, the performance data result files are automatically parsed and exported. For details, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/profile_data_file_references.md).
+After the msprof command is executed, the performance data result files are automatically parsed and exported. For details, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/profile_data_file_references.md).
 <!-- end id3 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/general_collect_commands_res.md#id00002 -->

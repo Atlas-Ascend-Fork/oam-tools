@@ -34,7 +34,7 @@ The Ascend Graph API collects performance data during graph construction.
 |Passing the option parameter through the GEInitialize API|ge.exec.profilingMode and ge.exec.profilingOptions.<br>By passing the option parameter ge.exec.profilingOptions through GEInitialize, you can collect iteration trace data. The fields to be passed include training_trace/bp_point/fp_point.<br>The performance data collected in this method is stored in the path configured by the output parameter of ge.exec.profilingOptions.|
 |aclgrph API|aclgrphProfInit, aclgrphProfFinalize, aclgrphProfCreateConfig, aclgrphProfDestroyConfig, aclgrphProfStart, and aclgrphProfStop.<br>The performance data collected in this method is stored in the path configured by the profiler_path parameter of aclgrphProfInit.|
 
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id6 -->
+<!-- npu="950,A3,910b,910,310p,310b" id6 -->
 > [!NOTE] Note
 > For detailed API descriptions, see [*Graph Development*](https://hiascend.com/document/redirect/CannCommunityGraphguide).
 <!-- end id6 -->
@@ -99,9 +99,9 @@ Call the APIs as shown in the following example to collect Profiling performance
   ge::GEFinalize();
 ```
 
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id7 -->
+<!-- npu="950,A3,910b,910,310p,310b" id7 -->
 ## Data Collection Description
 
-After configuring Ascend Graph API-based collection, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md) to parse the raw data files and export them as visualized timeline and summary files.
+After configuring Ascend Graph API-based collection, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md) to parse the raw data files and export them as visualized timeline and summary files.
 
 <!-- end id7 -->

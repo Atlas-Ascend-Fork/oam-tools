@@ -95,7 +95,7 @@ launch方式必须传入用户程序，app参数说明请参见[app参数说明]
 
 ## 输出说明
 
-在--output指定的目录下生成PROF_XXX目录，建议使用[解析命令](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)进行性能数据的解析和导出。
+在--output指定的目录下生成PROF_XXX目录，建议使用[解析命令](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)进行性能数据的解析和导出。
 
 动态采集时，若配置多个PID，则每个PID进程会在--output指定的目录下生成自己的PROF\_XXX目录，此时建议在解析时将--output指定为PROF_\_*XXX的父目录，以便同时解析多份PROF*\__XXX目录。
 

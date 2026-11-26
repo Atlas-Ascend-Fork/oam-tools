@@ -92,7 +92,7 @@
         export HCCL_BUFFSIZE=2048
         ```
 
-        For more environment variables, see "[Environment Variable Reference](https://gitcode.com/cann/hccl/blob/master/docs/en/user_guide/hccl_env/README.md)" in *HCCL Collective Communication Library*.
+        For more environment variables, see "[Environment Variable Reference](https://gitcode.com/cann/hccl/blob/9.3.0-beta.2/docs/en/user_guide/hccl_env/README.md)" in *HCCL Collective Communication Library*.
 
     4. (Optional) Configure auxiliary environment variables for the HCCL Test tool.
        - Specify the Device to run HCCL Test.
@@ -111,7 +111,7 @@
          export HCCL_TEST_PROFILING_PATH=/home/profiling
          ```
 
-         If HCCL_TEST_PROFILING is enabled, profiling data is generated in the directory specified by HCCL_TEST_PROFILING_PATH after HCCL Test execution is complete. For details about how to parse the performance data, see the "msProf Performance Data Parsing" section in *[Performance Tuning Tool](https://gitcode.com/cann/docs/blob/master/docs/zh/profiling/profiling_menu.md)*.
+         If HCCL_TEST_PROFILING is enabled, profiling data is generated in the directory specified by HCCL_TEST_PROFILING_PATH after HCCL Test execution is complete. For details about how to parse the performance data, see the "msProf Performance Data Parsing" section in *[Performance Tuning Tool](https://gitcode.com/cann/docs/blob/9.3.0-beta.2/docs/zh/profiling/profiling_menu.md)*.
 
          > [!CAUTION] Caution
          > Enabling profiling affects the performance of collective communication operators.

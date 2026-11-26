@@ -29,8 +29,8 @@ For details about the **PROFILING\_OPTIONS** parameter and how to use it, see [P
 > [!NOTE] Note
 >When **PROFILING\_MODE** is set to **true** but **PROFILING\_OPTIONS** is not configured, Profiling collects **training\_trace**, **task\_trace**, **hccl**, **aicpu**, and **aic\_metrics** (PipeUtilization) by default and saves the collected data in the directory where the current AI task resides. When **PROFILING\_MODE** is set to **true** and any parameter of **PROFILING\_OPTIONS** is configured, for the default values of the **PROFILING\_OPTIONS** parameters, see [Profiling options Parameter Description](../appendices/profiling_options_parameter.md).
 
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id1 -->
+<!-- npu="950,A3,910b,910,310p,310b" id1 -->
 ## Collection Result Description
 
-After configuring the PROFILING\_OPTIONS parameter, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md) to parse the raw data files and export them as visualized performance data files, which are saved in the PROF\_XXX/mindstudio\_profiler\_output directory.
+After configuring the PROFILING\_OPTIONS parameter, see [Parsing, Querying, and Exporting Performance Data Using the msprof Command](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md) to parse the raw data files and export them as visualized performance data files, which are saved in the PROF\_XXX/mindstudio\_profiler\_output directory.
 <!-- end id1 -->

@@ -32,7 +32,7 @@ Ascend Graph API是在构图过程中采集性能数据。
 |GEInitialize接口传入option参数|ge.exec.profilingMode和ge.exec.profilingOptions。<br>通过GEInitialize传入option参数ge.exec.profilingOptions，可以采集迭代轨迹数据，传入字段包括training_trace/bp_point/fp_point。<br>该方式采集的性能数据将存放在ge.exec.profilingOptions的output参数所配置的路径下。|
 |aclgrph接口|aclgrphProfInit、aclgrphProfFinalize、aclgrphProfCreateConfig、aclgrphProfDestroyConfig、aclgrphProfStart和aclgrphProfStop。<br>该方式采集的性能数据将存放在aclgrphProfInit的profiler_path参数所配置的路径下。|
 
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id6 -->
+<!-- npu="950,A3,910b,910,310p,310b" id6 -->
 > [!NOTE]说明
 >接口详细说明，请参见[《图开发》](https://hiascend.com/document/redirect/CannCommunityGraphguide)。
 <!-- end id6 -->
@@ -97,9 +97,9 @@ std::map<AscendString, AscendString> config = {{"ge.exec.deviceId", "0"},
   ge::GEFinalize();
 ```
 
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id7 -->
+<!-- npu="950,A3,910b,910,310p,310b" id7 -->
 ## 采集数据说明
 
-配置Ascend Graph API方式采集后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的timeline和summary文件。
+配置Ascend Graph API方式采集后请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)将原始数据文件解析并导出为可视化的timeline和summary文件。
 
 <!-- end id7 -->

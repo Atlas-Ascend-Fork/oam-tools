@@ -364,9 +364,9 @@ Ascend 950PR&950DT系列产品
 msprof --output=/home/projects/output --sys-devices=<ID> --sys-period=<period> --ai-core=on --sys-hardware-mem=on --sys-cpu-profiling=on --sys-profiling=on --sys-pid-profiling=on --dvpp-profiling=on
 ```
 
-Ascend EP场景下，在--output指定的目录下生成PROF_XXX目录，存放自动解析后的性能数据，相关结果文件请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/profile_data_file_references.md)。
+Ascend EP场景下，在--output指定的目录下生成PROF_XXX目录，存放自动解析后的性能数据，相关结果文件请参见[性能数据文件参考](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/profile_data_file_references.md)。
 
-Ascend RC场景下，在--output指定的目录下生成PROF_XXX目录，该目录下的文件未经解析无法查看，您需要将PROF_XXX目录上传到开发环境进行数据解析，具体操作方法请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md)。
+Ascend RC场景下，在--output指定的目录下生成PROF_XXX目录，该目录下的文件未经解析无法查看，您需要将PROF_XXX目录上传到开发环境进行数据解析，具体操作方法请参见[使用msprof命令解析、查询与导出性能数据](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/zh/user_guide/msprof_parsing_instruct.md)。
 <!-- end id4 -->
 
 <!-- @ref: oam-tools/res/docs/zh/profiling/msprof_cmd/processorai_accelerator_system_data_res.md#id00004 -->

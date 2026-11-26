@@ -15,7 +15,7 @@ This section describes how to collect performance data through APIs in offline i
 |Method 3: Subscribe to operator information|Parse the collected performance data and write it to a pipe. The user reads it into memory and then calls an API to obtain the performance data.|
 
 <!-- npu="950,A3,910b,910,310p,310b" id22 -->
-Note: For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md).
+Note: For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.2/docs/en/api_ref/README.md).
 <!-- end id22 -->
 
 > [!NOTE] Note
@@ -25,7 +25,7 @@ Note: For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/m
 
 ## Collecting and Persisting Performance Data
 
-The profile data collection function is enabled by calling APIs, so that raw performance data is automatically collected. After the raw performance data is successfully collected, you can copy the collected raw data to a development environment where the tool is installed to perform raw performance [data parsing](https://gitcode.com/Ascend/msprof/blob/master/docs/zh/user_guide/msprof_parsing_instruct.md), and visually display the parsing result of the raw performance data.
+The profile data collection function is enabled by calling APIs, so that raw performance data is automatically collected. After the raw performance data is successfully collected, you can copy the collected raw data to a development environment where the tool is installed to perform raw performance [data parsing](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md), and visually display the parsing result of the raw performance data.
 
 **API Overview**
 
@@ -43,8 +43,8 @@ The profile data collection function is enabled by calling APIs, so that raw per
 
 > [!NOTE] Note
 >For the persistence path of the collected performance data passed in by the aclprofInit API, ensure that the user process has read and write permissions.
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id23 -->
->For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md).
+<!-- npu="950,A3,910b,910,310p,310b" id23 -->
+>For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.2/docs/en/api_ref/README.md).
 <!-- end id23 -->
 
 **API Call Example**
@@ -115,8 +115,8 @@ To obtain performance data of user and upper-layer framework programs, before Pr
 
 > [!NOTE] Note
 >When only the msproftx function is enabled, set the deviceIdList parameter of the aclprofCreateConfig API to empty and the deviceNums parameter to 0.
-<!-- npu="950,A3,910b,910,310p,310b,IPV350" id24 -->
->For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md).
+<!-- npu="950,A3,910b,910,310p,310b" id24 -->
+>For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.2/docs/en/api_ref/README.md).
 <!-- end id24 -->
 
 **API Call Example**
@@ -317,13 +317,13 @@ By calling the message subscription API, the collected Profiling data is parsed 
 |aclprofDestroySubscribeConfig|Destroys the data of the aclprofSubscribeConfig type created through the aclprofCreateSubscribeConfig API. This is a synchronous API.|
 
 > [!NOTE] Note
->For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/master/docs/zh/api_ref/README.md).
+>For API details, see [Runtime API](https://gitcode.com/cann/runtime/blob/9.3.0-beta.2/docs/en/api_ref/README.md).
 
 ## Data Collection Description
 
 After performance data is collected, parse the raw data files and export them as visualized performance data files, which are saved in the PROF\_XXX/mindstudio\_profiler\_output directory.
 <!-- npu="950,A3,910b,910,310p,310b" id1 -->
-For details about parsing, see [Using the msprof Command to Parse, Query, and Export Performance Data](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/msprof_parsing_instruct.md).
+For details about parsing, see [Using the msprof Command to Parse, Query, and Export Performance Data](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/msprof_parsing_instruct.md).
 <!-- end id1 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id21 -->
@@ -391,7 +391,7 @@ The performance data files corresponding to each parameter are as follows:
 <!-- end id19 -->
 
 <!-- npu="950,A3,910b,910,310p,310b" id20 -->
-For detailed performance data information, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/master/docs/en/user_guide/profile_data_file_references.md).
+For detailed performance data information, see [Performance Data File Reference](https://gitcode.com/Ascend/msprof/blob/26.2.0/docs/en/user_guide/profile_data_file_references.md).
 <!-- end id20 -->
 
 <!-- end id21 -->
