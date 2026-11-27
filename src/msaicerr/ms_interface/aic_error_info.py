@@ -456,11 +456,9 @@ args after  execution: {self._get_args_str(self.args_after_list)}
     def _get_tiling_str(self: any) -> str:
         if not self.tiling_data:
             return "\n"
-        binfile = open(self.tiling_data, "rb")  # rb表示以二进制模式读取
-        # 读取文件内容，返回一个bytes对象
-        content = binfile.read()
-        # 关闭文件
-        binfile.close()
+        with open(self.tiling_data, "rb") as binfile:  # rb表示以二进制模式读取
+            # 读取文件内容，返回一个bytes对象
+            content = binfile.read()
         result_str = f"tiling_data: {self.tiling_data}\n"
         tiling_datas = content
         int32_size = struct.calcsize("i")

@@ -91,7 +91,7 @@ class TestUtilsMethods(unittest.TestCase):
     def test_tiling_data(self, mock_open_func):
         aicerr_info = AicErrorInfo()
         aicerr_info.tiling_data = "tiling data"
-        mock_file = mock_open_func.return_value
+        mock_file = mock_open_func.return_value.__enter__.return_value
         mock_file.read.return_value = struct.pack("q", int("1234567891234567"))
         res = getattr(aicerr_info, "_get_tiling_str")()
         self.assertIn("tiling data in int32: [1016835847, 287445]", res)
