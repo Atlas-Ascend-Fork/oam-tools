@@ -756,6 +756,22 @@ TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptOmitsDavidPipeUtilizationExct)
     EXPECT_EQ(std::string::npos, prompt.find("PipeUtilizationExct"));
 }
 
+TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptHidesInternalPipeUtilizationExctOnCloudV2)
+{
+    // CHIP_V4_1_0 maps the profiler platform reflection to CHIP_CLOUD_V2.
+    SetPlatformTypeForTest(PlatformType::CHIP_V4_1_0);
+    Platform::instance()->Uninit();
+    (void)Platform::instance()->Init();
+    InputParser parser;
+
+    const std::string prompt = parser.GeneratePrompts();
+    Platform::instance()->Uninit();
+
+    EXPECT_EQ(std::string::npos, prompt.find("PipeUtilizationExct"));
+    EXPECT_NE(std::string::npos, prompt.find("ArithmeticUtilization"));
+    EXPECT_NE(std::string::npos, prompt.find("Custom:<event-list>"));
+}
+
 TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptIncludesAllSupportedPmuOptions)
 {
     SetPlatformTypeForTest(PlatformType::CLOUD_TYPE);
@@ -773,6 +789,9 @@ TEST_F(INPUT_PARSER_UTEST, AiCoreMetricsPromptIncludesAllSupportedPmuOptions)
 
     std::vector<std::string> expectedMetrics;
     for (const auto& metric : METRIC_FEATURE_MAP) {
+        if (metric.second == PLATFORM_TASK_PUEXCT_PMU) {
+            continue;
+        }
         expectedMetrics.push_back(metric.first);
     }
     EXPECT_EQ(expectedMetrics, ParseAiCoreMetricsPrompt(prompt));

@@ -2000,6 +2000,11 @@ std::string InputParser::GeneratePrompts() const
     result << "[";
     bool isFirstMetric = true;
     for (const auto& metrics : METRIC_FEATURE_MAP) {
+        if (metrics.second == PLATFORM_TASK_PUEXCT_PMU) {
+            // PipeUtilizationExct is internal-only. Keep parsing and collection available,
+            // but do not expose it in command-line user prompts.
+            continue;
+        }
         if (!Platform::instance()->CheckIfSupport(metrics.second)) {
             continue;
         }
