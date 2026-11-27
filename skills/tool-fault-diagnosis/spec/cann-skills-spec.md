@@ -8,5 +8,5 @@ Each skill is a directory containing a `SKILL.md` file with YAML frontmatter (`n
 
 - Skills target **Ascend NPU** with **CANN 8.5.0**
 - Platform: aarch64, 48 AIVector Cores, 256KB UB per core
-- All paths assume CANN installed at `/usr/local/Ascend/cann-8.5.0/`
+- CANN install paths are auto-detected under standard roots (`/usr/local/Ascend/`, `$HOME/Ascend/`) or overridden via `CANN_HOME` / `ASCEND_INSTALL_PATH` / `ASCEND_HOME_PATH`
 - Scripts use bash and python3

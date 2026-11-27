@@ -16,7 +16,7 @@
 # ----------------------------------------------------------------------------
 # collect.sh — Ascend NPU 日志自动采集脚本
 # 用途：复制本地 slog/CANN（旧名 msnpureprot）、host、plog 日志到指定目录
-# 平台：Ascend NPU, CANN 8.5.0, aarch64
+# 平台：Ascend NPU, aarch64
 
 set -euo pipefail
 
@@ -28,7 +28,71 @@ COLLECT_HOST=false
 COLLECT_PLOG=false
 START_TIME=""
 END_TIME=""
-CANN_HOME="/usr/local/Ascend/cann-8.5.0"
+CANN_HOME="${CANN_HOME:-}"
+
+# 按优先级探测包含 log 子目录的有效 CANN 根路径；所有告警打印到 stderr
+resolve_cann_home() {
+    local env_name env_val cand sub
+    for env_name in CANN_HOME ASCEND_INSTALL_PATH ASCEND_HOME_PATH; do
+        env_val="${!env_name:-}"
+        [[ -z "$env_val" ]] && continue
+        if [[ -d "${env_val}/log" ]]; then
+            echo "$env_val"
+            return 0
+        fi
+        if [[ -d "$env_val" ]]; then
+            for sub in \
+                "${env_val}/cann" \
+                "${env_val}/ascend-toolkit/latest" \
+                "${env_val}/latest"; do
+                if [[ -d "${sub}/log" ]]; then
+                    echo "$sub"
+                    return 0
+                fi
+            done
+            for sub in \
+                "${env_val}"/ascend-toolkit/* \
+                "${env_val}"/cann-*; do
+                if [[ -d "${sub}/log" ]]; then
+                    log_warn "${env_name}=${env_val} 通过通配探测选中 CANN 目录：${sub}（如存在多版本，请直接指定到目标版本目录）" >&2
+                    echo "$sub"
+                    return 0
+                fi
+            done
+        fi
+        log_warn "环境变量 ${env_name}（${env_val}）未包含有效 log 子目录，继续自动探测" >&2
+    done
+
+    local exact_candidates=(
+        "/usr/local/Ascend/cann"
+        "/usr/local/Ascend/ascend-toolkit/latest"
+        "/usr/local/Ascend/latest"
+        "${HOME}/Ascend/cann"
+        "${HOME}/Ascend/ascend-toolkit/latest"
+        "${HOME}/Ascend/latest"
+    )
+    for cand in "${exact_candidates[@]}"; do
+        if [[ -n "$cand" && -d "${cand}/log" ]]; then
+            echo "$cand"
+            return 0
+        fi
+    done
+
+    local glob_candidates=(
+        /usr/local/Ascend/ascend-toolkit/*
+        /usr/local/Ascend/cann-*
+        "${HOME}/Ascend"/ascend-toolkit/*
+        "${HOME}/Ascend"/cann-*
+    )
+    for cand in "${glob_candidates[@]}"; do
+        if [[ -n "$cand" && -d "${cand}/log" ]]; then
+            log_warn "通过通配探测选中 CANN 目录：${cand}（若多版本共存，请通过 CANN_HOME / ASCEND_INSTALL_PATH / ASCEND_HOME_PATH 指定目标版本）" >&2
+            echo "$cand"
+            return 0
+        fi
+    done
+    return 1
+}
 PLOG_DIR="${HOME}/ascend/log/plog"
 NPU_SLOG_DIR="/var/log/npu/slog"
 NPU_DRIVER_DIR="/var/log/npu/driver"
@@ -46,6 +110,10 @@ usage() {
     echo "  --start DATETIME     起始时间过滤，格式：'YYYY-MM-DD HH:MM:SS'"
     echo "  --end   DATETIME     结束时间过滤，格式：'YYYY-MM-DD HH:MM:SS'"
     echo "  -h, --help           显示此帮助"
+    echo ""
+    echo "环境变量："
+    echo "  CANN_HOME / ASCEND_INSTALL_PATH / ASCEND_HOME_PATH  覆盖自动探测的 CANN 安装目录（按此优先级查找 log/）"
+    echo "  ASCEND_LOG_PATH                                     覆盖 plog 采集根目录"
     echo ""
     echo "示例："
     echo "  $0 --all --output ./collected_logs"
@@ -119,9 +187,14 @@ collect_msnpureprot() {
     fi
 
     # 同时复制 CANN 框架内部协议日志
-    local cann_log="${CANN_HOME}/log"
-    if [[ -d "$cann_log" ]]; then
+    local resolved_cann_home
+    resolved_cann_home="$(resolve_cann_home || true)"
+    if [[ -n "$resolved_cann_home" && -d "${resolved_cann_home}/log" ]]; then
+        local cann_log="${resolved_cann_home}/log"
         copy_with_time_filter "$cann_log" "${dst}/cann"
+        log_info "CANN 日志已从 ${cann_log} 复制到 ${dst}/cann"
+    else
+        log_warn "未探测到有效的 CANN 日志目录，跳过 CANN 日志采集（可通过 CANN_HOME、ASCEND_INSTALL_PATH 或 ASCEND_HOME_PATH 指定路径）"
     fi
 }
 

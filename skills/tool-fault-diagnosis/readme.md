@@ -254,7 +254,7 @@ bash collect-skill/scripts/collect.sh --all \
 | 产物路径 | 采集来源与内容 | 用途及生成条件 |
 |----------|----------------|----------------|
 | `msnpureprot/` 下的 `*.log` | 复制 `/var/log/npu/slog/` 下的日志 | `--msnpureprot` 或 `--all`；用于关联 Host/Device 事件、任务执行和驱动错误 |
-| `msnpureprot/cann/` 下的 `*.log` | 复制 `/usr/local/Ascend/cann-8.5.0/log/` 下的日志 | 同上，且源目录存在；补充 CANN 安装目录中的日志 |
+| `msnpureprot/cann/` 下的 `*.log` | 复制自动探测到的 `<cann_home>/log/` 下的日志（支持 `CANN_HOME` / `ASCEND_INSTALL_PATH` / `ASCEND_HOME_PATH` 覆盖） | 同上，且探测到有效源目录；补充 CANN 安装目录中的日志 |
 | `host/dmesg_npu.log` | `dmesg` 中匹配 `npu/ascend/davinci/hisi` 的内核消息 | `--host` 或 `--all`，且 `dmesg` 可用；检查设备、驱动及硬件异常 |
 | `host/journalctl.log` | 指定时间段的系统日志；未同时指定起止时间时取最近 1000 行 | 同上，且 `journalctl` 可用；检查系统事件及 OOM 等异常 |
 | `host/syslog.log` 或 `host/messages.log` | 复制 `/var/log/syslog` 或 `/var/log/messages` | 仅在 `journalctl` 命令不存在时回退，优先选择 `syslog`；命令执行失败不会触发回退 |
@@ -276,7 +276,7 @@ logs/
 ├── manifest.txt
 ├── msnpureprot/
 │   ├── var/log/npu/slog/...
-│   └── cann/usr/local/Ascend/cann-8.5.0/log/...
+│   └── cann/<cann_home>/log/...
 ├── host/
 │   ├── dmesg_npu.log
 │   ├── journalctl.log        # 或 syslog.log / messages.log
@@ -296,6 +296,7 @@ logs/
 - `--start` 和 `--end` 需同时设置才生效。复制日志时按文件修改时间筛选，范围为起始时间之后、结束时间及之前，不会逐行裁剪日志；`journalctl` 使用自身的时间查询。
 - `dmesg`、系统日志文件回退、设备和资源快照、IR 图不受上述时间范围限制。快照反映采集时状态，不一定是故障发生时状态。
 - 复制日志仅匹配 `*.log`，不会自动包含 `.log.1`、`.gz` 等轮转或压缩文件。IR 图只保留前 50 项，同名文件平铺复制时可能覆盖。
+- 若 CANN 安装路径非默认布局或并存多版本，执行采集时可通过 `CANN_HOME`、`ASCEND_INSTALL_PATH` 或 `ASCEND_HOME_PATH` 指定实际 CANN 根目录（脚本优先检查环境变量，未设置或无效时回退至 `/usr/local/Ascend`、`$HOME/Ascend` 自动探测）。
 - 默认 plog 路径若与运行环境不一致，例如实际位于 `$HOME/ascend/log/debug/plog/`，执行采集时可设置 `ASCEND_LOG_PATH` 指向已有日志目录；脚本将该变量直接作为搜索根目录。
 - `--msnpureprot` 和 `msnpureprot/` 是现有脚本的参数与目录名称；此步骤只复制本地日志，不会调用驱动工具 `msnpureport` 导出 Device 现场。
 

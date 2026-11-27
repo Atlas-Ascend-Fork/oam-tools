@@ -13,7 +13,7 @@ bash <skill_root>/scripts/collect.sh --msnpureprot --output <collection_root>
 
 ## 路径与设备核对
 
-脚本历史默认检查`/var/log/npu/slog/`和`/usr/local/Ascend/cann-8.5.0/log/`；它们不是所有版本的固定日志位置。核对实际安装、运行用户、Host/Device日志分类、节点/设备/rank及轮转范围，再补齐其他路径。
+脚本默认检查`/var/log/npu/slog/`并按环境变量（`CANN_HOME`、`ASCEND_INSTALL_PATH`、`ASCEND_HOME_PATH`）及常见安装目录（`/usr/local/Ascend/`、`$HOME/Ascend/` 等）自动探测`<cann_home>/log/`（不再固定依赖单一历史版本目录）；若探测结果与运行环境不一致，可设置上述环境变量覆盖。核对实际安装、运行用户、Host/Device日志分类、节点/设备/rank及轮转范围，再补齐其他路径。
 
 设备ID范围取现场清单，不能固定为0～7；容器可见ID与物理设备ID的对应也需确认。文件内字段由实际产生日志的组件解释，不能给所有导出内容套用一套dispatch/notify协议格式。
 

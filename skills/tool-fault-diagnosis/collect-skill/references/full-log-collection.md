@@ -10,7 +10,7 @@
 bash <skill_root>/scripts/collect.sh --all --output <node_root>
 ```
 
-检查实际 CANN 安装位置及运行用户。脚本默认使用 `/usr/local/Ascend/cann-8.5.0/log`、`/var/log/npu/slog`、`/var/log/npu/driver` 和 `${ASCEND_LOG_PATH:-$HOME/ascend/log/plog}`；实际路径不同的日志在下一步补采。特别检查 `$HOME/ascend/log/debug/plog/`、应用工作目录和运行用户的日志目录，不能只检查采集用户的 `$HOME`。
+检查实际 CANN 安装位置及运行用户。脚本默认按 `CANN_HOME`、`ASCEND_INSTALL_PATH`、`ASCEND_HOME_PATH` 及常见安装路径（`/usr/local/Ascend/`、`$HOME/Ascend/` 下的 `cann`、`ascend-toolkit/latest`、`ascend-toolkit/*`、`cann-*` 等）自动探测 `<cann_home>/log`，同时使用 `/var/log/npu/slog`、`/var/log/npu/driver` 和 `${ASCEND_LOG_PATH:-$HOME/ascend/log/plog}`；实际路径不同的日志在下一步补采。特别检查 `$HOME/ascend/log/debug/plog/`、应用工作目录和运行用户的日志目录，不能只检查采集用户的 `$HOME`。
 
 脚本的日志复制只匹配 `*.log`，IR 搜索只取前 50 项且平铺复制，部分命令失败会被忽略。因此，脚本退出成功或存在 `manifest.txt` 都不能作为完整性判据。
 

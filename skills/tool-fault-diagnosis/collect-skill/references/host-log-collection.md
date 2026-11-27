@@ -33,9 +33,23 @@ cp -r /var/log/npu/driver/ ./logs/host/driver/
 npu-smi info > ./logs/host/npu_smi_info.txt
 npu-smi info -t board -i 0 >> ./logs/host/npu_smi_info.txt
 
-# 采集 HCCL 日志
-cp -r ./hccl_logs/ ./logs/host/hccl/ 2>/dev/null || \
-  cp -r /usr/local/Ascend/cann-8.5.0/log/hccl/ ./logs/host/hccl/ 2>/dev/null
+# 采集 HCCL 日志（若已执行 collect.sh --msnpureprot，可优先从 [INFO] CANN 日志已从 <path> 复制到 ... 输出确认实际目录）
+cp -r ./hccl_logs/ ./logs/host/hccl/ 2>/dev/null || {
+  hccl_src=""
+  for base in "${CANN_HOME:-}" "${ASCEND_INSTALL_PATH:-}" "${ASCEND_HOME_PATH:-}" \
+              /usr/local/Ascend /usr/local/Ascend/ascend-toolkit/latest \
+              "$HOME/Ascend" "$HOME/Ascend/ascend-toolkit/latest"; do
+    [ -n "$base" ] || continue
+    for cand in "$base/log/hccl" "$base/cann/log/hccl" "$base/ascend-toolkit/latest/log/hccl"; do
+      [ -d "$cand" ] && hccl_src="$cand" && break 2
+    done
+  done
+  if [ -n "$hccl_src" ]; then
+    cp -r "$hccl_src/" ./logs/host/hccl/
+  else
+    echo "[WARN] 未找到 HCCL 日志目录（可设置 CANN_HOME / ASCEND_INSTALL_PATH / ASCEND_HOME_PATH，或先执行 collect.sh --msnpureprot）" >&2
+  fi
+}
 
 # 进程资源快照
 ps aux | grep -E "python|train|ascend" > ./logs/host/processes.txt
