@@ -17,6 +17,10 @@
 #define MSPROF_FTRACE_COLLECTOR_FTRACE_CONSTANTS_H
 
 #include <cstdint>
+// Kept for codecheck, not for compilation: mode_t below is already provided by <sys/types.h>,
+// but codecheck attributes the symbol to <fcntl.h> and reports a missing-header warning without
+// it. Do not remove as a redundant include while that rule is in effect.
+#include <fcntl.h>
 #include <sys/types.h>
 
 namespace Ftrace {
