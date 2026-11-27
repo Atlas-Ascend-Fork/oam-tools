@@ -157,7 +157,7 @@
   - 仅支持通信算子展开模式为AI CPU的场景。
   - 针对Ascend 950PR&950DT系列产品：
     - 仅支持超节点内通信。
-    - 仅支持执行reduce_scatter_test、all_gather_test、all_reduce_test、alltoall_test、alltoallvc_test、broadcast_test命令。
+    - 仅支持执行reduce_scatter_test、reduce_scatterv_test、all_gather_test、all_gatherv_test、all_reduce_test、alltoall_test、alltoallvc_test、broadcast_test、scatter_test、reduce_test命令。
       关于通信算子展开模式的详细说明可参见HCCL_OP_EXPANSION_MODE环境变量。
     - 仅支持URMA通信场景。
   - 针对Atlas A3系列产品：

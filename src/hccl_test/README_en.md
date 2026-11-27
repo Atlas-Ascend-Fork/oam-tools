@@ -234,7 +234,7 @@ HCCL Test supports three memory management modes:
 |------|------|-------------|---------|
 | **Standard mode** | `-z 0 -m 0` | `aclrtMalloc` allocates send_buff and recv_buff separately | All operators |
 | **Zero copy mode** | `-z 1` | `aclrtReserveMemAddress` reserves virtual address → `aclrtMallocPhysical` + `aclrtMapMem` maps physical memory → `HcclCommActivateCommMemory` activates → send/recv offset from same virtual address range | AllGather / ReduceScatter / Broadcast / AllReduce |
-| **Symmetric memory mode** | `-m 1` | `hccl_mem_alloc` allocates physical memory → `HcclCommSymWinRegister` registers symmetric window → send/recv offset from same address | For Ascend 950PR/Ascend 950DT: AllGather / ReduceScatter / Broadcast / AllReduce / AlltoAll / AlltoAllVC <br>For Atlas A3 training series products/Atlas A3 inference series products: AllGather / ReduceScatter / AllReduce / AlltoAll |
+| **Symmetric memory mode** | `-m 1` | `hccl_mem_alloc` allocates physical memory → `HcclCommSymWinRegister` registers symmetric window → send/recv offset from same address | For Ascend 950PR/Ascend 950DT: AllGather / AllGatherV / ReduceScatter / ReduceScatterV / Broadcast / Reduce / AllReduce / AlltoAll / AlltoAllVC / Scatter <br>For Atlas A3 training series products/Atlas A3 inference series products: AllGather / ReduceScatter / AllReduce / AlltoAll |
 
 > Zero copy and symmetric memory cannot be enabled simultaneously.
 
