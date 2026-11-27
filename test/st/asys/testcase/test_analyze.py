@@ -675,9 +675,8 @@ class TestAnalyze(AssertTest):
             st_root_path, "data/coredump/coredump_reg_info.txt"
         )
         p = PopenMock()
-        stdout = open(coredump_file, "r", encoding="utf-8")
         self.assertTrue(True)
-        try:
+        with open(coredump_file, "r", encoding="utf-8") as stdout:
             p.stdout = stdout
 
             mocker.patch("subprocess.Popen", return_value=p)
@@ -688,8 +687,6 @@ class TestAnalyze(AssertTest):
                 ["#0 0x7f05887750a3 0x7f058876a000 xxxx.so"],
                 q_reg_info,
             )
-        finally:
-            stdout.close()
         reg_info = q_reg_info.get()
         self.assertTrue(
             reg_info
@@ -729,10 +726,10 @@ class TestAnalyze(AssertTest):
             st_root_path, "data/coredump/coredump_reg_info.txt"
         )
         p = PopenMock()
-        stdout = open(coredump_file, "r", encoding="utf-8")
-        p.stdout = stdout
-        mocker.patch("subprocess.Popen", return_value=p)
-        reg_1 = obj.get_threads_stacks_reg_info()
+        with open(coredump_file, "r", encoding="utf-8") as stdout:
+            p.stdout = stdout
+            mocker.patch("subprocess.Popen", return_value=p)
+            reg_1 = obj.get_threads_stacks_reg_info()
         self.assertTrue(
             reg_1 == {"Thread 1 (21240)": ["0x7ffeef83dc20", "0x7ffeef83dcf0", "0x0"]}
         )
