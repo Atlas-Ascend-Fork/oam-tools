@@ -30,6 +30,8 @@
 #include "application_tool.h"
 #include "platform/platform_tool.h"
 #include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <memory>
@@ -179,6 +181,8 @@ TEST_F(RUNNING_MODE_UTEST, GetOutputDirInfoFromRecord)
     Utils::CreateDir(result);
     std::ofstream out;
     out.open(result + '/' + "1_" + OUTPUT_RECORD);
+    Utils::CreateDir(result + "/PROF_000001_20211211194055303_DANEQIJKACHMDGNB");
+    Utils::CreateDir(result + "/JOB44444444444");
     out << "PROF_000001_20211211194055303_DANEQIJKACHMDGNB" << std::endl << "JOB44444444444" << std::endl;
     out.close();
     EXPECT_EQ(PROFILING_SUCCESS, rMode.GetOutputDirInfoFromRecord());
@@ -187,6 +191,128 @@ TEST_F(RUNNING_MODE_UTEST, GetOutputDirInfoFromRecord)
     params->result_dir = "/tmp/profiling_output_r";
     EXPECT_EQ(PROFILING_FAILED, rMode.GetOutputDirInfoFromRecord());
     Utils::RemoveDir(result);
+}
+
+TEST_F(RUNNING_MODE_UTEST, GetOutputDirInfoFromRecordRejectInvalidInput)
+{
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    MOCKER(Utils::GetPid).stubs().will(returnValue(1));
+    const std::string result = "/tmp/running_mode_record_invalid_ut";
+    const std::string profDir = "PROF_000001_20211211194055303_DANEQIJKACHMDGNB";
+    const std::string record = result + "/1_" + OUTPUT_RECORD;
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result + "/" + profDir;
+    (void)system(prepare.c_str());
+
+    const std::vector<std::string> invalidContents = {"../evil", "/absolute/path", "a/b", ".", "..", "", "\n"};
+    for (const auto& content : invalidContents) {
+        std::ofstream out(record);
+        out << content;
+        out.close();
+        params->result_dir = result;
+        rMode.jobResultDir_.clear();
+        rMode.jobResultDirList_.clear();
+        EXPECT_EQ(PROFILING_FAILED, rMode.GetOutputDirInfoFromRecord()) << "content: [" << content << "]";
+        EXPECT_TRUE(Utils::IsFileExist(record));
+    }
+
+    std::ofstream out(record);
+    out << "invalid\n" << profDir << "\n";
+    out.close();
+    params->result_dir = result;
+    rMode.jobResultDir_.clear();
+    rMode.jobResultDirList_.clear();
+    EXPECT_EQ(PROFILING_SUCCESS, rMode.GetOutputDirInfoFromRecord());
+    EXPECT_EQ(1U, rMode.jobResultDirList_.size());
+    EXPECT_FALSE(Utils::IsFileExist(record));
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, GetOutputDirInfoFromRecordRejectSoftLink)
+{
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    MOCKER(Utils::GetPid).stubs().will(returnValue(1));
+    const std::string result = "/tmp/running_mode_record_link_ut";
+    const std::string profDir = "PROF_000001_20211211194055303_DANEQIJKACHMDGNB";
+    const std::string target = result + "/target";
+    const std::string record = result + "/1_" + OUTPUT_RECORD;
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result + "/" + profDir;
+    (void)system(prepare.c_str());
+    std::ofstream targetFile(target);
+    targetFile << profDir << std::endl;
+    targetFile.close();
+    ASSERT_EQ(0, symlink(target.c_str(), record.c_str()));
+
+    params->result_dir = result;
+    EXPECT_EQ(PROFILING_FAILED, rMode.GetOutputDirInfoFromRecord());
+    EXPECT_TRUE(Utils::IsFileExist(target));
+
+    (void)unlink(record.c_str());
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, GetOutputDirInfoFromRecordRejectFifo)
+{
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    MOCKER(Utils::GetPid).stubs().will(returnValue(1));
+    const std::string result = "/tmp/running_mode_record_fifo_ut";
+    const std::string record = result + "/1_" + OUTPUT_RECORD;
+    const std::string cleanup = "rm -rf " + result;
+    (void)system((cleanup + " && mkdir -p " + result).c_str());
+    ASSERT_EQ(0, mkfifo(record.c_str(), 0600));
+
+    params->result_dir = result;
+    EXPECT_EQ(PROFILING_FAILED, rMode.GetOutputDirInfoFromRecord());
+
+    (void)unlink(record.c_str());
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, WriteFileRejectsFifoAndSoftLink)
+{
+    const std::string result = "/tmp/write_file_secure_tool_ut";
+    const std::string record = result + "/record";
+    const std::string target = result + "/target";
+    const std::string profName = "PROF_000001_20220222182700493_BABQCAKDOMCOLMJB\n";
+    const std::string cleanup = "rm -rf " + result;
+    (void)system((cleanup + " && mkdir -p " + result).c_str());
+    ASSERT_EQ(0, mkfifo(record.c_str(), 0600));
+    EXPECT_EQ(PROFILING_FAILED, WriteFile(record, "record", profName));
+    (void)unlink(record.c_str());
+
+    std::ofstream targetFile(target);
+    targetFile << "victim data" << std::endl;
+    targetFile.close();
+    ASSERT_EQ(0, symlink(target.c_str(), record.c_str()));
+    EXPECT_EQ(PROFILING_FAILED, WriteFile(record, "record", profName));
+    EXPECT_EQ("victim data\n", [&target]() {
+        std::ifstream input(target);
+        return std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    }());
+
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, WriteFileSecureAppend)
+{
+    GlobalMockObject::verify();
+    const std::string result = "/tmp/write_file_secure_append_tool_ut";
+    const std::string record = result + "/record";
+    const std::string profName = "PROF_000001_20220222182700493_BABQCAKDOMCOLMJB\n";
+    const std::string cleanup = "rm -rf " + result;
+    (void)system((cleanup + " && mkdir -p " + result).c_str());
+
+    EXPECT_EQ(PROFILING_SUCCESS, WriteFile(record, "record", profName));
+    EXPECT_EQ(PROFILING_SUCCESS, WriteFile(record, "record", profName));
+    std::ifstream input(record);
+    const std::string content((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(profName + profName, content);
+
+    (void)system(cleanup.c_str());
 }
 
 int32_t g_remove = 0;
@@ -872,13 +998,24 @@ TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasksTreatsUserQuitDuringExportAsSucces
     std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
     Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
     _app_mode_for_quit = &rMode;
-    rMode.jobResultDirList_.insert("PROF");
+    const std::string result = "/tmp/running_mode_app_quit_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result;
+    (void)system(prepare.c_str());
+    rMode.jobResultDirList_.insert(result);
     MOCKER_CPP(&AppMode::StartAppTask).stubs().will(returnValue(PROFILING_SUCCESS));
     MOCKER_CPP(&AppMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
     MOCKER_CPP(&AppMode::StartExportTask).stubs().will(invoke(_set_quit_and_return_failed));
 
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     _app_mode_for_quit = nullptr;
+    (void)system(cleanup.c_str());
+}
+
+static int _replace_app_result_dir_with_query_link()
+{
+    (void)system("rm -rf /tmp/running_mode_app_query_secure_ut && ln -s /etc /tmp/running_mode_app_query_secure_ut");
+    return PROFILING_SUCCESS;
 }
 
 TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasksPropagatesExportFailure)
@@ -900,13 +1037,25 @@ TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasksTreatsUserQuitDuringExportAsSuc
     std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
     Collector::Dvvp::Msprofbin::SystemMode rMode("system", params);
     _system_mode_for_quit = &rMode;
-    rMode.jobResultDirList_.insert("PROF");
+    const std::string result = "/tmp/running_mode_system_quit_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result;
+    (void)system(prepare.c_str());
+    rMode.jobResultDirList_.insert(result);
     MOCKER_CPP(&SystemMode::StartSysTaskByProfApi).stubs().will(returnValue(PROFILING_SUCCESS));
     MOCKER_CPP(&SystemMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
     MOCKER_CPP(&SystemMode::StartExportTask).stubs().will(invoke(_set_system_quit_and_return_failed));
 
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     _system_mode_for_quit = nullptr;
+    (void)system(cleanup.c_str());
+}
+
+static int _replace_system_result_dir_with_query_link()
+{
+    (void)system(
+        "rm -rf /tmp/running_mode_system_query_secure_ut && ln -s /etc /tmp/running_mode_system_query_secure_ut");
+    return PROFILING_SUCCESS;
 }
 
 static int _get_cmd_print_info(
@@ -986,7 +1135,11 @@ TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasks)
     Collector::Dvvp::Msprofbin::AppMode rMode("app", nullptr);
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     rMode.params_ = params;
-    rMode.jobResultDirList_.insert("PROF");
+    const std::string result = "/tmp/running_mode_app_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result;
+    (void)system(prepare.c_str());
+    rMode.jobResultDirList_.insert(result);
     MOCKER_CPP(&AppMode::StartAppTask).stubs().will(returnValue(PROFILING_FAILED)).then(returnValue(PROFILING_SUCCESS));
     MOCKER_CPP(&AppMode::CheckAnalysisEnv)
         .stubs()
@@ -1007,6 +1160,27 @@ TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasks)
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     rMode.jobResultDirList_.clear();
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasksRejectsChangedResultDirBeforeQuery)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::AppMode rMode("app", params);
+    MOCKER(Utils::GetPid).stubs().will(returnValue(1));
+    const std::string result = "/tmp/running_mode_app_query_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    (void)system((cleanup + " && mkdir -p " + result).c_str());
+    rMode.jobResultDirList_.insert(result);
+    MOCKER_CPP(&AppMode::StartAppTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&AppMode::StartExportTask).stubs().will(invoke(_replace_app_result_dir_with_query_link));
+    MOCKER_CPP(&AppMode::StartQueryTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
+    EXPECT_EQ(0, system(("rm " + result + " && test ! -e " + result + " || test -L " + result).c_str()));
+
+    (void)system(cleanup.c_str());
 }
 
 TEST_F(RUNNING_MODE_UTEST, AppModeRunModeTasksPropagatesExportFailure)
@@ -1215,7 +1389,11 @@ TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasks)
     EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
     rMode.params_ = params;
     rMode.params_->ai_core_profiling = "on";
-    rMode.jobResultDirList_.insert("PROF");
+    const std::string result = "/tmp/running_mode_system_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    const std::string prepare = cleanup + " && mkdir -p " + result;
+    (void)system(prepare.c_str());
+    rMode.jobResultDirList_.insert(result);
     MOCKER_CPP(&SystemMode::StartSysTaskByProfApi)
         .stubs()
         .will(returnValue(PROFILING_FAILED))
@@ -1242,6 +1420,28 @@ TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasks)
     EXPECT_EQ(PROFILING_SUCCESS, rMode.RunModeTasks());
     EXPECT_EQ("on", rMode.params_->aiv_profiling);
     EXPECT_EQ("sample-based", rMode.params_->aiv_profiling_mode);
+    (void)system(cleanup.c_str());
+}
+
+TEST_F(RUNNING_MODE_UTEST, SystemModeRunModeTasksRejectsChangedResultDirBeforeQuery)
+{
+    GlobalMockObject::verify();
+    std::shared_ptr<analysis::dvvp::message::ProfileParams> params(new analysis::dvvp::message::ProfileParams);
+    Collector::Dvvp::Msprofbin::SystemMode rMode("system", params);
+    MOCKER(Utils::GetPid).stubs().will(returnValue(1));
+    rMode.params_->ai_core_profiling = "on";
+    const std::string result = "/tmp/running_mode_system_query_secure_ut";
+    const std::string cleanup = "rm -rf " + result;
+    (void)system((cleanup + " && mkdir -p " + result).c_str());
+    rMode.jobResultDirList_.insert(result);
+    MOCKER_CPP(&SystemMode::StartSysTaskByProfApi).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::CheckAnalysisEnv).stubs().will(returnValue(PROFILING_SUCCESS));
+    MOCKER_CPP(&SystemMode::StartExportTask).stubs().will(invoke(_replace_system_result_dir_with_query_link));
+    MOCKER_CPP(&SystemMode::StartQueryTask).stubs().will(returnValue(PROFILING_SUCCESS));
+    EXPECT_EQ(PROFILING_FAILED, rMode.RunModeTasks());
+    EXPECT_EQ(0, system(("rm " + result + " && test ! -e " + result + " || test -L " + result).c_str()));
+
+    (void)system(cleanup.c_str());
 }
 
 TEST_F(RUNNING_MODE_UTEST, SystemModeStartSysTaskByProfApi)

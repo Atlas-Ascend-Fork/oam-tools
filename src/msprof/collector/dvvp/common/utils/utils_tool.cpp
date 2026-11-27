@@ -16,6 +16,7 @@
 #include "utils_tool.h"
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -30,6 +31,9 @@
 #include "cmd_log/cmd_log_tool.h"
 #if (defined(linux) || defined(__linux__))
 #include <sys/file.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace analysis {
@@ -1373,7 +1377,62 @@ int32_t Utils::DumpFile(const std::string& output, CONST_CHAR_PTR data, std::siz
 
 int32_t WriteFile(const std::string& absolutePath, const std::string& recordFile, const std::string& profName)
 {
-#if (defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER))
+#if (defined(linux) || defined(__linux__))
+    if (absolutePath.empty() || recordFile.empty() || profName.empty()) {
+        MSPROF_LOGE("Record file path, name or content is empty");
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+    constexpr mode_t RECORD_FILE_MODE = 0640;
+    const int32_t fd = open(
+        absolutePath.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY,
+        RECORD_FILE_MODE);
+    if (fd < 0) {
+        const int32_t openErrno = errno;
+        MSPROF_LOGE("Failed to open %s, errno=%d, err=%s", recordFile.c_str(), openErrno, strerror(openErrno));
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) != 0 || !S_ISREG(fileStat.st_mode) || fileStat.st_uid != geteuid()) {
+        (void)close(fd);
+        MSPROF_LOGE("Record file %s is invalid", recordFile.c_str());
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+    const int32_t flags = fcntl(fd, F_GETFL);
+    const uint32_t flagsToSet = static_cast<uint32_t>(flags) & ~static_cast<uint32_t>(O_NONBLOCK);
+    const int32_t newFlags = flags < 0 ? 0 : fcntl(fd, F_SETFL, static_cast<int32_t>(flagsToSet));
+    if (flags < 0 || newFlags != 0) {
+        const int32_t flagsErrno = errno;
+        (void)close(fd);
+        MSPROF_LOGE(
+            "Failed to reset flags for %s, errno=%d, err=%s", recordFile.c_str(), flagsErrno, strerror(flagsErrno));
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+    if (fchmod(fd, RECORD_FILE_MODE) != 0) {
+        (void)close(fd);
+        MSPROF_LOGE("Failed to change mode for %s", recordFile.c_str());
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+    size_t writeSize = 0;
+    while (writeSize < profName.size()) {
+        const ssize_t onceSize = write(fd, profName.data() + writeSize, profName.size() - writeSize);
+        if (onceSize < 0 && errno == EINTR) {
+            continue;
+        }
+        if (onceSize <= 0) {
+            const int32_t writeErrno = errno;
+            (void)close(fd);
+            MSPROF_LOGE("Failed to write %s, errno=%d, err=%s", recordFile.c_str(), writeErrno, strerror(writeErrno));
+            return analysis::dvvp::common::error::PROFILING_FAILED;
+        }
+        writeSize += static_cast<size_t>(onceSize);
+    }
+    if (close(fd) != 0) {
+        MSPROF_LOGE("Failed to close %s", recordFile.c_str());
+        return analysis::dvvp::common::error::PROFILING_FAILED;
+    }
+    return analysis::dvvp::common::error::PROFILING_SUCCESS;
+#elif (defined(_WIN32) || defined(_WIN64) || defined(_MSC_VER))
     return analysis::dvvp::common::error::PROFILING_SUCCESS;
 #else
     FILE* file;
