@@ -86,6 +86,7 @@ docker run --ulimit nofile=8192 ...
 
 ```sh
 msprof --output=/home/projects/output --host-sys=cpu /home/projects/MyApp/out/main
+```
 
 采集Host侧调度和中断事件（ftrace），采集窗口为5秒：
 
