@@ -17,7 +17,7 @@
 # ----------------------------------------------------------------------------
 
 import sys
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 import numpy as np
@@ -83,12 +83,13 @@ def _tar_member(name, sym=False, lnk=False, dev=False, fifo=False):
 
 
 def test_extract_tar(mocker):
-    fake_tar = Mock()
+    fake_tar = MagicMock()
+    fake_tar.__enter__.return_value = fake_tar
     fake_tar.getmembers.return_value = [_tar_member("data/a.txt")]
     mocker.patch("tarfile.open", return_value=fake_tar)
     msaicerr.extract_tar("a.tar", "/dest")
     assert fake_tar.extractall.called
-    assert fake_tar.close.called
+    assert fake_tar.__exit__.called
 
 
 def test_extract_tar_skips_path_traversal_and_links(mocker):
@@ -96,13 +97,14 @@ def test_extract_tar_skips_path_traversal_and_links(mocker):
     escaping = _tar_member("../../etc/passwd")
     symlink = _tar_member("data/evil", sym=True)
     hardlink = _tar_member("data/evil2", lnk=True)
-    fake_tar = Mock()
+    fake_tar = MagicMock()
+    fake_tar.__enter__.return_value = fake_tar
     fake_tar.getmembers.return_value = [normal, escaping, symlink, hardlink]
     mocker.patch("tarfile.open", return_value=fake_tar)
     msaicerr.extract_tar("a.tar", "/dest")
     # 只有目标目录内的普通文件被解压，逃逸成员与链接类成员全部丢弃。
     assert fake_tar.extractall.call_args.kwargs["members"] == [normal]
-    assert fake_tar.close.called
+    assert fake_tar.__exit__.called
 
 
 def test_extract_tar_skips_absolute_path_and_special_files(mocker):
@@ -110,7 +112,8 @@ def test_extract_tar_skips_absolute_path_and_special_files(mocker):
     absolute = _tar_member("/etc/passwd")
     device = _tar_member("data/dev_node", dev=True)
     fifo = _tar_member("data/pipe", fifo=True)
-    fake_tar = Mock()
+    fake_tar = MagicMock()
+    fake_tar.__enter__.return_value = fake_tar
     fake_tar.getmembers.return_value = [normal, absolute, device, fifo]
     mocker.patch("tarfile.open", return_value=fake_tar)
     msaicerr.extract_tar("a.tar", "/dest")

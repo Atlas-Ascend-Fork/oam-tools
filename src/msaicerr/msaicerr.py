@@ -74,11 +74,8 @@ def safe_tar_members(tar, tar_file, path):
 
 
 def extract_tar(tar_file, path):
-    tar = tarfile.open(tar_file, "r")
-    try:
+    with tarfile.open(tar_file, "r") as tar:
         tar.extractall(path, members=safe_tar_members(tar, tar_file, path))
-    finally:
-        tar.close()
 
 
 def get_select_dir(path):
