@@ -159,7 +159,7 @@ This section describes only the common parameters of the Open MPI tool. For more
   - Only the scenario where the communication operator expansion mode is AI CPU is supported.
   - For the Ascend 950PR&950DT products:
     - Only intra-supernode communication is supported.
-    - Only the reduce_scatter_test, all_gather_test, all_reduce_test, alltoall_test, alltoallvc_test, and broadcast_test commands are supported.
+    - Only the reduce_scatter_test, reduce_scatterv_test, all_gather_test, all_gatherv_test, all_reduce_test, alltoall_test, alltoallvc_test, broadcast_test, scatter_test, and reduce_test commands are supported.
       For details about the communication operator expansion mode, see the HCCL_OP_EXPANSION_MODE environment variable.
     - Only the URMA communication scenario is supported.
   - For the Atlas A3 products:

@@ -234,7 +234,7 @@ HCCL Test支持三种内存管理模式：
 |------|------|-------------|---------|
 | **标准模式** | `-z 0 -m 0` | `aclrtMalloc`分别分配send_buff与recv_buff | 所有算子 |
 | **零拷贝模式** | `-z 1` | `aclrtReserveMemAddress`预留虚拟地址 → `aclrtMallocPhysical` + `aclrtMapMem`映射物理内存 → `HcclCommActivateCommMemory`激活 → send/recv从同一虚拟地址区间偏移 | AllGather / ReduceScatter / Broadcast / AllReduce |
-| **对称内存模式** | `-m 1` | `hccl_mem_alloc`分配物理内存 → `HcclCommSymWinRegister`注册对称窗口 → send/recv从同一地址偏移 | 针对Ascend 950PR/Ascend 950DT：AllGather / ReduceScatter / Broadcast / AllReduce / AlltoAll / AlltoAllVC <br>针对Atlas A3训练系列产品/Atlas A3 推理系列产品：AllGather / ReduceScatter / AllReduce / AlltoAll |
+| **对称内存模式** | `-m 1` | `hccl_mem_alloc`分配物理内存 → `HcclCommSymWinRegister`注册对称窗口 → send/recv从同一地址偏移 | 针对Ascend 950PR/Ascend 950DT：AllGather / AllGatherV / ReduceScatter / ReduceScatterV / Broadcast / Reduce / AllReduce / AlltoAll / AlltoAllVC / Scatter <br>针对Atlas A3训练系列产品/Atlas A3 推理系列产品：AllGather / ReduceScatter / AllReduce / AlltoAll |
 
 > 零拷贝与对称内存不可同时启用。
 
