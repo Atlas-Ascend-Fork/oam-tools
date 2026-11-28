@@ -1953,6 +1953,52 @@ TEST_F(INPUT_PARSER_UTEST, UseInstrProfilingWarnsDeprecated)
     EXPECT_EQ(1000, parser.params_->instrProfilingFreq);
 }
 
+// 退出码契约（#395）：-h 与 --help 等价——都打印帮助、解析结果标记为
+// help-only，main 侧据此返回 0 且不进入采集流程。
+TEST_F(INPUT_PARSER_UTEST, ShortHelpMatchesLongHelpContract)
+{
+    GlobalMockObject::verify();
+    RefreshArgsManagerForTest();
+    // help 条目只在 ArgsManager 构造函数尾部加入，不随 AddArgs() 恢复，须补回
+    ArgsManager::instance()->argsList_.push_back({"help", "help message. Short option: -h."});
+    InputParser parser = InputParser();
+    const char* longArgv[] = {"msprof", "--help"};
+    std::ostringstream longHelpOutput;
+    auto* oldBuffer = std::cout.rdbuf(longHelpOutput.rdbuf());
+    optind = 0;
+    auto longParams = parser.MsprofGetOpts(2, longArgv);
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_NE(nullptr, longParams);
+    EXPECT_TRUE(parser.HasHelpParamOnly());
+    EXPECT_NE(std::string::npos, longHelpOutput.str().find("--help"));
+
+    GlobalMockObject::verify();
+    InputParser shortParser = InputParser();
+    const char* shortArgv[] = {"msprof", "-h"};
+    std::ostringstream shortHelpOutput;
+    oldBuffer = std::cout.rdbuf(shortHelpOutput.rdbuf());
+    optind = 0;
+    auto shortParams = shortParser.MsprofGetOpts(2, shortArgv);
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_NE(nullptr, shortParams);
+    EXPECT_TRUE(shortParser.HasHelpParamOnly());
+    EXPECT_NE(std::string::npos, shortHelpOutput.str().find("--help"));
+}
+
+TEST_F(INPUT_PARSER_UTEST, HasHelpParamOnlySemantics)
+{
+    GlobalMockObject::verify();
+    InputParser parser = InputParser();
+    EXPECT_FALSE(parser.HasHelpParamOnly());
+    parser.params_->usedParams.insert(ARGS_HELP);
+    EXPECT_TRUE(parser.HasHelpParamOnly());
+    parser.params_->usedParams.insert(ARGS_OUTPUT);
+    EXPECT_FALSE(parser.HasHelpParamOnly());
+    parser.params_->usedParams.clear();
+    parser.params_->usedParams.insert(ARGS_OUTPUT);
+    EXPECT_FALSE(parser.HasHelpParamOnly());
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------

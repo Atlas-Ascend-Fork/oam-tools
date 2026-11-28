@@ -78,6 +78,39 @@ TEST_F(MSPROF_BIN_UTEST, LltMain)
     EXPECT_EQ(PROFILING_FAILED, LltMain(SYS_ARGC, argv, envp));
 }
 
+// 退出码契约（#395）：-h / --help 均返回 SUCCESS(0)。help-only 若误入
+// 采集流程，MsprofManager::Init 会失败并返回 FAILED，本用例即转红。
+// getopt 状态（optind/nextchar）是进程级全局的，多次调用 LltMain 前须
+// 重置，否则会接着上次调用残留的位置解析本次 argv 而越界。
+TEST_F(MSPROF_BIN_UTEST, LltMainHelpOnlyReturnsSuccessWithoutProfiling)
+{
+    GlobalMockObject::verify();
+    // 帮助文本取自 ArgsManager 单例的 argsList_：help 条目只在构造函数尾部
+    // 加入，前置用例把列表清成平台子集后不会随 AddArgs() 恢复，须显式补回
+    ArgsManager::instance()->argsList_.clear();
+    ArgsManager::instance()->AddArgs();
+    ArgsManager::instance()->argsList_.push_back({"help", "help message. Short option: -h."});
+    const char* argv[ARGS_CAPACITY];
+    argv[BASIC_ENV_INDEX] = "msprof";
+    const char* envp[] = {"test=a", "a=b", nullptr};
+
+    argv[SECOND_ENV_INDEX] = "--help";
+    std::ostringstream longHelpOutput;
+    auto* oldBuffer = std::cout.rdbuf(longHelpOutput.rdbuf());
+    optind = 0;
+    EXPECT_EQ(PROFILING_SUCCESS, LltMain(2, argv, envp));
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_NE(std::string::npos, longHelpOutput.str().find("--help"));
+
+    argv[SECOND_ENV_INDEX] = "-h";
+    std::ostringstream shortHelpOutput;
+    oldBuffer = std::cout.rdbuf(shortHelpOutput.rdbuf());
+    optind = 0;
+    EXPECT_EQ(PROFILING_SUCCESS, LltMain(2, argv, envp));
+    std::cout.rdbuf(oldBuffer);
+    EXPECT_NE(std::string::npos, shortHelpOutput.str().find("--help"));
+}
+
 TEST_F(MSPROF_BIN_UTEST, SetEnvList)
 {
     GlobalMockObject::verify();

@@ -104,7 +104,7 @@ You can pass the user program and its related parameters, for example:
 
     When this parameter is not configured, if the available disk space is less than 20 MB before collection, the data is not written to the disk.
 
-- --help: Optional. Help prompt parameter.
+- --help / -h: Optional. Help prompt parameter.
 
 <!-- npu="950,A3,910b,910,310p,310b" id3 -->
 ## Usage Example

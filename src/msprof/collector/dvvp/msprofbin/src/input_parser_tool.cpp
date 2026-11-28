@@ -869,14 +869,14 @@ SHARED_PTR_ALIA<analysis::dvvp::message::ProfileParams> InputParser::MsprofGetOp
     int32_t opt = 0;
     int32_t optionIndex = 0;
     bool setOutput = false;
-    MsprofString optString = "";
+    MsprofString optString = "h";
     struct MsprofCmdInfo cmdInfo = {{nullptr}};
     while (
         (opt = OsalGetOptLong(argCount, const_cast<MsprofStrBufAddrT>(argv), optString, LONG_OPTIONS, &optionIndex)) !=
         MSPROF_DAEMON_ERROR) {
-        if (opt == ARGS_HELP) {
+        if (opt == ARGS_HELP || opt == 'h') {
             params_->usedParams.clear();
-            params_->usedParams.insert(opt);
+            params_->usedParams.insert(ARGS_HELP);
             MsprofCmdUsage("");
             return params_;
         }
@@ -935,6 +935,10 @@ void InputParser::SplitApplicationArgv(int32_t argc, CONST_CHAR_PTR argv[], int3
                 argCount += argWithSpaceNum;
                 i++;
             }
+        } else if (std::strcmp(argv[i], "-h") == 0) {
+            // -h 是 msprof 自身的短帮助参数，须计入 msprof 参数段；
+            // 其余单横线开头的参数仍按 app 参数段处理
+            argCount++;
         } else {
             for (; i < argc; i++) {
                 params_->application.emplace_back(argv[i]);
@@ -2909,7 +2913,7 @@ ArgsManager::ArgsManager()
                                 "\t\t\t\t\t\t   The switch is only applicable when parameter msproftx is set to on;\n"
                                 "\t\t\t\t\t\t   The switch cannot be set with mstx-domain-include at the same time."}};
     AddArgs();
-    Args help = {"help", "help message."};
+    Args help = {"help", "help message. Short option: -h."};
     argsList_.push_back(help);
 }
 
